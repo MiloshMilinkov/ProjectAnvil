@@ -1,17 +1,17 @@
-# Forgeboard — local workspace
+# ProjectAnvil — local workspace
 
-A browser workspace for game development: plan tasks, build worlds, and connect the thinking behind the work. This copy runs on your PC at **http://127.0.0.1:5173**.
+A browser workspace for projects, tasks, notes, and everyday planning. Connect ideas, organize responsibilities, and keep track of progress. This copy runs on your PC at **http://127.0.0.1:5173**.
 
-## Open Forgeboard
+## Open ProjectAnvil
 
-1. Open `D:\Forgeboard` in File Explorer.
-2. Double-click **Start Forgeboard.cmd**.
+1. Open `D:\ProjectAnvil` in File Explorer.
+2. Double-click **Start ProjectAnvil.cmd**.
 3. Wait for your browser to open at **http://127.0.0.1:5173**. You can also type that address into your browser.
-4. Keep the Forgeboard console window open while using the app.
+4. Keep the ProjectAnvil console window open while using the app.
 
-To stop Forgeboard, save your work, wait for any saving indicator to finish, then press **Ctrl+C** in the console window. Confirm terminating the batch job if Windows asks. Closing the browser tab alone does not stop the app. Double-click the launcher again whenever you want to reopen it. It is not configured to start with Windows.
+To stop ProjectAnvil, save your work, wait for any saving indicator to finish, then press **Ctrl+C** in the console window. Confirm terminating the batch job if Windows asks. Closing the browser tab alone does not stop the app. Double-click the launcher again whenever you want to reopen it. It is not configured to start with Windows.
 
-The launcher checks whether Forgeboard is already running before starting another copy. It uses a fixed port and will not stop a different application using that port.
+The launcher checks whether ProjectAnvil is already running before starting another copy. It uses a fixed port and will not stop a different application using that port.
 
 **This address works on this PC only.** Other people and other devices cannot connect to it. You can use every feature as a guest. Add optional people labels to assign tasks, and filter assignments from the task board. No user accounts are required. You can use another browser on this PC to open the same workspace. Preferences such as appearance and tour completion are saved separately in each browser.
 
@@ -22,18 +22,18 @@ Installed dependencies are already present on this PC. Normal use does not need 
 The local database and uploaded attachment files are kept together under:
 
 ```text
-D:\Forgeboard\.wrangler\state
+D:\ProjectAnvil\.wrangler\state
 ```
 
 **Do not delete `.wrangler` when cleaning or moving the project.** Do not delete or reinitialize the local database to fix a startup issue.
 
 To make a complete backup:
 
-1. Stop Forgeboard with Ctrl+C and wait for the server to exit.
+1. Stop ProjectAnvil with Ctrl+C and wait for the server to exit.
 2. Copy the entire `.wrangler\state` folder to a dated backup folder on another drive.
-3. Preserve the `D:\Forgeboard` project files too if you want a ready-to-run backup, including its hidden folders. Keep the copy of `.wrangler\state` with the matching project version.
+3. Preserve the `D:\ProjectAnvil` project files too if you want a ready-to-run backup, including its hidden folders. Keep the copy of `.wrangler\state` with the matching project version.
 
-To restore a backup, first stop the app. Preserve a copy of the current state before replacing it with the backed-up `.wrangler\state` folder, then start Forgeboard again. Do not merge individual database files between backups.
+To restore a backup, first stop the app. Preserve a copy of the current state before replacing it with the backed-up `.wrangler\state` folder, then start ProjectAnvil again. Do not merge individual database files between backups.
 
 You can also use **Workspace settings → Export workspace** for a readable JSON backup of notes, tasks, discussions, people, projects, and canvas layouts. **That JSON does not contain uploaded files.** A full `.wrangler\state` backup preserves the files too. Import replaces the workspace records after confirmation, so export before importing.
 
@@ -41,8 +41,8 @@ The former hosted app and this local copy used separate databases and attachment
 
 The transition backups are kept in:
 
-- `D:\Forgeboard\backups\online-2026-10-19`: the online workspace snapshot and downloaded media files.
-- `D:\Forgeboard\backups\local-before-online-import-2026-10-19`: a copy of the earlier local state preserved before restoring online records locally.
+- `D:\ProjectAnvil\backups\online-2026-10-19`: the online workspace snapshot and downloaded media files.
+- `D:\ProjectAnvil\backups\local-before-online-import-2026-10-19`: a copy of the earlier local state preserved before restoring online records locally.
 
 Keep these backups. The online archive is separate from the active local database; subsequent edits do not update it.
 
@@ -56,6 +56,10 @@ Keep these backups. The online archive is separate from the active local databas
 - **Attachments and history:** upload images, PDFs, audio, and video. Record audio with microphone permission and a supported browser. Note changes save automatically, and history can restore earlier content.
 
 New workspaces start empty: no example projects, people, tasks, notes, saved filters, or canvases. Create only what you need. Move or delete a project's notes and tasks before deleting the project.
+
+## Templates for work and everyday life
+
+Choose from 14 templates: Blank note, Project brief, Weekly plan, Daily journal, Habit tracker, Workout log, Meal plan, Study notes, Personal budget, Trip planner, Worldbuilding, Character, Research, and Meeting. Search or filter by category when creating a note. Creative templates remain available alongside practical ones.
 
 ## Guest mode and guide
 
@@ -73,10 +77,10 @@ Choose **Light**, **Dark**, or **Current** from the top-bar appearance icon or *
 
 ## Troubleshooting
 
-- **Browser did not open:** type `http://127.0.0.1:5173` into your browser after the console reports that Forgeboard is ready.
+- **Browser did not open:** type `http://127.0.0.1:5173` into your browser after the console reports that ProjectAnvil is ready.
 - **Address will not load:** make sure the console is still open. Restart the launcher if it has stopped, and check its error message.
-- **Port 5173 already in use:** if another Forgeboard window is starting, wait for it. Otherwise close the program using that port before retrying. The launcher never kills other programs.
-- **Missing Node.js:** the launcher uses `C:\Program Files\nodejs\node.exe` and requires Node.js 22.13 or newer. Reinstalling Node does not require deleting your Forgeboard data.
+- **Port 5173 already in use:** if another ProjectAnvil window is starting, wait for it. Otherwise close the program using that port before retrying. The launcher never kills other programs.
+- **Missing Node.js:** the launcher uses `C:\Program Files\nodejs\node.exe` and requires Node.js 22.13 or newer. Reinstalling Node does not require deleting your ProjectAnvil data.
 - **Saving failed:** leave the tab open, read the error, and retry. Avoid closing the app until saving succeeds.
 - **Database or migration error:** preserve `.wrangler\state` and ask for help. Do not blindly rerun initial migrations against an existing database.
 
@@ -93,7 +97,7 @@ Choose **Light**, **Dark**, or **Current** from the top-bar appearance icon or *
 
 The app uses Node.js 22.13+, React, Vinext, and local emulation of D1 and R2. Those database and file services run on this PC for this setup. Its local database is already prepared; normal use does not require building or applying migrations.
 
-From `D:\Forgeboard` in a terminal, the manual equivalent of the launcher is:
+From `D:\ProjectAnvil` in a terminal, the manual equivalent of the launcher is:
 
 ```powershell
 & 'C:\Program Files\nodejs\node.exe' scripts\start-local.mjs

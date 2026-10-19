@@ -6,28 +6,42 @@ import type { FeatureProps, Media, Note, Workspace } from '../lib/types';
 import { today, uid } from '../lib/types';
 import Markdown from './Markdown';
 import './knowledge.css';
+import './templates.css';
 
 type Props=FeatureProps & {selectedNote:string;mode:'notes'|'daily';tourActive?:boolean;onSelectNote:(id:string)=>void};
 type Kind=Note['kind'];
 type EditableKey='title'|'content'|'folder'|'tags'|'projectId'|'kind'|'bookmarked'|'properties';
 const editableKeys:EditableKey[]=['title','content','folder','tags','projectId','kind','bookmarked','properties'];
 type LocalEdit={value:Note[EditableKey];version:number};
-const templates:{kind:Kind;label:string;description:string;folder:string;body:string}[]=[
-  {kind:'note',label:'Blank note',description:'Give a new idea room to grow.',folder:'Notes',body:'# Overview\n\n'},
-  {kind:'world',label:'Worldbuilding',description:'Places, histories, systems, and lore.',folder:'Worldbuilding',body:'# Overview\n\n## Atmosphere\n\n## History\n\n## Locations\n\n## Rules of the world\n\n## Open questions\n\n- [ ] Explore this idea\n'},
-  {kind:'character',label:'Character',description:'Make someone worth remembering.',folder:'Characters',body:'# Identity\n\n| Property | Detail |\n| --- | --- |\n| Role | |\n| Motivation | |\n| Home | |\n\n## Backstory\n\n## Personality\n\n## Relationships\n\n## Character arc\n'},
-  {kind:'research',label:'Research',description:'Sources, findings, and next steps.',folder:'Research',body:'# Question\n\n## Sources\n\n## Findings\n\n## Implications\n\n## Next steps\n\n- [ ] Review findings\n'},
-  {kind:'meeting',label:'Meeting',description:'Decisions that become action.',folder:'Meetings',body:'# Agenda\n\n- \n\n## Notes\n\n## Decisions\n\n## Action items\n\n- [ ] \n'},
-  {kind:'daily',label:'Daily journal',description:'A small plan for a good day.',folder:'Journal',body:'# Today’s focus\n\n- [ ] \n\n## Development log\n\n## Ideas & discoveries\n\n## End-of-day reflection\n'},
+type TemplateId='blank'|'project-brief'|'weekly-plan'|'daily-journal'|'habit-tracker'|'workout-log'|'meal-plan'|'study-notes'|'personal-budget'|'trip-planner'|'worldbuilding'|'character'|'research'|'meeting';
+const templateCategories=['General','Planning','Everyday','Wellbeing','Learning','Creative'] as const;
+type TemplateCategory=typeof templateCategories[number];
+const templates:{id:TemplateId;kind:Kind;label:string;description:string;category:TemplateCategory;folder:string;body:string}[]=[
+  {id:'blank',kind:'note',label:'Blank note',description:'A simple page for any idea.',category:'General',folder:'Notes',body:'# Overview\n\n'},
+  {id:'project-brief',kind:'note',label:'Project brief',description:'Define the goal, scope, and next steps.',category:'Planning',folder:'Projects',body:'# Project overview\n\n## Goal\n\n## What success looks like\n\n## Scope\n\n### Included\n\n- \n\n### Out of scope\n\n- \n\n## Milestones\n\n| Milestone | Target date | Owner | Status |\n| --- | --- | --- | --- |\n| | | | |\n\n## Risks & open questions\n\n## Next actions\n\n- [ ] \n'},
+  {id:'weekly-plan',kind:'note',label:'Weekly plan',description:'Priorities, commitments, and a weekly review.',category:'Planning',folder:'Planning',body:'# Week of\n\n## Main priorities\n\n- [ ] \n- [ ] \n- [ ] \n\n## Weekly schedule\n\n| Day | Focus | Commitments |\n| --- | --- | --- |\n| Monday | | |\n| Tuesday | | |\n| Wednesday | | |\n| Thursday | | |\n| Friday | | |\n| Saturday | | |\n| Sunday | | |\n\n## Notes & reminders\n\n## Weekly review\n\n### What went well\n\n### What to change next week\n'},
+  {id:'daily-journal',kind:'daily',label:'Daily journal',description:'Plan your day and reflect on it.',category:'Everyday',folder:'Journal',body:'# Today’s focus\n\n- [ ] \n\n## Activity log\n\n## Ideas & discoveries\n\n## End-of-day reflection\n'},
+  {id:'habit-tracker',kind:'note',label:'Habit tracker',description:'Track routines in a flexible weekly checklist.',category:'Everyday',folder:'Routines',body:'# Routine goals\n\n## Week of\n\n| Habit | Mon | Tue | Wed | Thu | Fri | Sat | Sun |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| | | | | | | | |\n| | | | | | | | |\n| | | | | | | | |\n\n## What helps me stay consistent\n\n## Obstacles & adjustments\n\n## Weekly reflection\n'},
+  {id:'workout-log',kind:'note',label:'Workout log',description:'Record your own sessions, progress, and reflections.',category:'Wellbeing',folder:'Fitness',body:'# Session details\n\n| Property | Detail |\n| --- | --- |\n| Date | |\n| Session focus | |\n| Location | |\n\n## Activity log\n\n| Exercise or activity | Sets | Repetitions | Duration | Notes |\n| --- | --- | --- | --- | --- |\n| | | | | |\n| | | | | |\n\n## How the session felt\n\n## Progress & observations\n\n## Notes for next time\n'},
+  {id:'meal-plan',kind:'note',label:'Meal plan',description:'Plan meals, groceries, and preparation.',category:'Wellbeing',folder:'Everyday',body:'# Week of\n\n## Preferences & practical needs\n\n## Meal ideas\n\n| Day | Breakfast | Lunch | Dinner | Other |\n| --- | --- | --- | --- | --- |\n| Monday | | | | |\n| Tuesday | | | | |\n| Wednesday | | | | |\n| Thursday | | | | |\n| Friday | | | | |\n| Saturday | | | | |\n| Sunday | | | | |\n\n## Grocery list\n\n- [ ] \n\n## Preparation & leftovers\n\n## Recipes & notes\n'},
+  {id:'study-notes',kind:'note',label:'Study notes',description:'Organize concepts, questions, and practice.',category:'Learning',folder:'Learning',body:'# Topic\n\n## Learning goals\n\n- [ ] \n\n## Key concepts\n\n## Notes & examples\n\n## Questions to revisit\n\n## Practice & review\n\n- [ ] \n\n## Sources & further reading\n'},
+  {id:'personal-budget',kind:'note',label:'Personal budget',description:'Keep planned and actual amounts in one place.',category:'Everyday',folder:'Personal',body:'# Budget period\n\n## Goals & reminders\n\n## Income\n\n| Source | Planned | Actual | Notes |\n| --- | --- | --- | --- |\n| | | | |\n\n## Spending\n\n| Category | Planned | Actual | Notes |\n| --- | --- | --- | --- |\n| | | | |\n| | | | |\n\n## Savings & upcoming costs\n\n## Period review\n'},
+  {id:'trip-planner',kind:'note',label:'Trip planner',description:'Bring bookings, itineraries, and packing together.',category:'Everyday',folder:'Travel',body:'# Trip overview\n\n| Property | Detail |\n| --- | --- |\n| Destination | |\n| Dates | |\n| Travelers | |\n\n## Bookings & important details\n\n## Itinerary\n\n| Date | Place or activity | Time | Notes |\n| --- | --- | --- | --- |\n| | | | |\n\n## Packing checklist\n\n- [ ] \n\n## Costs & reminders\n\n## Useful contacts & links\n'},
+  {id:'worldbuilding',kind:'world',label:'Worldbuilding',description:'Places, histories, systems, and lore.',category:'Creative',folder:'Worldbuilding',body:'# Overview\n\n## Atmosphere\n\n## History\n\n## Locations\n\n## Rules of the world\n\n## Open questions\n\n- [ ] Explore this idea\n'},
+  {id:'character',kind:'character',label:'Character',description:'Identity, motivations, and relationships.',category:'Creative',folder:'Characters',body:'# Identity\n\n| Property | Detail |\n| --- | --- |\n| Role | |\n| Motivation | |\n| Home | |\n\n## Backstory\n\n## Personality\n\n## Relationships\n\n## Character arc\n'},
+  {id:'research',kind:'research',label:'Research',description:'Sources, findings, and next steps.',category:'Learning',folder:'Research',body:'# Question\n\n## Sources\n\n## Findings\n\n## Implications\n\n## Next steps\n\n- [ ] Review findings\n'},
+  {id:'meeting',kind:'meeting',label:'Meeting',description:'Agendas, decisions, and follow-up actions.',category:'Planning',folder:'Meetings',body:'# Agenda\n\n- \n\n## Notes\n\n## Decisions\n\n## Action items\n\n- [ ] \n'},
 ];
+const noteKinds:{kind:Kind;label:string}[]=[{kind:'note',label:'Note'},{kind:'world',label:'Worldbuilding'},{kind:'character',label:'Character'},{kind:'research',label:'Research'},{kind:'daily',label:'Daily journal'},{kind:'meeting',label:'Meeting'}];
 
-function newNote(kind:Kind,title:string,projectId:string):Note {
-  const template=templates.find(item=>item.kind===kind)!;
+function newNote(templateId:TemplateId,title:string,projectId:string):Note {
+  const template=templates.find(item=>item.id===templateId)!;
+  const kind=template.kind;
   const now=new Date().toISOString();
   return {id:uid(),title,content:template.body,kind,folder:template.folder,tags:[],projectId,bookmarked:false,properties:kind==='character'?{Role:'',Faction:'',Status:'Draft'}:{Status:'Draft'},snapshots:[],createdAt:now,updatedAt:now};
 }
 const shortDate=(value:string)=>new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
-const kindLabel=(kind:Kind)=>kind==='note'?'Note':templates.find(item=>item.kind===kind)?.label || 'Note';
+const kindLabel=(kind:Kind)=>noteKinds.find(item=>item.kind===kind)?.label || 'Note';
 
 export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mode,tourActive=false,projectFilter,openTask,openNote,notify}:Props){
   const [draft,setDraft]=useState<Note|null>(workspace.notes.find(note=>note.id===selectedNote) || null);
@@ -37,7 +51,9 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
   const [tag,setTag]=useState('all');
   const [bookmarksOnly,setBookmarksOnly]=useState(false);
   const [newOpen,setNewOpen]=useState(false);
-  const [newKind,setNewKind]=useState<Kind>('note');
+  const [newTemplateId,setNewTemplateId]=useState<TemplateId>('blank');
+  const [templateSearch,setTemplateSearch]=useState('');
+  const [templateCategory,setTemplateCategory]=useState<'all'|TemplateCategory>('all');
   const [newTitle,setNewTitle]=useState('');
   const [creating,setCreating]=useState(false);
   const [saveState,setSaveState]=useState<'saved'|'saving'|'pending'|'error'>('saved');
@@ -77,7 +93,12 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
   workspaceRef.current=workspace;
   selectedRef.current=selectedNote;
 
-  useEffect(()=>{if(window.innerWidth<=1050)setDetails(false);},[]);
+  useEffect(()=>{
+    const narrow=window.matchMedia('(max-width: 1050px)');
+    const collapse=()=>{if(narrow.matches)setDetails(false);};
+    collapse();narrow.addEventListener('change',collapse);
+    return()=>narrow.removeEventListener('change',collapse);
+  },[]);
 
   useEffect(()=>{
     if(mode!=='notes')return;
@@ -194,16 +215,24 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
     return()=>window.removeEventListener('keydown',handle);
   },[slides,flush]);
 
-  const create=async(kind:Kind,title:string)=>{
+  const openNewNote=()=>{
+    setNewTemplateId(mode==='daily'?'daily-journal':'blank');
+    setTemplateSearch('');setTemplateCategory('all');setNewOpen(true);
+  };
+  const selectedTemplate=templates.find(item=>item.id===newTemplateId)!;
+  const visibleTemplates=templates.filter(item=>(templateCategory==='all' || item.category===templateCategory) && `${item.label} ${item.description} ${item.category}`.toLowerCase().includes(templateSearch.trim().toLowerCase()));
+
+  const create=async(templateId:TemplateId,title:string)=>{
     if(creating)return;
     setCreating(true);
     try{
       await flush();
-      const note=newNote(kind,title.trim() || (kind==='daily'?today():'Untitled note'),projectFilter==='all'?'':projectFilter);
+      const template=templates.find(item=>item.id===templateId)!;
+      const note=newNote(templateId,title.trim() || (template.kind==='daily'?today():templateId==='blank'?'Untitled note':template.label),projectFilter==='all'?'':projectFilter);
       const updated=await mutate({action:'upsert',entity:'notes',item:note});
       const committed=updated.notes.find(item=>item.id===note.id) || note;
       draftRef.current=committed;setDraft(committed);onSelectNote(note.id);setNewOpen(false);setNewTitle('');
-      notify(`${kind==='daily'?'Daily journal':'Note'} created`);
+      notify(`${template.kind==='daily'?'Daily journal':'Note'} created`);
     }catch{notify('Could not create the note. Please try again.');}
     finally{setCreating(false);}
   };
@@ -215,7 +244,7 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
     dailyMode.current=true;
     const note=workspaceRef.current.notes.find(item=>item.kind==='daily' && item.title===today());
     if(note)onSelectNote(note.id);
-    else void create('daily',today());
+    else void create('daily-journal',today());
   },[mode,tourActive]);
 
   const notes=workspace.notes.filter(note=>(mode!=='daily' || note.kind==='daily') && (projectFilter==='all' || !projectFilter || note.projectId===projectFilter));
@@ -294,7 +323,7 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
     if(!current || !field || field.selectionEnd===field.selectionStart){notify('Select some text in the editor to move it into a new note.');setView('edit');setMoreOpen(false);return;}
     const text=current.content.slice(field.selectionStart,field.selectionEnd);
     const title=text.split('\n')[0].replace(/^#+\s*/, '').slice(0,70) || 'Extracted idea';
-    const note={...newNote('note',title,current.projectId),folder:current.folder,content:text,tags:current.tags};
+    const note={...newNote('blank',title,current.projectId),folder:current.folder,content:text,tags:current.tags};
     try{await mutate({action:'upsert',entity:'notes',item:note});edit({content:current.content.slice(0,field.selectionStart)+`[[${note.title}]]`+current.content.slice(field.selectionEnd)});void flush();notify('Selection moved into a linked note');setMoreOpen(false);}catch{notify('Could not split this note. Please try again.');}
   };
   const merge=async()=>{
@@ -312,12 +341,12 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
 
   return <div className={`knowledge ${mode==='daily'?'daily-knowledge':''}`}>
     <aside className={`note-browser ${mobileBrowser?'mobile-visible':''}`}>
-      <div className="note-browser-title"><span>{mode==='daily'?<CalendarDays size={18}/>:<BookOpen size={18}/>} {mode==='daily'?'Daily journal':'Knowledge base'}</span><button className="btn-icon" title="New note" onClick={()=>{setNewKind(mode==='daily'?'daily':'note');setNewOpen(true);}}><Plus size={17}/></button></div>
+      <div className="note-browser-title"><span>{mode==='daily'?<CalendarDays size={18}/>:<BookOpen size={18}/>} {mode==='daily'?'Daily journal':'Knowledge base'}</span><button className="btn-icon" title="New note" onClick={openNewNote}><Plus size={17}/></button></div>
       <label className="note-search"><Search size={15}/><input aria-label="Search notes" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Find a note…"/><kbd>⌕</kbd></label>
       <div className="note-scope"><button className={bookmarksOnly?'active':''} onClick={()=>setBookmarksOnly(value=>!value)}><Bookmark size={13} fill={bookmarksOnly?'currentColor':'none'}/> Bookmarked</button><span>{notes.length} notes</span></div>
       <div className="note-filter-row"><label><Folder size={13}/><select aria-label="Filter notes by folder" value={folder} onChange={event=>setFolder(event.target.value)}><option value="all">All folders</option>{folders.map(item=><option key={item}>{item}</option>)}</select></label><label><Tag size={13}/><select aria-label="Filter notes by tag" value={tag} onChange={event=>setTag(event.target.value)}><option value="all">All tags</option>{tags.map(item=><option key={item}>{item}</option>)}</select></label></div>
-      <div className="note-list">{visible.length?visible.map(note=><button key={note.id} className={`note-list-item ${selectedNote===note.id?'selected':''}`} onClick={()=>onSelectNote(note.id)}><div className="note-list-item-top"><span className={`note-type-symbol kind-${note.kind}`}>{note.kind==='daily'?<CalendarDays size={16}/>:<FileText size={16}/>}</span><span className="note-list-name">{note.title || 'Untitled note'}</span>{note.bookmarked && <Bookmark size={12} className="note-bookmarked" fill="currentColor"/>}</div><p>{note.content.replace(/[#*\[\]`>_=]/g,'').replace(/\s+/g,' ').slice(0,90) || 'A blank page, a new possibility.'}</p><div className="note-list-meta"><span>{note.folder}</span><span>{shortDate(note.updatedAt)}</span></div></button>):<div className="note-list-empty"><Search size={25}/><p>No notes here yet.</p><button className="btn" onClick={()=>setNewOpen(true)}>Create a note</button></div>}</div>
-      <div className="note-browser-footer"><div className="note-vault-dot"/><span>Your studio knowledge</span><button className="btn-icon" title="New note from template" onClick={()=>setNewOpen(true)}><Plus size={15}/></button></div>
+      <div className="note-list">{visible.length?visible.map(note=><button key={note.id} className={`note-list-item ${selectedNote===note.id?'selected':''}`} onClick={()=>onSelectNote(note.id)}><div className="note-list-item-top"><span className={`note-type-symbol kind-${note.kind}`}>{note.kind==='daily'?<CalendarDays size={16}/>:<FileText size={16}/>}</span><span className="note-list-name">{note.title || 'Untitled note'}</span>{note.bookmarked && <Bookmark size={12} className="note-bookmarked" fill="currentColor"/>}</div><p>{note.content.replace(/[#*\[\]`>_=]/g,'').replace(/\s+/g,' ').slice(0,90) || 'A blank page, a new possibility.'}</p><div className="note-list-meta"><span>{note.folder}</span><span>{shortDate(note.updatedAt)}</span></div></button>):<div className="note-list-empty"><Search size={25}/><p>No notes here yet.</p><button className="btn" onClick={openNewNote}>Create a note</button></div>}</div>
+      <div className="note-browser-footer"><div className="note-vault-dot"/><span>Your workspace knowledge</span><button className="btn-icon" title="New note from template" onClick={openNewNote}><Plus size={15}/></button></div>
     </aside>
 
     <main className="note-workspace">
@@ -336,17 +365,24 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
           <div className="note-statusbar"><span>{wordCount} words <i>·</i> {draft.content.length.toLocaleString()} characters</span><span>Markdown <i>·</i> {Math.max(1,Math.ceil(wordCount/200))} min read</span></div>
         </div>
 
-        {details && <aside className="note-details"><div className="note-details-title">NOTE DETAILS<button className="btn-icon" aria-label="Close note details" onClick={()=>setDetails(false)}><X size={13}/></button></div><div className="note-details-section"><h3>Properties</h3><label className="note-property"><span>Folder</span><input value={draft.folder} onChange={event=>edit({folder:event.target.value})}/></label><label className="note-property"><span>Project</span><select value={draft.projectId} onChange={event=>edit({projectId:event.target.value})}><option value="">No project</option>{workspace.projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label className="note-property"><span>Template</span><select value={draft.kind} onChange={event=>edit({kind:event.target.value as Kind})}>{templates.map(item=><option key={item.kind} value={item.kind}>{item.label}</option>)}</select></label>{Object.entries(draft.properties).map(([key,value])=><label className="note-property" key={key}><span title={key}>{key}</span><input value={value} placeholder="Empty" onChange={event=>edit({properties:{...draft.properties,[key]:event.target.value}})}/><button aria-label={`Remove property ${key}`} onClick={()=>{const properties={...draft.properties};delete properties[key];edit({properties});}}><X size={10}/></button></label>)}<form className="note-add-property" onSubmit={event=>{event.preventDefault();const key=propertyName.trim();if(key && !(key in draft.properties)){edit({properties:{...draft.properties,[key]:''}});setPropertyName('');}}}><Plus size={12}/><input value={propertyName} onChange={event=>setPropertyName(event.target.value)} placeholder="Add property" aria-label="New property name"/>{propertyName && <button type="submit" aria-label="Add property"><Check size={12}/></button>}</form></div>
+        {details && <aside className="note-details"><div className="note-details-title">NOTE DETAILS<button className="btn-icon" aria-label="Close note details" onClick={()=>setDetails(false)}><X size={13}/></button></div><div className="note-details-section"><h3>Properties</h3><label className="note-property"><span>Folder</span><input value={draft.folder} onChange={event=>edit({folder:event.target.value})}/></label><label className="note-property"><span>Project</span><select value={draft.projectId} onChange={event=>edit({projectId:event.target.value})}><option value="">No project</option>{workspace.projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label className="note-property"><span>Type</span><select aria-label="Note type" value={draft.kind} onChange={event=>edit({kind:event.target.value as Kind})}>{noteKinds.map(item=><option key={item.kind} value={item.kind}>{item.label}</option>)}</select></label>{Object.entries(draft.properties).map(([key,value])=><label className="note-property" key={key}><span title={key}>{key}</span><input value={value} placeholder="Empty" onChange={event=>edit({properties:{...draft.properties,[key]:event.target.value}})}/><button aria-label={`Remove property ${key}`} onClick={()=>{const properties={...draft.properties};delete properties[key];edit({properties});}}><X size={10}/></button></label>)}<form className="note-add-property" onSubmit={event=>{event.preventDefault();const key=propertyName.trim();if(key && !(key in draft.properties)){edit({properties:{...draft.properties,[key]:''}});setPropertyName('');}}}><Plus size={12}/><input value={propertyName} onChange={event=>setPropertyName(event.target.value)} placeholder="Add property" aria-label="New property name"/>{propertyName && <button type="submit" aria-label="Add property"><Check size={12}/></button>}</form></div>
           <div className="note-details-section"><h3><Link2 size={13}/>Backlinks<span>{backlinks.length}</span></h3>{backlinks.map(note=><button key={note.id} className="note-related" onClick={()=>openNote(note.id)}><FileText size={13}/><div><strong>{note.title}</strong><small>{note.folder}</small></div><ArrowUpRight size={12}/></button>)}{!backlinks.length && <p className="note-details-empty">Notes that link here will appear here. Connect an idea with <code>[[{draft.title}]]</code>.</p>}</div>
           <div className="note-details-section"><h3>Linked tasks<span>{linkedTasks.length}</span></h3>{linkedTasks.map(task=><button key={task.id} className="note-related" onClick={()=>openTask(task.id)}><span className={`linked-task-dot ${task.status}`}/><div><small>{task.key}</small><strong>{task.title}</strong></div><ArrowUpRight size={12}/></button>)}{!linkedTasks.length && <p className="note-details-empty">Link this note from a task to keep the plan and the work connected.</p>}</div>
           <div className="note-details-section note-syntax-help"><h3>A little writing magic</h3><p><code>[[Note title]]</code> connect ideas</p><p><code>![[Note title]]</code> embed a note</p><p><code>[[Note#Heading]]</code> link a section</p><p><code>- [ ]</code> create a checklist</p><p><code>$$ equation $$</code> write math</p><button onClick={()=>{setSnapshotsOpen(true);}}><History size={13}/>Version history <ChevronRight size={12}/></button></div>
         </aside>}
         </div>
-      </> : <div className="knowledge-empty"><div><BookOpen size={32}/></div><span className="eyebrow">IDEAS BECOME WORLDS</span><h2>A home for everything you know.</h2><p>Capture a fleeting thought, build a character, or document the world your team is creating. Every idea can connect to the next.</p><button className="btn btn-primary" onClick={()=>setNewOpen(true)}><Plus size={16}/>{workspace.notes.length?'Create a note':'Create your first note'}</button><button className="btn mobile-note-toggle" onClick={()=>setMobileBrowser(true)}>Browse notes</button></div>}
+      </> : <div className="knowledge-empty"><div><BookOpen size={32}/></div><span className="eyebrow">IDEAS BECOME PLANS</span><h2>A home for everything you know.</h2><p>Capture a thought, plan a project, keep a routine, or explore a creative idea. Connect notes to each other and to the tasks that move them forward.</p><button className="btn btn-primary" onClick={openNewNote}><Plus size={16}/>{workspace.notes.length?'Create a note':'Create your first note'}</button><button className="btn mobile-note-toggle" onClick={()=>setMobileBrowser(true)}>Browse notes</button></div>}
     </main>
     <input ref={fileInput} type="file" className="note-hidden-input" accept="image/*,audio/*,video/*,application/pdf,.txt,.md" onChange={event=>{if(event.target.files?.[0])void upload(event.target.files[0]);}}/>
 
-    {newOpen && <div className="knowledge-modal-backdrop" onClick={()=>!creating && setNewOpen(false)}><section className="knowledge-modal new-note-modal" onClick={event=>event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Create note"><div className="knowledge-modal-heading"><div><span className="eyebrow">MAKE SPACE FOR AN IDEA</span><h2>Create a note</h2></div><button className="btn-icon" aria-label="Close" onClick={()=>setNewOpen(false)}><X size={19}/></button></div><label className="note-new-title">Note title<input className="field" autoFocus value={newTitle} onChange={event=>setNewTitle(event.target.value)} placeholder={newKind==='daily'?today():'Give your idea a name…'} onKeyDown={event=>{if(event.key==='Enter')void create(newKind,newTitle);}}/></label><div className="note-template-label">START WITH A TEMPLATE</div><div className="note-template-grid">{templates.map(item=><button className={newKind===item.kind?'selected':''} key={item.kind} onClick={()=>setNewKind(item.kind)}><span className="note-template-icon">{item.kind==='daily'?<CalendarDays size={18}/>:<FileText size={18}/>}</span><strong>{item.label}</strong><p>{item.description}</p>{newKind===item.kind && <Check size={14} className="template-check"/>}</button>)}</div><div className="knowledge-modal-footer"><button className="btn" onClick={()=>setNewOpen(false)}>Cancel</button><button className="btn btn-primary" disabled={creating} onClick={()=>void create(newKind,newTitle)}>{creating?<LoaderCircle size={15} className="spin"/>:<Plus size={15}/>}Create note</button></div></section></div>}
+    {newOpen && <div className="knowledge-modal-backdrop" onClick={()=>!creating && setNewOpen(false)}><section className="knowledge-modal new-note-modal" onClick={event=>event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Create note">
+      <div className="knowledge-modal-heading"><div><span className="eyebrow">MAKE SPACE FOR AN IDEA</span><h2>Create a note</h2></div><button className="btn-icon" aria-label="Close" onClick={()=>setNewOpen(false)}><X size={19}/></button></div>
+      <label className="note-new-title">Note title<input className="field" autoFocus value={newTitle} onChange={event=>setNewTitle(event.target.value)} placeholder={selectedTemplate.kind==='daily'?today():newTemplateId==='blank'?'Give your idea a name…':selectedTemplate.label} onKeyDown={event=>{if(event.key==='Enter')void create(newTemplateId,newTitle);}}/></label>
+      <div className="note-template-label">CHOOSE A STARTING POINT <span>{templates.length} templates</span></div>
+      <div className="note-template-filters"><label className="note-template-search"><Search size={17}/><input aria-label="Search templates" value={templateSearch} onChange={event=>setTemplateSearch(event.target.value)} placeholder="Search templates…"/></label><select aria-label="Template category" value={templateCategory} onChange={event=>setTemplateCategory(event.target.value as 'all'|TemplateCategory)}><option value="all">All categories</option>{templateCategories.map(category=><option key={category} value={category}>{category}</option>)}</select></div>
+      <div className="note-template-scroll"><div className="note-template-grid">{visibleTemplates.map(item=><button className={newTemplateId===item.id?'selected':''} key={item.id} aria-pressed={newTemplateId===item.id} onClick={()=>setNewTemplateId(item.id)}><span className="note-template-icon">{item.kind==='daily'?<CalendarDays size={20}/>:<FileText size={20}/>}<small>{item.category}</small></span><strong>{item.label}</strong><p>{item.description}</p>{newTemplateId===item.id && <Check size={17} className="template-check"/>}</button>)}</div>{!visibleTemplates.length && <p className="note-template-no-results">No templates match. Try another search or category.</p>}</div>
+      <div className="knowledge-modal-footer"><span className="note-template-selection">Selected: <strong>{selectedTemplate.label}</strong></span><button className="btn" onClick={()=>setNewOpen(false)}>Cancel</button><button className="btn btn-primary" disabled={creating} onClick={()=>void create(newTemplateId,newTitle)}>{creating?<LoaderCircle size={16} className="spin"/>:<Plus size={16}/>}Create note</button></div>
+    </section></div>}
 
     {snapshotsOpen && draft && <div className="knowledge-modal-backdrop" onClick={()=>setSnapshotsOpen(false)}><section className="knowledge-modal snapshots-modal" onClick={event=>event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Version history"><div className="knowledge-modal-heading"><div><span className="eyebrow">NOTHING GOOD GETS LOST</span><h2>Version history</h2></div><button className="btn-icon" aria-label="Close version history" onClick={()=>setSnapshotsOpen(false)}><X size={18}/></button></div><p className="knowledge-modal-description">Up to 12 earlier versions are saved automatically as you write. Restoring a version also preserves your current content.</p>{draft.snapshots.length?[...draft.snapshots].reverse().map(snapshot=><div className="note-snapshot" key={snapshot.id}><div><strong>{new Date(snapshot.savedAt).toLocaleString()}</strong><pre>{snapshot.content.slice(0,230) || 'Empty note'}</pre></div><button className="btn" onClick={()=>{edit({content:snapshot.content});void flush();setSnapshotsOpen(false);notify('Earlier version restored');}}>Restore</button></div>):<div className="note-list-empty"><History size={28}/><p>Your earlier versions will appear as you edit this note.</p></div>}</section></div>}
 
@@ -357,4 +393,3 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
     {slides && draft && <div className="knowledge-slides" role="dialog" aria-modal="true" aria-label="Note presentation"><div className="slides-toolbar"><span><Presentation size={16}/>{draft.title}</span><button className="btn-icon" aria-label="Close presentation" onClick={()=>setSlides(false)}><X size={21}/></button></div><div className="slides-content"><Markdown content={slidesContent[slideIndex] || ''} workspace={workspace} onNoteClick={id=>{setSlides(false);openNote(id);}}/></div><div className="slides-footer"><span>Separate slides with <code>---</code> in your note.</span><div><button className="btn-icon" aria-label="Previous slide" disabled={slideIndex===0} onClick={()=>setSlideIndex(index=>index-1)}><ChevronLeft size={20}/></button><span>{slideIndex+1} / {slidesContent.length}</span><button className="btn-icon" aria-label="Next slide" disabled={slideIndex>=slidesContent.length-1} onClick={()=>setSlideIndex(index=>index+1)}><ChevronRight size={20}/></button></div></div></div>}
   </div>;
 }
-

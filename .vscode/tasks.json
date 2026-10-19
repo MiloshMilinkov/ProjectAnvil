@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Run Forgeboard",
+      "label": "Run ProjectAnvil",
       "type": "process",
       "command": "node",
       "args": ["scripts/start-local.mjs"],
@@ -11,7 +11,7 @@
       "presentation": { "reveal": "always", "panel": "dedicated" }
     },
     {
-      "label": "Check Forgeboard types",
+      "label": "Check ProjectAnvil types",
       "type": "process",
       "command": "node",
       "args": ["node_modules/typescript/bin/tsc", "--noEmit"],
@@ -20,7 +20,7 @@
       "group": "test"
     },
     {
-      "label": "Test Forgeboard storage",
+      "label": "Test ProjectAnvil storage",
       "type": "process",
       "command": "node",
       "args": ["scripts/check-backend.mjs"],
@@ -29,7 +29,7 @@
       "group": "test"
     },
     {
-      "label": "Build Forgeboard",
+      "label": "Build ProjectAnvil",
       "type": "process",
       "command": "node",
       "args": ["scripts/run-framework.mjs", "build"],

@@ -7,7 +7,7 @@ export async function GET() {
     return new Response(JSON.stringify(workspace, null, 2), {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
-        'Content-Disposition': `attachment; filename="forgeboard-workspace-${date}.json"`,
+        'Content-Disposition': `attachment; filename="projectanvil-workspace-${date}.json"`,
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },

@@ -19,10 +19,10 @@ async function portIsOpen() {
   });
 }
 
-async function isForgeboard() {
+async function isProjectAnvil() {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(10000), redirect: "error" });
-    if (!response.ok || !(await response.text()).includes("Forgeboard")) return false;
+    if (!response.ok || !(await response.text()).includes("ProjectAnvil")) return false;
     const stateResponse = await fetch(new URL("api/state", url), { signal: AbortSignal.timeout(10000), redirect: "error" });
     if (!stateResponse.ok) return false;
     const { workspace } = await stateResponse.json();
@@ -42,14 +42,14 @@ function openBrowser() {
 }
 
 if (await portIsOpen()) {
-  if (await isForgeboard()) {
-    console.log(`Forgeboard is already running at ${url}`);
+  if (await isProjectAnvil()) {
+    console.log(`ProjectAnvil is already running at ${url}`);
     console.log("Opening it. Use its original console window to stop the app.");
     openBrowser();
     process.exitCode = 0;
   } else {
-    console.error(`Port ${port} is already in use. Forgeboard has not started another server.`);
-    console.error("Close the app using that port, or check whether Forgeboard is still starting in another window, then try again.");
+    console.error(`Port ${port} is already in use. ProjectAnvil has not started another server.`);
+    console.error("Close the app using that port, or check whether ProjectAnvil is still starting in another window, then try again.");
     process.exitCode = 1;
   }
 } else {
@@ -73,20 +73,20 @@ if (await portIsOpen()) {
   });
   // Both processes share the user's console, so Ctrl+C reaches the server too.
   // Keep the launcher alive until the server has completed its cleanup.
-  const onInterrupt = () => { interrupted = true; console.log("\nStopping Forgeboard..."); };
+  const onInterrupt = () => { interrupted = true; console.log("\nStopping ProjectAnvil..."); };
   process.on("SIGINT", onInterrupt);
   const deadline = Date.now() + 120000;
   let ready = false;
   while (!finished && Date.now() < deadline) {
-    if (await isForgeboard()) { ready = true; break; }
+    if (await isProjectAnvil()) { ready = true; break; }
     if (!finished) await delay(1000);
   }
   if (ready && !finished) {
-    console.log(`\nForgeboard is ready: ${url}`);
+    console.log(`\nProjectAnvil is ready: ${url}`);
     console.log("Keep this window open. Press Ctrl+C here to stop the app.\n");
     openBrowser();
   } else if (!finished) {
-    console.log(`\nForgeboard is taking longer to start. Keep this window open and try ${url}`);
+    console.log(`\nProjectAnvil is taking longer to start. Keep this window open and try ${url}`);
   }
   process.exitCode = await completion;
   process.off("SIGINT", onInterrupt);

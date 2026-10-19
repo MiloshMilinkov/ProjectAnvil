@@ -1,0 +1,478 @@
+/* Root scope keeps working sizes consistent when component styles load later. */
+/* Comfortable working sizes, shared by every appearance. Keep density in spacing. */
+:root body { font-size: 14px; line-height: 1.55; }
+:root .app-shell { --workspace-sidebar-width: 260px; }
+:root .sidebar { width: var(--workspace-sidebar-width); }
+:root .app-body { margin-left: var(--workspace-sidebar-width); width: calc(100% - var(--workspace-sidebar-width)); }
+:root .focus-mode .app-body { margin-left: 0; width: 100%; }
+:root .brand { font-size: 21px; gap: 8px; padding-left: 7px; padding-right: 0; letter-spacing: -.65px; white-space: nowrap; }
+:root .brand-mark { flex-shrink: 0; }
+:root .brand-beta { font-size: 9px; letter-spacing: .3px; padding: 2px 3px; }
+:root .workspace-select strong { font-size: 13px; }
+:root .workspace-select div span { font-size: 12px; line-height: 1.5; }
+:root .sidebar-search { min-height: 38px; font-size: 13px; margin-bottom: 15px; }
+:root .sidebar-search kbd { font-size: 10px; }
+:root .nav-caption { font-size: 11px; letter-spacing: 1.1px; }
+:root .nav-item { min-height: 40px; font-size: 14px; gap: 10px; }
+:root .nav-item small { font-size: 12px; }
+:root .project-nav { font-size: 13px; min-height: 38px; }
+:root .connected-callout strong, :root .connected-callout p span, :root .sidebar-footer { font-size: 12px; }
+:root .connected-callout { align-items: flex-start; }
+:root .sidebar-footer { gap: 8px; padding-left: 5px; padding-right: 5px; }
+:root .sidebar-footer button { flex-shrink: 0; }
+:root .topbar { gap: 12px; }
+:root .breadcrumbs { min-width: 0; font-size: 12px; }
+:root .breadcrumbs > span, :root .breadcrumbs strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+:root .topbar-actions { gap: 12px; flex-shrink: 0; }
+:root .live-indicator, :root .guest-badge { font-size: 12px; }
+:root .guest-badge { min-height: 38px; }
+:root .top-search, :root .appearance-trigger, :root .tour-trigger { flex-shrink: 0; }
+:root .btn { min-height: 38px; padding: 8px 13px; font-size: 13px; }
+:root .btn-icon { width: 38px; height: 38px; padding: 8px; flex-shrink: 0; }
+:root .text-button { min-height: 34px; font-size: 12px; }
+:root .icon-link { min-width: 34px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+:root .small-text, :root .eyebrow, :root .count-badge, :root .badge { font-size: 12px; }
+:root .eyebrow { letter-spacing: 1.25px; }
+:root .page-heading p { font-size: 14px; line-height: 1.65; max-width: 680px; }
+:root .page-heading { align-items: flex-start; }
+:root .page-heading > div { min-width: 0; }
+:root .heading-actions { flex-wrap: wrap; justify-content: flex-end; }
+:root .section-heading h2 { font-size: 15px; }
+:root .section-heading .text-button { font-size: 12px; }
+:root .hero-label, :root .hero-copy p, :root .hero-copy button, :root .hero-note { font-size: 12px; }
+:root .hero-copy p { line-height: 1.6; }
+:root .overview-hero { height: auto; min-height: 225px; }
+:root .hero-copy { min-width: 0; max-width: 65%; flex-shrink: 1; }
+:root .hero-art { min-width: 220px; }
+:root .stat-top { font-size: 13px; gap: 8px; }
+:root .stat-card small { font-size: 12px; line-height: 1.6; }
+:root .project-summary h3 { font-size: 15px; }
+:root .project-summary p { font-size: 13px; }
+:root .project-summary-copy > div:first-child { flex-wrap: wrap; }
+:root .project-summary-copy .badge { font-size: 11px; }
+:root .progress-label, :root .progress-label strong { font-size: 12px; }
+:root .note-peek strong { font-size: 14px; }
+:root .note-peek small, :root .knowledge-footer, :root .dashboard-foot { font-size: 12px; }
+:root .note-kind { width: 34px; height: 36px; flex-shrink: 0; }
+:root .dashboard-foot { flex-wrap: wrap; }
+
+/* Keep wide work tables and boards inside their own scrollable regions. */
+:root .table-scroll, :root .base-table-scroll, :root .base-content, :root .kanban-board, :root .base-board { min-width: 0; max-width: 100%; }
+:root .task-table th { font-size: 12px; padding-top: 12px; padding-bottom: 12px; }
+:root .task-table td { font-size: 13px; padding-top: 12px; padding-bottom: 12px; }
+:root .task-title-button { min-height: 38px; }
+:root .task-title-button strong { font-size: 14px; }
+:root .task-key, :root .task-card-top .task-key, :root .status-select, :root .priority-inline, :root .assignee-inline, :root .due-date { font-size: 12px; }
+:root .status-select { min-height: 34px; max-width: 125px; padding: 5px 8px; }
+:root .avatar.small { width: 28px; height: 28px; font-size: 10px; }
+:root .task-view-toolbar { flex-wrap: wrap; }
+:root .view-tabs { max-width: 100%; overflow-x: auto; }
+:root .view-tabs button { min-height: 36px; font-size: 13px; }
+:root .filters > select, :root .filter-search input { font-size: 14px; }
+:root .filters > select { height: 40px; max-width: 190px; }
+:root .filter-search { min-height: 40px; }
+:root .filters .text-button, :root .result-count { font-size: 12px; }
+:root .kanban-board { grid-template-columns: repeat(5, minmax(250px, 1fr)); }
+:root .kanban-column h2 { font-size: 14px; }
+:root .kanban-column header > span:nth-of-type(2) { font-size: 12px; }
+:root .kanban-column header button { min-width: 34px; min-height: 36px; }
+:root .task-card h3 { font-size: 14px; }
+:root .task-card .tag, :root .task-card-bottom > .due-date, :root .task-tags .tag { font-size: 12px; }
+:root .task-card-bottom { flex-wrap: wrap; gap: 8px; }
+:root .project-card > p, :root .project-card > .project-goal, :root .team-card > p, :root .collection-card p { font-size: 13px; }
+:root .project-card footer, :root .project-card footer > span, :root .project-card .progress-label { font-size: 12px; }
+:root .project-card footer { flex-wrap: wrap; gap: 10px; }
+:root .project-card-top > .badge { font-size: 12px; }
+:root .project-add strong { font-size: 15px; }
+:root .project-add span { font-size: 13px; }
+:root .team-stats, :root .team-card > .text-button { font-size: 12px; }
+:root .team-stats { flex-wrap: wrap; }
+:root .team-stats strong { font-size: 16px; }
+:root .settings-section > h2 { font-size: 18px; }
+:root .settings-section > p, :root .small-dialog > p.muted, :root .info-note, :root .form-error, :root .warning-box { font-size: 14px; line-height: 1.7; }
+:root .form-label, :root .field-heading label, :root .field-heading label > span, :root .connection-options > label { font-size: 13px; }
+:root .field, :root .task-meta-grid > label > input, :root .task-meta-grid > label > select { min-height: 40px; font-size: 14px; }
+:root .settings-inline .btn { font-size: 13px; }
+:root .settings-stats { font-size: 12px; flex-wrap: wrap; }
+:root .setting-toggle strong { font-size: 14px !important; }
+:root .setting-toggle small { font-size: 12px !important; line-height: 1.7; }
+:root .setting-toggle { min-width: 0; gap: 16px; }
+:root .setting-toggle > span { min-width: 0; }
+:root .setting-toggle .field { font-size: 14px; }
+:root .task-meta-grid > label { font-size: 13px; min-width: 0; }
+:root .task-dialog > .dialog-footer > .small-text { font-size: 12px; }
+:root .description-editor { font-size: 14px; line-height: 1.8; }
+:root .dialog-tabs button { font-size: 13px; }
+:root .dialog-tabs button span, :root .comments small { font-size: 12px; }
+:root .subtasks > div, :root .comments strong, :root .comments article p, :root .inline-add input { font-size: 14px; }
+:root .subtask-check { width: 22px; height: 22px; flex-shrink: 0; }
+:root .connection-options > label { min-height: 40px; }
+:root .palette-results > button, :root .palette-input input { font-size: 14px; }
+:root .palette-results > button { min-height: 42px; }
+:root .palette-results > button > span.muted, :root .section-label, :root .command-palette footer, :root .palette-empty, :root .shortcut-row, :root .toast, :root .error-banner { font-size: 12px; }
+:root .error-banner { flex-wrap: wrap; }
+:root .toast > button { min-width: 32px; min-height: 32px; }
+
+/* Notes, properties and the reusable template library. */
+:root .knowledge { font-size: 14px; }
+:root .note-browser { width: 265px; }
+:root .note-browser-title { font-size: 15px; height: 64px; }
+:root .note-search { height: 40px; }
+:root .note-search input { font-size: 14px; }
+:root .note-scope, :root .note-scope button, :root .note-filter-row select, :root .note-browser-footer { font-size: 12px; }
+:root .note-scope button, :root .note-filter-row select { min-height: 34px; }
+:root .note-list-name { font-size: 14px; }
+:root .note-list-item p { font-size: 13px; height: 43px; }
+:root .note-list-meta { font-size: 12px; }
+:root .note-browser-footer { min-height: 46px; height: auto; }
+:root .note-toolbar { min-height: 60px; height: auto; padding-top: 8px; padding-bottom: 8px; }
+:root .note-breadcrumb { font-size: 12px; }
+:root .note-save-state, :root .note-save-state.error button { font-size: 12px; }
+:root .note-toolbar-actions { gap: 4px; }
+:root .note-menu { top: 42px; width: 260px; max-width: calc(100vw - 30px); }
+:root .note-menu button { font-size: 13px; min-height: 40px; }
+:root .note-kind-label, :root .note-heading-date, :root .note-tag, :root .note-tags > input { font-size: 12px; }
+:root .note-tags > input { min-height: 32px; width: 115px; }
+:root .note-tag button { min-width: 22px; min-height: 22px; justify-content: center; align-items: center; }
+:root .note-editor-toolbar { flex-wrap: wrap; row-gap: 8px; }
+:root .note-view-switch button { font-size: 12px; min-height: 34px; }
+:root .note-format-tools { flex-wrap: wrap; }
+:root .note-format-tools button { width: 34px; height: 34px; }
+:root .note-pane-label, :root .note-statusbar, :root .record-time { font-size: 12px; }
+:root .note-editing-area { min-height: 0; }
+:root .note-source-pane textarea { min-height: 180px; font-size: 14px; line-height: 1.85; }
+:root .markdown { font-size: 15px; line-height: 1.85; }
+:root .markdown h3 { font-size: 18px; }
+:root .markdown h4 { font-size: 16px; }
+:root .markdown code, :root .markdown pre, :root .markdown table { font-size: 13px; }
+:root .markdown input[type=checkbox] { width: 17px; height: 17px; }
+:root .note-statusbar { height: auto; min-height: 38px; gap: 10px; }
+:root .note-details { width: 260px; }
+:root .note-details-title, :root .note-details-section h3, :root .note-details-section h3 > span { font-size: 12px; }
+:root .note-property > span, :root .note-property input, :root .note-property select, :root .note-add-property input { font-size: 12px; }
+:root .note-property > span { width: 72px; }
+:root .note-property input, :root .note-property select { min-height: 34px; }
+:root .note-details-empty, :root .note-details-empty code, :root .note-related strong, :root .note-related small, :root .note-syntax-help p, :root .note-syntax-help code, :root .note-syntax-help > button { font-size: 12px; }
+:root .note-related, :root .note-syntax-help > button { min-height: 38px; }
+:root .note-link-picker > button, :root .note-link-picker > div, :root .note-link-picker p { font-size: 13px; }
+:root .note-link-picker > button > span, :root .note-inline-error, :root .note-list-empty { font-size: 12px; }
+:root .note-link-picker > button { min-height: 40px; }
+:root .knowledge .eyebrow, :root .note-template-label { font-size: 12px; }
+:root .knowledge-empty p, :root .knowledge-modal-description, :root .note-new-title { font-size: 14px; }
+:root .note-list-empty .btn, :root .knowledge-empty .btn, :root .knowledge-modal-footer .btn { font-size: 13px; }
+:root .knowledge-modal:not(.new-note-modal) { width: 740px; }
+:root .note-new-title .field, :root .compact-modal > .field { font-size: 14px; }
+:root .note-template-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+:root .note-template-grid > button { min-width: 0; padding: 16px 14px; }
+:root .note-template-grid strong { font-size: 14px; padding-right: 12px; }
+:root .note-template-grid p { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+:root .note-snapshot strong, :root .note-snapshot pre, :root .note-snapshot .btn { font-size: 12px; }
+:root .knowledge-modal:not(.new-note-modal) .knowledge-modal-footer { position: sticky; bottom: -27px; background: var(--panel); padding-bottom: 12px; }
+
+/* Structured collections. */
+:root .base-saving, :root .base-view-tabs > button, :root .base-preference-hint, :root .base-clear-filters, :root .base-result-count, :root .base-arrange-bar, :root .base-arrange-bar select, :root .base-edit-hint, :root .base-board-hint { font-size: 12px; }
+:root .base-view-tabs > button { min-height: 42px; padding-top: 8px; }
+:root .base-search { height: 40px; }
+:root .base-search input, :root .base-filterbar > select { font-size: 14px; }
+:root .base-filterbar > select { height: 40px; max-width: 200px; }
+:root .base-arrange-bar { flex-wrap: wrap; }
+:root .base-arrange-bar select { min-height: 34px; }
+:root .base-table th { font-size: 12px; }
+:root .base-table td { font-size: 13px; }
+:root .base-note-link { min-height: 38px; }
+:root .base-note-link strong { font-size: 14px; }
+:root .base-kind, :root .base-location > span, :root .base-location small, :root .base-tags button, :root .base-tags > span, :root .base-group-heading > span, :root .base-group-heading > small { font-size: 12px; }
+:root .base-tags button { min-height: 30px; padding: 4px 7px; }
+:root .base-property-input { font-size: 13px !important; min-height: 36px; }
+:root .base-status-select, :root .base-gallery-footer .base-status-select, :root .base-board-footer .base-status-select { font-size: 12px !important; min-height: 36px; min-width: 100px; max-width: 150px; }
+:root .base-date, :root .base-word-count { font-size: 12px !important; }
+:root .base-group-heading h2 { font-size: 14px; }
+:root .base-list-main > strong { font-size: 14px; }
+:root .base-list-main > span { font-size: 13px; }
+:root .base-list-main > small, :root .base-list-props > span { font-size: 12px; }
+:root .base-gallery-title { font-size: 15px !important; }
+:root .base-gallery-content > p { font-size: 13px; height: 62px; }
+:root .base-gallery-art > span:not(.base-art-orbit), :root .base-gallery-footer > span { font-size: 12px; }
+:root .base-gallery-footer { flex-wrap: wrap; }
+:root .base-gallery-footer > span { max-width: 100%; }
+:root .base-board-column { flex-basis: 270px; min-width: 270px; }
+:root .base-column-heading h3 { font-size: 14px; }
+:root .base-column-heading > span:last-child, :root .base-board-type, :root .base-board-footer > span, :root .base-board-empty { font-size: 12px; }
+:root .base-board-title { font-size: 14px !important; }
+:root .base-board-card > p { font-size: 13px; height: 44px; }
+:root .base-summary > div > span, :root .base-summary > button > span { font-size: 12px; }
+:root .base-options-heading h3 { font-size: 15px; }
+:root .base-options-heading p, :root .base-options-caption, :root .base-column-checks label, :root .base-column-checks > span, :root .base-calculation-note { font-size: 12px; }
+:root .base-column-checks input { width: 17px; height: 17px; }
+:root .base-add-property > .field, :root .base-calculation-options > .field { font-size: 14px; }
+:root .base-add-property > .btn, :root .base-empty .btn { font-size: 13px; }
+:root .base-empty p { font-size: 14px; }
+
+/* Graph and canvas controls stay readable without changing the saved zoom. */
+:root .visual-heading p, :root .visual-muted, :root .visual-empty-overlay p, :root .visual-modal-heading p { font-size: 14px; }
+:root .visual-eyebrow, :root .visual-count, :root .visual-inspector-label, :root .graph-hint, :root .graph-stats span, :root .graph-selected-subtitle, :root .graph-connections-heading, :root .graph-connections-heading > span, :root .graph-connection-list > button, :root .graph-connection-list small, :root .graph-results small, :root .graph-results p, :root .visual-surface-caption, :root .visual-footer { font-size: 12px; }
+:root .visual-segment button, :root .graph-types button, :root .canvas-tool { min-height: 36px; font-size: 13px; }
+:root .visual-search { min-height: 40px; }
+:root .visual-search input, :root .canvas-selector select { font-size: 14px; }
+:root .canvas-selector { min-width: 0; }
+:root .canvas-selector select { min-width: 0; min-height: 38px; }
+:root .graph-depth { font-size: 13px !important; min-height: 40px; }
+:root .graph-node text, :root .canvas-edge-target text { font-size: 13px; }
+:root .graph-open, :root .canvas-connect-button { font-size: 13px !important; }
+:root .graph-results button { font-size: 14px; }
+:root .visual-zoom button { width: 36px; height: 36px; }
+:root .visual-zoom > span { font-size: 12px; width: 42px; }
+:root .canvas-toolbar .btn-icon { width: 38px; height: 38px; }
+:root .canvas-save-state, :root .canvas-save-state button, :root .canvas-card-header small, :root .canvas-card-tags, :root .canvas-task-chips > span, :root .canvas-task-person, :root .canvas-audio small, :root .canvas-web-preview small, :root .canvas-connect-notice, :root .canvas-title-button span, :root .visual-field-label, :root .visual-input-hint, :root .canvas-card-size > label, :root .canvas-detail-hint { font-size: 12px; }
+:root .canvas-card-header { height: 40px; padding-top: 4px; padding-bottom: 4px; }
+:root .canvas-card-header button { width: 32px; height: 32px; }
+:root .canvas-card-content h3 { font-size: 15px; }
+:root .canvas-note-preview, :root .canvas-task-description, :root .canvas-card-content a, :root .canvas-web-preview span { font-size: 13px; }
+:root .canvas-text-content { font-size: 14px; }
+:root .canvas-quick-add button { width: 38px; height: 38px; }
+:root .canvas-title-input, :root .canvas-edit-text { font-size: 14px !important; }
+:root .canvas-card-size input { min-height: 38px; font-size: 14px !important; }
+:root .canvas-inspector > .field, :root .canvas-add-search input, :root .canvas-add-form > .field { font-size: 14px; }
+:root .canvas-add-types button, :root .canvas-add-list small, :root .canvas-no-results, :root .canvas-upload-zone > span { font-size: 12px; }
+:root .canvas-add-list strong, :root .canvas-existing-media strong { font-size: 14px; }
+:root .canvas-web-preview > small { font-size: 11px; }
+
+/* Theme choices and the guided tour use the same comfortable rhythm. */
+:root .appearance-option-label strong, :root .appearance-dropdown strong { font-size: 14px; }
+:root .appearance-option > p, :root .appearance-dropdown small, :root .appearance-dropdown > p, :root .appearance-dropdown > span { font-size: 12px; }
+:root .appearance-dropdown { width: 275px; max-width: calc(100vw - 24px); top: 44px; }
+:root .appearance-dropdown > button { min-height: 52px; }
+:root .tour-label, :root .tour-step-count, :root .tour-card > .tour-key-hint { font-size: 12px; }
+:root .tour-card > p { font-size: 14px; line-height: 1.75; }
+:root .tour-card .tour-tip { font-size: 13px; }
+:root .tour-navigation > button { min-height: 40px; font-size: 13px; }
+:root .tour-navigation > .tour-skip { font-size: 12px; }
+:root .tour-close { min-width: 36px; min-height: 36px; }
+:root .tour-card { width: 400px; }
+
+/* Compact mode changes spacing while preserving legible type. */
+:root .compact .task-table td { min-height: 42px; height: 42px; padding-top: 6px; padding-bottom: 6px; }
+:root .compact .task-card { padding: 10px; }
+:root .compact .task-card h3 { font-size: 14px; }
+
+@media (min-width: 761px) and (max-width: 1150px) {
+  :root .sidebar { padding-left: 12px; padding-right: 12px; }
+  :root .brand-beta { display: none; }
+  :root .topbar { padding-left: 22px; padding-right: 22px; }
+  :root .topbar-actions { gap: 8px; }
+  :root .dashboard-columns { grid-template-columns: minmax(0, 1fr); }
+  :root .projects-grid, :root .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .hero-copy { max-width: 100%; }
+  :root .hero-art { display: none; }
+  :root .note-browser { width: 250px; }
+}
+
+@media (min-width: 1051px) and (max-width: 1400px) {
+  :root .note-details { position: absolute; right: 0; top: 60px; bottom: 0; z-index: 25; box-shadow: -20px 0 60px var(--theme-shadow-0003, #0003); }
+}
+
+@media (max-width: 1050px) {
+  :root .note-details { top: 60px; width: 280px; max-width: calc(100% - 20px); }
+  :root .note-toolbar { padding-left: 14px; padding-right: 14px; }
+  :root .note-toolbar-actions { gap: 0; }
+  :root .note-save-state > span:last-child { display: none; }
+  :root .graph-layout { grid-template-columns: minmax(0, 1fr); }
+  :root .graph-inspector { display: block; border-left: 0; border-top: 1px solid var(--border); max-height: 360px; overflow: auto; }
+  :root .canvas-layout.with-inspector { grid-template-columns: minmax(0, 1fr) 250px; }
+  :root .graph-toolbar, :root .canvas-toolbar { gap: 8px; }
+  :root .canvas-save-state { font-size: 12px; }
+  :root .canvas-tool > span { display: none; }
+  :root .graph-types { flex-wrap: wrap; }
+}
+
+@media (max-width: 760px) {
+  :root .sidebar { width: 280px; max-width: calc(100vw - 40px); padding: 24px 15px 0; }
+  :root .brand { font-size: 22px; gap: 9px; }
+  :root .brand-beta { display: none; }
+  :root .app-body { margin-left: 0; width: 100%; }
+  :root .topbar { height: 64px; padding: 0 14px; gap: 8px; }
+  :root .breadcrumbs { flex: 1; gap: 5px; overflow: hidden; font-size: 12px; }
+  :root .breadcrumbs > span { display: none; }
+  :root .breadcrumbs > svg { display: none; }
+  :root .breadcrumbs > .btn-icon { margin-left: -5px; margin-right: 0; }
+  :root .topbar-actions { gap: 6px; }
+  :root .guest-badge { min-height: 40px; padding: 6px 8px; font-size: 12px; }
+  :root .btn, :root .heading-actions .btn-primary, :root .settings-inline .btn { min-height: 44px; font-size: 13px; padding: 10px 12px; }
+  :root .btn-icon { width: 44px; height: 44px; }
+  :root .nav-item { min-height: 44px; font-size: 14px; }
+  :root .workspace-select strong { font-size: 14px; }
+  :root .workspace-select div span, :root .nav-caption, :root .sidebar-search, :root .sidebar-search kbd, :root .sidebar-footer { font-size: 12px; }
+  :root .project-nav { min-height: 44px; }
+  :root .text-button { min-height: 40px; }
+  :root .page { padding: 24px 16px 20px; }
+  :root .page-heading { flex-wrap: wrap; gap: 14px; }
+  :root .page-heading h1 { font-size: 27px; }
+  :root .page-heading p { font-size: 14px; max-width: none; line-height: 1.65; }
+  :root .heading-actions { padding-top: 0; margin-left: auto; }
+  :root .eyebrow { font-size: 12px; }
+  :root .main-content { min-height: calc(100vh - 64px); }
+  :root .hero-copy { max-width: 100%; width: 100%; }
+  :root .hero-copy p, :root .hero-copy button, :root .hero-label { font-size: 12px; }
+  :root .hero-copy h2 { font-size: 28px; }
+  :root .overview-hero { min-height: 240px; }
+  :root .stat-top { font-size: 13px; }
+  :root .stat-card small { font-size: 12px; }
+  :root .section-heading { flex-wrap: wrap; gap: 8px; }
+  :root .section-heading h2 { font-size: 15px; }
+  :root .project-summary h3 { font-size: 14px; }
+  :root .project-summary p { max-width: none; font-size: 13px; }
+  :root .project-summary-copy .badge { font-size: 11px; }
+  :root .note-peek strong { font-size: 14px; }
+  :root .note-peek small { font-size: 12px; }
+  :root .task-table th { font-size: 12px; }
+  :root .task-title-button strong { font-size: 14px; }
+  :root .task-key, :root .dashboard-foot { font-size: 12px; }
+  :root .status-select { min-height: 44px; font-size: 13px; }
+  :root .filters > select, :root .filter-search input { font-size: 16px; }
+  :root .filters > select, :root .filter-search { min-height: 44px; }
+  :root .filters > select { height: 44px; flex: 1 1 140px; max-width: 100%; }
+  :root .view-tabs button { min-height: 40px; font-size: 13px; padding: 8px 11px; }
+  :root .task-view-toolbar > .result-count { font-size: 12px; }
+  :root .task-view-toolbar > .btn { min-width: 44px; width: 44px; height: 44px; min-height: 44px; }
+  :root .kanban-board { grid-template-columns: repeat(5, 270px); margin-right: 0; padding-right: 0; }
+  :root .task-card h3 { font-size: 14px; }
+  :root .projects-grid, :root .team-grid, :root .collection-grid { grid-template-columns: 1fr; }
+  :root .project-card { padding: 20px; }
+  :root .project-card h2 { font-size: 19px; }
+  :root .project-card > p, :root .project-card > .project-goal, :root .team-card > p { font-size: 14px; }
+  :root .project-card-top > .badge, :root .project-card footer > span, :root .project-card .progress-label { font-size: 12px; }
+  :root .project-add { min-height: 180px; }
+  :root .settings-section { padding: 20px; }
+  :root .settings-section > p { font-size: 14px; }
+  :root .settings-stats { font-size: 12px; gap: 8px; }
+  :root .setting-toggle { flex-wrap: wrap; }
+  :root .setting-toggle > span { flex: 1 1 180px; }
+  :root .setting-toggle .field { max-width: 100%; font-size: 16px; }
+  :root .field, :root .task-meta-grid > label > input, :root .task-meta-grid > label > select, :root .inline-add input, :root .palette-input input, :root .task-dialog textarea { font-size: 16px; min-height: 44px; }
+  :root .task-meta-grid { grid-template-columns: 1fr; }
+  :root .task-meta-grid > label { font-size: 13px; }
+  :root .task-meta-grid > label > input, :root .task-meta-grid > label > select { max-width: 70%; width: 70%; }
+  :root .task-dialog > .dialog-footer > .small-text { font-size: 12px; max-width: 100%; }
+  :root .task-dialog > .dialog-footer { flex-wrap: wrap; }
+  :root .subtask-check { width: 44px; height: 44px; }
+  :root .palette-results > button { min-height: 44px; font-size: 14px; }
+  :root .command-palette footer { flex-wrap: wrap; font-size: 12px; gap: 8px; }
+  :root .toast { font-size: 13px; }
+  :root .toast > button { min-width: 40px; min-height: 40px; }
+  :root .error-banner { font-size: 13px; }
+  :root .view-notes, :root .view-daily { height: calc(100dvh - 64px); }
+  :root .note-toolbar { min-height: 60px; padding-left: 8px; padding-right: 8px; flex-wrap: wrap; gap: 4px; }
+  :root .note-breadcrumb { flex: 1 1 110px; font-size: 12px; }
+  :root .note-breadcrumb-current { max-width: 115px; }
+  :root .note-toolbar-actions { margin-left: auto; }
+  :root .note-toolbar-actions .btn-icon { width: 40px; height: 40px; }
+  :root .note-heading { padding: 22px 20px 18px; }
+  :root .note-kind-label, :root .note-tag { font-size: 12px; }
+  :root .note-tags > input { min-height: 40px; font-size: 16px; }
+  :root .note-editor-toolbar { padding: 0 16px 13px; row-gap: 8px; }
+  :root .note-view-switch button { min-height: 40px; font-size: 12px; padding: 8px 10px; }
+  :root .note-format-tools { width: 100%; overflow-x: auto; flex-wrap: nowrap; gap: 3px; }
+  :root .note-format-tools button { width: 40px; height: 40px; min-width: 40px; }
+  :root .note-source-pane, :root .note-preview-pane, :root .view-preview .note-preview-pane { padding: 20px; }
+  :root .note-source-pane textarea { font-size: 16px; min-height: 140px; }
+  :root .note-statusbar { font-size: 12px; min-height: 38px; padding: 6px 16px; }
+  :root .note-details { top: 60px; width: 290px; }
+  :root .note-property input, :root .note-property select, :root .note-add-property input { min-height: 44px; font-size: 16px; }
+  :root .note-property button { display: flex; min-width: 30px; min-height: 34px; align-items: center; justify-content: center; }
+  :root .note-property input, :root .note-property select { padding-right: 30px; }
+  :root .note-list-name { font-size: 14px; }
+  :root .note-search input, :root .note-filter-row select { font-size: 16px; }
+  :root .note-filter-row select { min-height: 44px; }
+  :root .note-new-title .field, :root .compact-modal > .field { font-size: 16px; min-height: 44px; }
+  :root .note-template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  :root .note-template-grid > button { padding: 14px 12px; }
+  :root .note-template-grid strong { font-size: 14px; }
+  :root .note-template-grid p { font-size: 13px; }
+  :root .knowledge-modal:not(.new-note-modal) .knowledge-modal-footer { bottom: -22px; }
+  :root .note-template-search input, :root .note-template-filters select { font-size: 16px; }
+  :root .base-view-tabs { gap: 16px; max-width: 100%; overflow-x: auto; }
+  :root .base-view-tabs > button { flex-shrink: 0; min-height: 44px; font-size: 12px; }
+  :root .base-search, :root .base-filterbar > select { height: 44px; }
+  :root .base-search input, :root .base-filterbar > select { font-size: 16px; }
+  :root .base-filterbar > select { flex: 1 1 140px; max-width: 100%; min-width: 0; }
+  :root .base-arrange-bar > label, :root .base-arrange-bar select, :root .base-clear-filters, :root .base-result-count, :root .base-board-hint { font-size: 12px; }
+  :root .base-arrange-bar select { min-height: 44px; max-width: 150px; }
+  :root .base-property-input { font-size: 16px !important; min-height: 44px; }
+  :root .base-status-select, :root .base-gallery-footer .base-status-select, :root .base-board-footer .base-status-select { min-height: 44px; font-size: 16px !important; max-width: 170px; min-width: 120px; }
+  :root .base-list-row { flex-wrap: wrap; }
+  :root .base-list-main > span { max-width: 100%; }
+  :root .base-list-props { width: 100%; flex-direction: row; justify-content: space-between; align-items: center; }
+  :root .base-gallery { grid-template-columns: 1fr; }
+  :root .base-gallery-content > p { height: auto; max-height: 64px; }
+  :root .base-gallery-footer { flex-direction: row; align-items: center; }
+  :root .base-gallery-footer .base-status-select { width: auto; }
+  :root .base-summary > div, :root .base-summary > button { padding: 16px 12px; gap: 8px; }
+  :root .base-summary > div > span, :root .base-summary > button > span { font-size: 12px; }
+  :root .base-summary strong { font-size: 22px; }
+  :root .base-options-heading h3 { font-size: 15px; }
+  :root .base-options-heading p, :root .base-group-heading h2 { font-size: 13px; }
+  :root .base-add-property > .field, :root .base-calculation-options > .field { font-size: 16px; }
+  :root .base-empty p { font-size: 14px; }
+  :root .view-graph, :root .view-canvas { padding: 24px 16px 18px; }
+  :root .visual-heading { flex-wrap: wrap; }
+  :root .visual-heading h1 { font-size: 27px; }
+  :root .visual-heading p { font-size: 14px; max-width: none; }
+  :root .visual-heading .btn { min-width: 44px; width: auto; min-height: 44px; height: auto; font-size: 13px !important; padding: 10px 12px !important; gap: 7px; }
+  :root .visual-segment { min-width: 0; max-width: 100%; }
+  :root .visual-segment button, :root .graph-types button, :root .canvas-tool { min-height: 44px; font-size: 12px; }
+  :root .graph-types { gap: 12px; flex-wrap: wrap; }
+  :root .graph-toolbar > .visual-search { min-width: 0; }
+  :root .visual-search input, :root .canvas-selector select, :root .canvas-add-search input, :root .canvas-add-form > .field, :root .canvas-inspector > .field { font-size: 16px; }
+  :root .graph-depth { font-size: 16px !important; min-height: 44px; }
+  :root .graph-surface, :root .canvas-surface, :root .canvas-layout, :root .graph-layout { min-height: 500px; }
+  :root .canvas-layout.with-inspector { grid-template-columns: minmax(0, 1fr); }
+  :root .canvas-inspector { border-left: 0; border-top: 1px solid var(--border); max-height: 420px; }
+  :root .canvas-inspector > .visual-muted, :root .canvas-selector select, :root .visual-footer, :root .visual-surface-caption { font-size: 12px; }
+  :root .canvas-selector { max-width: 180px; min-width: 0; }
+  :root .canvas-selector select { max-width: 145px; font-size: 16px; min-height: 44px; }
+  :root .canvas-toolbar > .btn-icon { width: 44px; height: 44px; }
+  :root .canvas-quick-add button, :root .visual-zoom button { width: 44px; height: 44px; }
+  :root .visual-zoom > span { font-size: 12px; width: 39px; }
+  :root .canvas-quick-add { left: 10px; top: 12px; }
+  :root .canvas-connect-notice { font-size: 12px; max-width: calc(100% - 24px); min-width: 0; left: 50%; }
+  :root .canvas-edit-text, :root .canvas-title-input, :root .canvas-card-size input { font-size: 16px !important; }
+  :root .canvas-card-size input { min-height: 44px; }
+  :root .canvas-add-types { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  :root .canvas-add-types button { min-height: 70px; font-size: 12px; }
+  :root .canvas-add-list strong { font-size: 14px; }
+  :root .canvas-colors button { width: 36px; height: 36px; }
+  :root .appearance-option-label strong { font-size: 14px; }
+  :root .appearance-option > p { font-size: 12px; }
+  :root .appearance-dropdown { right: 0; top: 48px; }
+  :root .tour-card > p { font-size: 14px; }
+  :root .tour-navigation > button { min-height: 44px; font-size: 13px; }
+  :root .tour-navigation > .tour-skip { font-size: 12px; }
+  :root .tour-close { min-width: 40px; min-height: 40px; }
+}
+
+@media (max-width: 430px) {
+  :root .topbar { padding-left: 10px; padding-right: 10px; }
+  :root .topbar-actions { gap: 2px; }
+  :root .breadcrumbs { gap: 3px; }
+  :root .breadcrumbs strong { max-width: 102px; }
+  :root .guest-badge { padding: 6px; gap: 4px; }
+  :root .note-template-grid { grid-template-columns: 1fr; }
+  :root .note-template-grid > button { padding: 15px; }
+  :root .note-template-grid p { margin-top: 5px; }
+  :root .note-template-icon { margin-bottom: 6px; }
+  :root .form-grid { grid-template-columns: 1fr; }
+  :root .settings-inline { flex-wrap: wrap; }
+  :root .settings-inline .field { flex: 1 1 100%; }
+  :root .note-breadcrumb { flex-basis: 100%; }
+  :root .note-toolbar-actions { width: 100%; justify-content: flex-end; }
+  :root .note-details { top: 108px; }
+  :root .tour-card { padding-left: 16px; padding-right: 16px; }
+  :root .tour-navigation { gap: 6px; flex-wrap: wrap; }
+  :root .tour-navigation > button { padding-left: 9px; padding-right: 9px; }
+  :root .appearance-option > p { font-size: 12px; }
+}
+
+/* Keep mobile template fields readable when component styles load later. */
+@media (max-width: 760px) {
+  :root .new-note-modal .note-template-search input, :root .new-note-modal .note-template-filters select { font-size: 16px; }
+}

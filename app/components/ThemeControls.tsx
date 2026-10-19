@@ -3,9 +3,10 @@
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {Check,ChevronDown,Moon,Palette,Sun} from 'lucide-react';
 import './appearance.css';
+import {readBrowserPreference} from '../lib/browser-preferences';
 
 export type Appearance='light'|'dark'|'current';
-const key='forgeboard-appearance';
+const key='projectanvil-appearance';
 const valid=(value:unknown):Appearance=>value==='light'||value==='dark'?value:'current';
 const options=[
  {id:'light' as const,label:'Light',description:'A bright, clear workspace.',icon:Sun,bg:'#f4f6f9',sidebar:'#eef0f5',panel:'#ffffff',text:'#334155',accent:'#6d55cc'},
@@ -18,7 +19,7 @@ export function ThemeProvider({children}:{children:ReactNode}){
  const [appearance,setAppearance]=useState<Appearance>('current');
  useEffect(()=>{
   const apply=(value:Appearance)=>{document.documentElement.dataset.theme=value;setAppearance(value)};
-  try{apply(valid(localStorage.getItem(key)))}catch{apply('current')}
+  try{apply(valid(readBrowserPreference(key)))}catch{apply('current')}
   const sync=(event:StorageEvent)=>{if(event.key===key||event.key===null)apply(valid(event.newValue))};
   window.addEventListener('storage',sync);
   return()=>window.removeEventListener('storage',sync);
