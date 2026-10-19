@@ -21,6 +21,10 @@ The local copy and published website have **separate databases and attachment st
 
 Start with the editable Aetherfall and Moonlit Market examples, or create your own projects. All example records can be edited or removed. Move or delete a project's notes and tasks before deleting the project.
 
+## Appearance
+
+Choose **Light**, **Dark**, or **Current** from the appearance icon in the top bar, or **Workspace settings → Appearance**. Current preserves the original violet look. Your choice is saved on this device and follows notes, tasks, graph, canvas, and diagrams.
+
 ## Save, share, and back up
 
 Changes are saved to the workspace database. Other open browsers refresh about every ten seconds. A save error means the change needs attention; use the retry/refresh control and check the message before closing the browser. This is shared planning with periodic refresh, rather than simultaneous Google Docs-style text editing. Coordinate before editing the same note or canvas at the same time.
@@ -77,4 +81,5 @@ npm run build
 ```
 
 The backend check uses an in-memory SQLite database and a fake file bucket. It checks mutation validation, links and dependencies, deletion cleanup, snapshots, concurrent saves and task numbering, file-upload metadata, and safe download headers. It does not connect to or verify a published deployment. Test browser interactions and mobile layouts separately before releasing changes.
+
 

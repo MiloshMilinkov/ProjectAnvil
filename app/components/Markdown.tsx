@@ -8,6 +8,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import 'katex/dist/katex.min.css';
 import './knowledge.css';
+import {useAppearance} from './ThemeControls';
 import type { Note, Workspace } from '../lib/types';
 
 export const headingSlug = (text:string) => text.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu,'').replace(/\s+/g,'-');
@@ -28,18 +29,19 @@ function remarkHighlights(){
 }
 
 function Mermaid({ source }:{source:string}) {
+  const {appearance}=useAppearance();
   const ref=useRef<HTMLDivElement>(null);
   const [error,setError]=useState(false);
   useEffect(()=>{
     let live=true;
     setError(false);
     import('mermaid').then(async ({default:mermaid})=>{
-      mermaid.initialize({startOnLoad:false,theme:'dark',securityLevel:'strict',fontFamily:'Inter, system-ui, sans-serif'});
+      mermaid.initialize({startOnLoad:false,theme:appearance==='current'?'dark':'base',securityLevel:'strict',fontFamily:'DM Sans, system-ui, sans-serif',...(appearance==='current'?{}:{themeVariables:appearance==='light'?{darkMode:false,background:'#ffffff',primaryColor:'#efecfa',primaryTextColor:'#302c40',primaryBorderColor:'#9787c3',secondaryColor:'#eef3f7',tertiaryColor:'#f7f8fb',lineColor:'#7d718c',textColor:'#302c40'}:{darkMode:true,background:'#191c23',primaryColor:'#273447',primaryTextColor:'#e2e8f0',primaryBorderColor:'#6c88a8',secondaryColor:'#232b38',tertiaryColor:'#1d232d',lineColor:'#9aadc4',textColor:'#e2e8f0'}})});
       const {svg}=await mermaid.render(`diagram-${crypto.randomUUID().replace(/-/g,'')}`,source);
       if(live && ref.current) ref.current.innerHTML=svg;
     }).catch(()=>{if(live)setError(true);});
     return()=>{live=false;};
-  },[source]);
+  },[source,appearance]);
   return error ? <pre className="diagram-error"><code>{source}</code><small>Check the Mermaid diagram syntax.</small></pre> : <div ref={ref} className="mermaid-diagram" aria-label="Mermaid diagram" />;
 }
 
