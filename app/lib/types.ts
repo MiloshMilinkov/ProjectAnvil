@@ -1,6 +1,6 @@
 export type Status = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done';
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';
-export interface Person { id: string; name: string; role: string; color: string }
+export interface Person { id: string; name: string; role: string; color: string; userId?: string; inactive?: boolean }
 export interface Project { id: string; name: string; key: string; description: string; color: string; status: string; goal: string; targetDate: string }
 export interface Task { id: string; key: string; title: string; description: string; status: Status; priority: Priority; type: 'task' | 'bug' | 'story' | 'epic'; projectId: string; assigneeId: string; dueDate: string; estimate: number; tags: string[]; noteIds: string[]; blockedBy: string[]; subtasks: {id:string; title:string; done:boolean}[]; comments: {id:string; personId:string; body:string; createdAt:string}[]; createdAt: string; updatedAt: string }
 export interface Note { id: string; title: string; content: string; folder: string; tags: string[]; projectId: string; kind: 'note' | 'world' | 'character' | 'research' | 'daily' | 'meeting'; bookmarked: boolean; properties: Record<string,string>; snapshots: {id:string; content:string; savedAt:string}[]; createdAt: string; updatedAt: string }

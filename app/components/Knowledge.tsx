@@ -1,4 +1,5 @@
 'use client';
+import {useWorkspaceFetch} from './WorkspaceScope';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowUpRight, BookOpen, Bookmark, CalendarDays, Check, ChevronLeft, ChevronRight, Columns2, Copy, ExternalLink, FileText, Folder, GitMerge, History, ImagePlus, Link2, LoaderCircle, Mic, MoreHorizontal, Plus, Presentation, Scissors, Search, Settings2, Square, Tag, Trash2, X } from 'lucide-react';
@@ -44,6 +45,7 @@ const shortDate=(value:string)=>new Date(value).toLocaleDateString(undefined,{mo
 const kindLabel=(kind:Kind)=>noteKinds.find(item=>item.kind===kind)?.label || 'Note';
 
 export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mode,tourActive=false,projectFilter,openTask,openNote,notify}:Props){
+  const scopedFetch=useWorkspaceFetch();
   const [draft,setDraft]=useState<Note|null>(workspace.notes.find(note=>note.id===selectedNote) || null);
   const [view,setView]=useState<'edit'|'preview'|'split'>('split');
   const [search,setSearch]=useState('');
@@ -271,7 +273,7 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
     setUploading(true);setRecordError('');
     try{
       const data=new FormData();data.append('file',file);
-      const response=await fetch('/api/media',{method:'POST',body:data});
+      const response=await scopedFetch('/api/media',{method:'POST',body:data});
       if(!response.ok)throw new Error('Upload failed');
       const {media,workspace:updatedWorkspace}=await response.json() as {media?:Media;workspace?:Workspace;error?:string};
       if(!media?.url)throw new Error('No file URL returned');

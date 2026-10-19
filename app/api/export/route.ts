@@ -1,8 +1,8 @@
 import { readWorkspace, routeError } from '../../lib/workspace-store';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const workspace = await readWorkspace();
+    const workspace = await readWorkspace(request);
     const date = new Date().toISOString().slice(0, 10);
     return new Response(JSON.stringify(workspace, null, 2), {
       headers: {

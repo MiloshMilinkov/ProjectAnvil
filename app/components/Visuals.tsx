@@ -1,4 +1,5 @@
 'use client';
+import {useWorkspaceFetch} from './WorkspaceScope';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ArrowDownToLine, ArrowUpRight, Check, CheckSquare2, CircleDot, FileText, Focus, Globe2, ImagePlus, Layers3, Link2, Loader2, Maximize, Minus, MousePointer2, Network, Plus, Search, StickyNote, Trash2, Unlink, X } from 'lucide-react';
@@ -216,6 +217,7 @@ const sanitizeCanvas = (canvas: Canvas): Canvas => canvas.cards.some(card => car
 type CanvasDrag = { type: 'pan' | 'move' | 'resize'; id?: string; start: Point; origin: Point; width?: number; height?: number; moved: boolean };
 
 export function CanvasView(props: FeatureProps) {
+  const scopedFetch=useWorkspaceFetch();
   const { workspace, mutate, notify } = props;
   const [canvasId, setCanvasId] = useState(workspace.canvases[0]?.id || '');
   const [canvas, setCanvas] = useState<Canvas | null>(workspace.canvases[0] || null);
@@ -329,7 +331,7 @@ export function CanvasView(props: FeatureProps) {
     setUploading(true);
     try {
       const form = new FormData(); form.append('file', file);
-      const result = await fetch('/api/media', { method: 'POST', body: form });
+      const result = await scopedFetch('/api/media', { method: 'POST', body: form });
       const body = await result.json() as { media?: Media; workspace?: Workspace; error?: string };
       if (!result.ok || !body.media) throw new Error(body.error || 'Upload failed');
       const media: Media = body.media;

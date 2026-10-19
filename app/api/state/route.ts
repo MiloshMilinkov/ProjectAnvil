@@ -1,14 +1,17 @@
-import { mutateWorkspace, readMutationRequest, readWorkspace, routeError } from '../../lib/workspace-store';
+import { resolveWorkspace } from '../../lib/access-store';
+import { mutateWorkspace, readMutationRequest, readWorkspace, routeError, workspaceForClient } from '../../lib/workspace-store';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return Response.json({ workspace: await readWorkspace() }, { headers: { 'Cache-Control': 'no-store' } });
+    const access = await resolveWorkspace(request);
+    return Response.json({ workspace: workspaceForClient(await readWorkspace(request), access.id) }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return routeError(error); }
 }
 
 export async function POST(request: Request) {
   try {
-    const workspace = await mutateWorkspace(await readMutationRequest(request));
-    return Response.json({ workspace }, { headers: { 'Cache-Control': 'no-store' } });
+    const access = await resolveWorkspace(request);
+    const workspace = await mutateWorkspace(request, await readMutationRequest(request));
+    return Response.json({ workspace: workspaceForClient(workspace, access.id) }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return routeError(error); }
 }

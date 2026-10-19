@@ -19,7 +19,7 @@ const content = z.string().max(100_000, 'Keep a single note or description under
 const tags = z.array(z.string().min(1).max(80)).max(40);
 const references = z.array(id).max(500).refine(values => new Set(values).size === values.length, 'Remove duplicate links.');
 const uniqueIds = <T extends { id: string }>(values: T[]) => new Set(values.map(value => value.id)).size === values.length;
-const people = z.object({ id, name: title, role: short, color }).strict();
+const people = z.object({ id, name: title, role: short, color, userId: id.optional(), inactive: z.boolean().optional() }).strict();
 const projects = z.object({ id, name: title, key: z.string().min(1).max(15).regex(/^[A-Za-z0-9_-]+$/), description: z.string().max(10_000), color, status: short, goal: z.string().max(10_000), targetDate: date }).strict();
 const tasks = z.object({
   id, key: z.string().min(1).max(50), title, description: content,
@@ -51,7 +51,7 @@ const savedViews = z.object({ id, name: title, query: z.string().max(500), assig
 const entitySchemas = { people, projects, tasks, notes, media, canvases, savedViews };
 const workspaceSchema = z.object({
   name: title, revision: z.number().int().nonnegative(),
-  people: z.array(people).max(200).refine(uniqueIds, 'Person IDs must be unique.'),
+  people: z.array(people).max(500).refine(uniqueIds, 'Person IDs must be unique.'),
   projects: z.array(projects).max(100).refine(uniqueIds, 'Project IDs must be unique.'),
   tasks: z.array(tasks).max(1500).refine(uniqueIds, 'Task IDs must be unique.'),
   notes: z.array(notes).max(1000).refine(uniqueIds, 'Note IDs must be unique.'),
@@ -60,7 +60,7 @@ const workspaceSchema = z.object({
   savedViews: z.array(savedViews).max(100).refine(uniqueIds, 'Saved view IDs must be unique.'),
 }).strict();
 const mutationSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('upsert'), entity: z.enum(['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews']), item: z.record(z.unknown()) }).strict(),
+  z.object({ action: z.literal('upsert'), entity: z.enum(['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews']), item: z.record(z.string(), z.unknown()) }).strict(),
   z.object({ action: z.literal('delete'), entity: z.enum(['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews']), id }).strict(),
   z.object({ action: z.literal('rename'), name: title }).strict(),
   z.object({ action: z.literal('import'), workspace: workspaceSchema }).strict(),

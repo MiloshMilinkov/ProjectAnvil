@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { readWorkspace, routeError } from '../../../lib/workspace-store';
+import { resolveWorkspace } from '../../../lib/access-store';
 import { WorkspaceError } from '../../../lib/workspace-model';
 
 const inlineTypes = new Set([
@@ -13,14 +14,20 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const { id } = await context.params;
     if (!/^[a-zA-Z0-9_-]{1,120}$/.test(id)) throw new WorkspaceError('This file could not be found.', 404);
     if (!env.BUCKET) throw new WorkspaceError('Media storage is unavailable.', 503);
-    const workspace = await readWorkspace();
+    const access = await resolveWorkspace(request);
+    const workspace = await readWorkspace(request);
     const media = workspace.media.find(item => item.id === id);
     if (!media) throw new WorkspaceError('This file was removed or could not be found.', 404);
+    let key = `media/${access.id}/${id}`;
+    let metadata = await env.BUCKET.head(key);
+    if (!metadata && access.kind === 'guest' && access.id === 'main') {
+      key = `media/${id}`;
+      metadata = await env.BUCKET.head(key);
+    }
+    if (!metadata) throw new WorkspaceError('The file data is missing. Upload the file again.', 404);
     let range: { offset: number; length: number } | undefined;
     const rangeHeader = request.headers.get('range');
     if (rangeHeader) {
-      const metadata = await env.BUCKET.head(`media/${id}`);
-      if (!metadata) throw new WorkspaceError('The file data is missing. Upload the file again.', 404);
       const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
       let start = 0;
       let end = metadata.size - 1;
@@ -35,7 +42,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       }
       range = { offset: start, length: end - start + 1 };
     }
-    const object = await env.BUCKET.get(`media/${id}`, range ? { range } : undefined);
+    const object = await env.BUCKET.get(key, range ? { range } : undefined);
     if (!object) throw new WorkspaceError('The file data is missing. Upload the file again.', 404);
     const isInline = inlineTypes.has(media.type.toLowerCase());
     const filename = media.name.replace(/[^\x20-\x7E]|["\\]/g, '_');

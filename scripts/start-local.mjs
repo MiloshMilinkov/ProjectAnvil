@@ -8,6 +8,7 @@ const port = 5173;
 const url = `http://${host}:${port}/`;
 const root = fileURLToPath(new URL("../", import.meta.url));
 process.chdir(root);
+await import("./prepare-local-accounts.mjs");
 
 async function portIsOpen() {
   return await new Promise((resolve) => {
