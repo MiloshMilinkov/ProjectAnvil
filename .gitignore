@@ -54,3 +54,14 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Private local backups, never publish.
+/backups/
+
+# Generated compiler caches and local Cloudflare secrets.
+*.tsbuildinfo
+.dev.vars*
+
+# Keep machine-specific editor state out; share project tasks.
+/.vscode/*
+!/.vscode/tasks.json

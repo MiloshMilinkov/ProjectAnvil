@@ -7,7 +7,7 @@ import { today, uid } from '../lib/types';
 import Markdown from './Markdown';
 import './knowledge.css';
 
-type Props=FeatureProps & {selectedNote:string;mode:'notes'|'daily';onSelectNote:(id:string)=>void};
+type Props=FeatureProps & {selectedNote:string;mode:'notes'|'daily';tourActive?:boolean;onSelectNote:(id:string)=>void};
 type Kind=Note['kind'];
 type EditableKey='title'|'content'|'folder'|'tags'|'projectId'|'kind'|'bookmarked'|'properties';
 const editableKeys:EditableKey[]=['title','content','folder','tags','projectId','kind','bookmarked','properties'];
@@ -29,7 +29,7 @@ function newNote(kind:Kind,title:string,projectId:string):Note {
 const shortDate=(value:string)=>new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
 const kindLabel=(kind:Kind)=>kind==='note'?'Note':templates.find(item=>item.kind===kind)?.label || 'Note';
 
-export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mode,projectFilter,openTask,openNote,notify}:Props){
+export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mode,tourActive=false,projectFilter,openTask,openNote,notify}:Props){
   const [draft,setDraft]=useState<Note|null>(workspace.notes.find(note=>note.id===selectedNote) || null);
   const [view,setView]=useState<'edit'|'preview'|'split'>('split');
   const [search,setSearch]=useState('');
@@ -210,13 +210,13 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
 
   const dailyMode=useRef(false);
   useEffect(()=>{
-    if(mode!=='daily'){dailyMode.current=false;return;}
+    if(tourActive || mode!=='daily'){dailyMode.current=false;return;}
     if(dailyMode.current)return;
     dailyMode.current=true;
     const note=workspaceRef.current.notes.find(item=>item.kind==='daily' && item.title===today());
     if(note)onSelectNote(note.id);
     else void create('daily',today());
-  },[mode]);
+  },[mode,tourActive]);
 
   const notes=workspace.notes.filter(note=>(mode!=='daily' || note.kind==='daily') && (projectFilter==='all' || !projectFilter || note.projectId===projectFilter));
   const folders=[...new Set(notes.map(note=>note.folder || 'Notes'))].sort();

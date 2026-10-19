@@ -37,7 +37,7 @@ export async function mutateWorkspace(mutation: unknown): Promise<Workspace> {
     if (result.meta.changes === 1) return updated;
     await new Promise(resolve => setTimeout(resolve, 15 + Math.floor(Math.random() * 35) * (attempt + 1)));
   }
-  throw new WorkspaceError('Several teammates are saving at once. Your change was not saved; try again.', 409);
+  throw new WorkspaceError('Several changes are being saved at once. Your change was not saved; try again.', 409);
 }
 
 export function routeError(error: unknown): Response {

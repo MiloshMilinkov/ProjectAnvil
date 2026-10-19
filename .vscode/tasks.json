@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Forgeboard",
+      "type": "process",
+      "command": "node",
+      "args": ["scripts/start-local.mjs"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Check Forgeboard types",
+      "type": "process",
+      "command": "node",
+      "args": ["node_modules/typescript/bin/tsc", "--noEmit"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": "$tsc",
+      "group": "test"
+    },
+    {
+      "label": "Test Forgeboard storage",
+      "type": "process",
+      "command": "node",
+      "args": ["scripts/check-backend.mjs"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Build Forgeboard",
+      "type": "process",
+      "command": "node",
+      "args": ["scripts/run-framework.mjs", "build"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}

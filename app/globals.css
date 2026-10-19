@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap');
 @import 'tailwindcss';
 @import 'highlight.js/styles/github-dark-dimmed.css';
 :root{--bg:var(--theme-surface-15151a,#15151a);--panel:var(--theme-surface-1c1c22,#1c1c22);--panel-2:var(--theme-surface-23232b,#23232b);--border:var(--theme-line-2c2c35,#2c2c35);--muted:var(--theme-ink-8f8e9e,#8f8e9e);--text:var(--theme-ink-e7e5ed,#e7e5ed);--accent:var(--theme-ink-b19aff,#b19aff);--accent-soft:var(--theme-surface-b19aff18,#b19aff18);--danger:var(--theme-ink-ed888e,#ed888e);--green:var(--theme-ink-91bea5,#91bea5);--font-sans:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color-scheme:dark}
