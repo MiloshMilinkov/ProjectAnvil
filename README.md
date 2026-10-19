@@ -73,7 +73,7 @@ Open this folder in VS Code and use Source Control to review changes. A local ch
 
 ## Appearance
 
-Choose **Light**, **Dark**, or **Current** from the top-bar appearance icon or **Workspace settings → Appearance**. Current retains the original violet look. The preference is stored in your browser on this PC.
+Choose **Light**, **Dark**, **Warp**, **Focus**, or **Soft** from the top-bar appearance icon or **Workspace settings → Appearance**. Warp retains the original violet look. Focus combines light slate surfaces with a dark sidebar and header. Soft uses blush pink, mauve, and dusty rose accents. The preference is stored in your browser, and the former Current selection carries over to Warp.
 
 ## Troubleshooting
 

@@ -1,0 +1,33 @@
+/* Complete light-surface syntax colors for the two new appearances. */
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown pre code.hljs {
+  color: var(--theme-ink-c6c5d4);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs :is(.hljs-doctag,.hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_,.hljs-selector-tag,.hljs-literal) {
+  color: var(--theme-ink-b995e7);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs :is(.hljs-title,.hljs-section) {
+  color: var(--theme-ink-8fbdd9);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs :is(.hljs-attr,.hljs-attribute,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-symbol,.hljs-bullet) {
+  color: var(--theme-ink-d4b07f);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs :is(.hljs-regexp,.hljs-string,.hljs-name,.hljs-selector-pseudo) {
+  color: var(--theme-ink-a4c59a);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs .hljs-built_in {
+  color: var(--theme-ink-8fc4bc);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs :is(.hljs-comment,.hljs-code,.hljs-formula,.hljs-quote) {
+  color: var(--theme-ink-73788d);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs :is(.hljs-subst,.hljs-emphasis,.hljs-strong,.hljs-char,.hljs-link,.hljs-params,.hljs-property,.hljs-punctuation,.hljs-tag,.hljs-variable) {
+  color: var(--theme-ink-c6c5d4);
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs .hljs-addition {
+  color: #275534;
+  background-color: #e4f1e6;
+}
+html:is([data-theme="focus"],[data-theme="soft"]) .markdown .hljs .hljs-deletion {
+  color: #852b44;
+  background-color: #fbe5eb;
+}

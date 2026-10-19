@@ -36,7 +36,11 @@ function Mermaid({ source }:{source:string}) {
     let live=true;
     setError(false);
     import('mermaid').then(async ({default:mermaid})=>{
-      mermaid.initialize({startOnLoad:false,theme:appearance==='current'?'dark':'base',securityLevel:'strict',fontFamily:'DM Sans, system-ui, sans-serif',...(appearance==='current'?{}:{themeVariables:appearance==='light'?{darkMode:false,background:'#ffffff',primaryColor:'#efecfa',primaryTextColor:'#302c40',primaryBorderColor:'#9787c3',secondaryColor:'#eef3f7',tertiaryColor:'#f7f8fb',lineColor:'#7d718c',textColor:'#302c40'}:{darkMode:true,background:'#191c23',primaryColor:'#273447',primaryTextColor:'#e2e8f0',primaryBorderColor:'#6c88a8',secondaryColor:'#232b38',tertiaryColor:'#1d232d',lineColor:'#9aadc4',textColor:'#e2e8f0'}})});
+      const styles=getComputedStyle(ref.current || document.documentElement);
+      const color=(name:string,fallback:string)=>styles.getPropertyValue(name).trim() || fallback;
+      const themed=appearance==='focus'||appearance==='soft';
+      const themeVariables=themed?{darkMode:false,background:color('--panel','#ffffff'),primaryColor:color('--panel-2','#f2edf2'),primaryTextColor:color('--text','#302c40'),primaryBorderColor:color('--accent','#9787c3'),secondaryColor:color('--panel','#ffffff'),tertiaryColor:color('--bg','#f7f8fb'),lineColor:color('--muted','#7d718c'),textColor:color('--text','#302c40'),edgeLabelBackground:color('--panel','#ffffff')}:appearance==='light'?{darkMode:false,background:'#ffffff',primaryColor:'#efecfa',primaryTextColor:'#302c40',primaryBorderColor:'#9787c3',secondaryColor:'#eef3f7',tertiaryColor:'#f7f8fb',lineColor:'#7d718c',textColor:'#302c40'}:{darkMode:true,background:'#191c23',primaryColor:'#273447',primaryTextColor:'#e2e8f0',primaryBorderColor:'#6c88a8',secondaryColor:'#232b38',tertiaryColor:'#1d232d',lineColor:'#9aadc4',textColor:'#e2e8f0'};
+      mermaid.initialize({startOnLoad:false,theme:appearance==='warp'?'dark':'base',securityLevel:'strict',fontFamily:'DM Sans, system-ui, sans-serif',...(appearance==='warp'?{}:{themeVariables})});
       const {svg}=await mermaid.render(`diagram-${crypto.randomUUID().replace(/-/g,'')}`,source);
       if(live && ref.current) ref.current.innerHTML=svg;
     }).catch(()=>{if(live)setError(true);});
