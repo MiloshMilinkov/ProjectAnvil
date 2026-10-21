@@ -1,10 +1,10 @@
 # ProjectAnvil source control
 
-ProjectAnvil already has a local Git repository on the `main` branch. Git keeps a history of the app's source code on this PC. The existing history is preserved. No GitHub repository or remote is connected yet.
+Use Git to review and save the app's source, then publish or push it to your GitHub repository from VS Code. A cloned repository already includes its Git history.
 
 ## Open the project in VS Code
 
-1. Choose **File → Open Folder** and open `D:\ProjectAnvil`.
+1. Choose **File → Open Folder** and open the ProjectAnvil repository folder.
 2. Open **Source Control** in the left sidebar, or press **Ctrl+Shift+G**. VS Code should recognize the repository automatically; do not initialize it again.
 3. Review the changes listed here before committing them. The current app source has a local checkpoint commit.
 
@@ -40,6 +40,6 @@ Git tracks the app code and setup files. These local files are excluded:
 - `.env*` and `.dev.vars*`: private environment settings.
 - `.sites-runtime/`, local tool folders, and TypeScript build caches.
 
-Git commits and GitHub pushes do not back up your notes, tasks, or uploaded media. Stop ProjectAnvil and copy `.wrangler/state` separately when backing up your work. The README explains how to restore it.
+Git commits and GitHub pushes do not back up your notes, tasks, uploaded media, or personal work rooms. Stop ProjectAnvil and copy `.wrangler/state` together with the matching private `.dev.vars` file. The [local setup guide](docs/LOCAL_SETUP.md#data-and-backups) explains complete backup and restore steps.
 
 Avoid **Discard Changes**, deleting `.wrangler`, or Git reset/clean commands as troubleshooting steps unless you intend to remove the affected work.
