@@ -13,6 +13,8 @@ const output = fs.mkdtempSync(
 );
 const files = [
   "app/lib/types.ts",
+  "app/lib/task-scheduling.ts",
+  "app/lib/task-drafts.ts",
   "app/lib/seed.ts",
   "app/lib/workspace-model.ts",
   "app/lib/access-store.ts",
@@ -80,6 +82,10 @@ try {
     path.join(root, "tests", "drafts.cjs"),
     path.join(output, "drafts.cjs"),
   );
+  fs.copyFileSync(
+    path.join(root, "tests", "task-scheduling.cjs"),
+    path.join(output, "task-scheduling.cjs"),
+  );
   const result = spawnSync(process.execPath, [path.join(output, "check.cjs")], {
     cwd: root,
     stdio: "inherit",
@@ -93,13 +99,21 @@ try {
   });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
-  if (!process.exitCode) {
+  for (const check of [
+    { file: "drafts.cjs" },
+    { file: "task-scheduling.cjs", timezone: "Europe/Belgrade" },
+    { file: "task-scheduling.cjs", timezone: "America/New_York" },
+  ]) {
+    if (process.exitCode) break;
     const draftResult = spawnSync(
       process.execPath,
-      [path.join(output, "drafts.cjs")],
+      [path.join(output, check.file)],
       {
         cwd: root,
         stdio: "inherit",
+        env: check.timezone
+          ? { ...process.env, TZ: check.timezone }
+          : process.env,
       },
     );
     if (draftResult.error) throw draftResult.error;

@@ -8,6 +8,7 @@ const {
   applyMutation: applyGuardedMutation,
   validateWorkspace,
 } = require("./compiled/app/lib/workspace-model");
+const { entitySignature } = require("./compiled/app/lib/relationships");
 
 function mutationBase(state, mutation) {
   if (mutation.action === "rename" && !Object.hasOwn(mutation, "base"))
@@ -138,7 +139,218 @@ function fixtureWorkspace() {
   return { ...state, revision: 0 };
 }
 
+function checkSchedulingModel() {
+  let state = applyMutation(
+    createSeedWorkspace(),
+    {
+      action: "upsert",
+      entity: "tasks",
+      item: { id: "schedule-task", title: "Scheduled work" },
+    },
+    now,
+  );
+  const update = (item) => {
+    state = applyMutation(
+      state,
+      {
+        action: "upsert",
+        entity: "tasks",
+        item: { id: "schedule-task", ...item },
+      },
+      now,
+    );
+    return state.tasks[0];
+  };
+  assert.equal(state.tasks[0].startDate, "");
+  update({ startDate: "2026-10-20" });
+  assert.equal(state.tasks[0].dueDate, "", "A planned start can stand alone");
+  update({ dueDate: "2026-10-25" });
+  assert.equal(
+    update({ startDate: "2026-10-25" }).startDate,
+    "2026-10-25",
+    "Same-day tasks are valid",
+  );
+  assert.throws(
+    () => update({ startDate: "2026-10-26" }),
+    /on or before the due date/,
+  );
+  assert.throws(() => update({ startDate: "2026-02-30" }), /valid date/);
+  assert.throws(() => update({ startDate: "tomorrow" }), /startDate/);
+  assert.equal(
+    update({ startDate: "" }).dueDate,
+    "2026-10-25",
+    "A due date can stand alone",
+  );
+  assert.equal(
+    update({ dueDate: "" }).startDate,
+    "",
+    "Both schedule fields can be cleared",
+  );
+
+  const reference = { type: "task", id: "schedule-task" };
+  const emptySignature = entitySignature(state, reference);
+  const oldWorkspace = structuredClone(state);
+  delete oldWorkspace.tasks[0].startDate;
+  assert.equal(
+    entitySignature(oldWorkspace, reference),
+    emptySignature,
+    "Introducing an empty start date must not mark legacy relationships changed",
+  );
+  const normalized = validateWorkspace(oldWorkspace);
+  assert.equal(normalized.tasks[0].startDate, "");
+  assert.equal(
+    oldWorkspace.tasks[0].startDate,
+    undefined,
+    "Legacy normalization does not mutate supplied records",
+  );
+  const imported = applyMutation(state, {
+    action: "import",
+    workspace: oldWorkspace,
+  });
+  assert.equal(imported.tasks[0].startDate, "");
+  const scheduleSignature = entitySignature(
+    { ...state, tasks: [{ ...state.tasks[0], startDate: "2026-10-20" }] },
+    reference,
+  );
+  assert.notEqual(
+    scheduleSignature,
+    emptySignature,
+    "Actual scheduling changes affect relationship review",
+  );
+
+  update({ startDate: "2026-10-20", dueDate: "2026-10-25" });
+  const base = structuredClone(state.tasks[0]);
+  const revisedDue = applyMutation(
+    state,
+    {
+      action: "upsert",
+      entity: "tasks",
+      item: { id: base.id, dueDate: "2026-10-22" },
+      base,
+    },
+    now,
+  );
+  assert.throws(
+    () =>
+      applyGuardedMutation(
+        revisedDue,
+        {
+          action: "upsert",
+          entity: "tasks",
+          item: { id: base.id, startDate: "2026-10-24" },
+          base,
+        },
+        now,
+      ),
+    (error) => error.status === 409 && /schedule changed/.test(error.message),
+    "Independent edits cannot merge into an inverted schedule",
+  );
+  const revisedStart = applyMutation(
+    state,
+    {
+      action: "upsert",
+      entity: "tasks",
+      item: { id: base.id, startDate: "2026-10-24" },
+      base,
+    },
+    now,
+  );
+  assert.throws(
+    () =>
+      applyGuardedMutation(
+        revisedStart,
+        {
+          action: "upsert",
+          entity: "tasks",
+          item: { id: base.id, dueDate: "2026-10-22" },
+          base,
+        },
+        now,
+      ),
+    (error) => error.status === 409 && /schedule changed/.test(error.message),
+  );
+  const compatible = applyGuardedMutation(
+    revisedDue,
+    {
+      action: "upsert",
+      entity: "tasks",
+      item: { id: base.id, startDate: "2026-10-21" },
+      base,
+    },
+    now,
+  );
+  assert.equal(compatible.tasks[0].startDate, "2026-10-21");
+  assert.equal(compatible.tasks[0].dueDate, "2026-10-22");
+
+  const defaultedTask = validateWorkspace(oldWorkspace).tasks[0];
+  const deletedLegacyTask = applyGuardedMutation(
+    { ...oldWorkspace, tasks: [defaultedTask] },
+    {
+      action: "delete",
+      entity: "tasks",
+      id: defaultedTask.id,
+      base: oldWorkspace.tasks[0],
+    },
+    now,
+  );
+  assert.equal(
+    deletedLegacyTask.tasks.length,
+    0,
+    "An old empty baseline can still delete an unchanged normalized task",
+  );
+
+  state = applyMutation(
+    state,
+    {
+      action: "upsert",
+      entity: "savedViews",
+      item: {
+        id: "schedule-view",
+        name: "Due soon",
+        dateFilter: "due-next-7-days",
+        sort: "due-date",
+      },
+    },
+    now,
+  );
+  assert.equal(state.savedViews[0].dateFilter, "due-next-7-days");
+  assert.equal(state.savedViews[0].sort, "due-date");
+  const legacyViews = structuredClone(state);
+  delete legacyViews.savedViews[0].dateFilter;
+  delete legacyViews.savedViews[0].sort;
+  const normalizedViews = validateWorkspace(legacyViews);
+  assert.equal(normalizedViews.savedViews[0].dateFilter, "all");
+  assert.equal(normalizedViews.savedViews[0].sort, "priority");
+  assert.equal(
+    applyMutation(state, { action: "import", workspace: legacyViews })
+      .savedViews[0].sort,
+    "priority",
+  );
+  const deletedLegacyView = applyGuardedMutation(
+    normalizedViews,
+    {
+      action: "delete",
+      entity: "savedViews",
+      id: "schedule-view",
+      base: legacyViews.savedViews[0],
+    },
+    now,
+  );
+  assert.equal(deletedLegacyView.savedViews.length, 0);
+  for (const item of [{ dateFilter: "invalid" }, { sort: "invalid" }])
+    assert.throws(
+      () =>
+        applyMutation(state, {
+          action: "upsert",
+          entity: "savedViews",
+          item: { id: "schedule-view", ...item },
+        }),
+      /dateFilter|sort/,
+    );
+}
+
 async function main() {
+  checkSchedulingModel();
   const empty = createSeedWorkspace();
   assert.equal(empty.name, "My workspace");
   assert.equal(empty.revision, 0);
@@ -613,6 +825,36 @@ async function main() {
       0,
       `Stored workspace must start without ${key}`,
     );
+  const originalStoredData = sql
+    .prepare("SELECT data FROM workspaces WHERE id = 'main'")
+    .get().data;
+  const legacyStored = fixtureWorkspace();
+  for (const task of legacyStored.tasks) delete task.startDate;
+  legacyStored.savedViews.push({
+    id: "legacy-view",
+    name: "Existing view",
+    query: "",
+    project: "",
+    assignee: "",
+    priority: "",
+    status: "",
+  });
+  const legacyStoredData = JSON.stringify(legacyStored);
+  sql
+    .prepare("UPDATE workspaces SET data = ? WHERE id = 'main'")
+    .run(legacyStoredData);
+  const legacyRead = await store.readWorkspace(request());
+  assert.ok(legacyRead.tasks.every((task) => task.startDate === ""));
+  assert.equal(legacyRead.savedViews[0].dateFilter, "all");
+  assert.equal(legacyRead.savedViews[0].sort, "priority");
+  assert.equal(
+    sql.prepare("SELECT data FROM workspaces WHERE id = 'main'").get().data,
+    legacyStoredData,
+    "Opening legacy records supplies defaults without rewriting persisted data",
+  );
+  sql
+    .prepare("UPDATE workspaces SET data = ? WHERE id = 'main'")
+    .run(originalStoredData);
   await Promise.all(
     Array.from({ length: 8 }, (_, i) =>
       store.mutateWorkspace(request(), {

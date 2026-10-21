@@ -28,8 +28,8 @@
 
 | Area | What you can do |
 | --- | --- |
-| **Projects & tasks** | Set project goals and target dates; create tasks, stories, bugs, and epics with assignees, priorities, statuses, due dates, effort estimates, tags, subtasks, dependencies, and discussions. |
-| **Dashboards & planning views** | See progress, upcoming work, and recent notes in Overview. Switch between boards, lists, and timelines; filter by project, person, priority, or status and save useful views. A visible project filter keeps your scope clear. Phones start with readable task cards in List. |
+| **Projects & tasks** | Set project goals and target dates; create tasks, stories, bugs, and epics with assignees, priorities, statuses, optional planned start and due dates, effort estimates, tags, subtasks, dependencies, and discussions. Date ranges are checked before saving. |
+| **Dashboards & planning views** | See progress, upcoming work, and recent notes in Overview. Switch between boards, lists, and timelines; filter by project, person, priority, status, or dates. Find tasks due today, overdue, starting soon, or without dates; sort by priority, due date, planned start, or recent changes. Save filters and sorting together. Timeline shows real date ranges or single-date markers with a movable 28-day window. Phones start with readable task cards in List. |
 | **Markdown notes** | Write with headings, checklists, tables, quotes, highlights, footnotes, and formatted code. Preview mathematical equations and Mermaid diagrams. |
 | **Connected knowledge** | Link notes, headings, and blocks with `[[links]]`; embed their content and follow backlinks. Organize with folders, tags, bookmarks, projects, and custom properties. |
 | **Relationship graph** | Explore global and local connections, search and filter nodes, adjust connection depth, and pan, zoom, or arrange the graph. Add meaningful relationships and review change impact. |

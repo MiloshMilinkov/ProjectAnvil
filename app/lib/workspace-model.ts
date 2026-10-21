@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { Entity, Mutation, Workspace } from "./types";
+import {
+  taskDateFilters,
+  taskSorts,
+  type Entity,
+  type Mutation,
+  type Workspace,
+} from "./types";
 import { createSignatureReader, entityKey } from "./relationships";
 import { normalizeSourceExcerpt } from "./source-excerpts";
 
@@ -93,6 +99,7 @@ const tasks = z
     type: z.enum(["task", "bug", "story", "epic"]),
     projectId: reference,
     assigneeId: reference,
+    startDate: date.default(""),
     dueDate: date,
     estimate: z.number().finite().min(0).max(100_000),
     tags,
@@ -217,6 +224,8 @@ const savedViews = z
       z.literal(""),
       z.enum(["backlog", "todo", "in-progress", "review", "done"]),
     ]),
+    dateFilter: z.enum(taskDateFilters).default("all"),
+    sort: z.enum(taskSorts).default("priority"),
   })
   .strict();
 const entityReference = z
@@ -380,6 +389,10 @@ export function validateWorkspace(value: unknown): Workspace {
   }
   const taskKeys = new Set<string>();
   for (const task of workspace.tasks) {
+    if (task.startDate && task.dueDate && task.startDate > task.dueDate)
+      throw new WorkspaceError(
+        "The planned start date must be on or before the due date.",
+      );
     if (taskKeys.has(task.key))
       throw new WorkspaceError(`Task key ${task.key} is already in use.`);
     taskKeys.add(task.key);
@@ -543,6 +556,16 @@ function serverOwnedField(entity: Entity, key: string): boolean {
   );
 }
 
+/** Old open tabs may hold baselines saved before optional scheduling existed. */
+function comparableField(entity: Entity, key: string, value: unknown): string {
+  if (value === undefined) {
+    if (entity === "tasks" && key === "startDate") value = "";
+    if (entity === "savedViews" && key === "dateFilter") value = "all";
+    if (entity === "savedViews" && key === "sort") value = "priority";
+  }
+  return comparable(value);
+}
+
 function assertMutationBase(current: Workspace, mutation: Mutation): void {
   if (mutation.action === "rename") {
     if (
@@ -590,13 +613,45 @@ function assertMutationBase(current: Workspace, mutation: Mutation): void {
       (mutation.action === "upsert" && entity === "tasks" && key === "comments")
     )
       continue;
-    const unchanged = comparable(existing[key]) === comparable(base[key]);
+    const unchanged =
+      comparableField(entity, key, existing[key]) ===
+      comparableField(entity, key, base[key]);
     const alreadyApplied =
       mutation.action === "upsert" &&
-      comparable(existing[key]) === comparable(item[key]);
+      comparableField(entity, key, existing[key]) ===
+        comparableField(entity, key, item[key]);
     if (!unchanged && !alreadyApplied)
       throw new WorkspaceError(
         `This item’s ${key} changed in another tab. Review the latest version before saving your draft.`,
+        409,
+      );
+  }
+  if (
+    entity === "tasks" &&
+    mutation.action === "upsert" &&
+    (Object.hasOwn(item, "startDate") || Object.hasOwn(item, "dueDate"))
+  ) {
+    const start = Object.hasOwn(item, "startDate")
+      ? item.startDate
+      : existing.startDate;
+    const due = Object.hasOwn(item, "dueDate")
+      ? item.dueDate
+      : existing.dueDate;
+    const scheduleChanged = ["startDate", "dueDate"].some(
+      (key) =>
+        comparableField(entity, key, existing[key]) !==
+        comparableField(entity, key, base[key]),
+    );
+    if (
+      scheduleChanged &&
+      typeof start === "string" &&
+      typeof due === "string" &&
+      start &&
+      due &&
+      start > due
+    )
+      throw new WorkspaceError(
+        "This task’s schedule changed in another tab. Review the latest planned start and due date before saving.",
         409,
       );
   }
@@ -625,6 +680,7 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         type: "task",
         projectId: "",
         assigneeId: "",
+        startDate: "",
         dueDate: "",
         estimate: 0,
         tags: [],
@@ -659,6 +715,8 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         priority: "",
         project: "",
         status: "",
+        dateFilter: "all",
+        sort: "priority",
       };
     case "media":
       return base;

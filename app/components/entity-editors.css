@@ -117,6 +117,21 @@
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
+:root .task-dialog .task-schedule-help {
+  margin: -4px 0 16px;
+  color: var(--text-secondary, var(--muted));
+  font-size: var(--font-size-meta, 12px);
+  line-height: 1.6;
+}
+:root .task-dialog .task-schedule-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: var(--font-size-caption, 13px);
+  line-height: 1.6;
+}
+:root .task-dialog .task-planning-options {
+  margin-top: 20px;
+}
 :root .task-section-heading {
   display: flex;
   align-items: baseline;

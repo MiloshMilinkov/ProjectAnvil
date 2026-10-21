@@ -1,0 +1,192 @@
+/* Scheduling uses shared theme roles and keeps the main page free of overflow. */
+:root .task-dates {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: 1.5;
+}
+:root .task-date-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+:root .task-date-line svg {
+  align-self: center;
+}
+:root .task-card-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+:root .task-card-bottom {
+  align-items: flex-end;
+  gap: 10px;
+}
+:root .task-sort-control,
+:root .task-date-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+:root .task-sort-control {
+  margin-left: auto;
+}
+:root .task-sort-control > span {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+:root .task-view-toolbar > .btn {
+  margin-left: 0;
+}
+:root .task-sort-control select,
+:root .task-date-filter select,
+:root .timeline-controls input {
+  min-height: var(--control-height);
+  padding: 8px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-size: var(--font-size-control);
+  max-width: 100%;
+}
+:root .task-date-filter {
+  flex-wrap: wrap;
+}
+:root .timeline-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+:root .timeline-controls > label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+:root .timeline-window-actions {
+  display: flex;
+  gap: 8px;
+}
+:root .timeline-header > span,
+:root .timeline-header > div > span,
+:root .timeline-header small,
+:root .timeline-foot {
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+}
+:root .timeline-header .is-today {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 650;
+}
+:root .timeline-header,
+:root .timeline-row {
+  min-width: calc(220px + 28 * 40px);
+}
+:root .timeline-header > span,
+:root .timeline-row > button {
+  width: 220px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface-panel);
+  border-right: 1px solid var(--border);
+}
+:root .timeline-row {
+  min-height: 56px;
+  height: auto;
+}
+:root .timeline-row > button {
+  font-size: var(--font-size-control);
+  color: var(--text-primary);
+  min-height: 56px;
+}
+:root .timeline-row > button > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 10px 0;
+}
+:root .timeline-bar {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border-color: var(--control-border);
+  font-size: var(--font-size-meta);
+}
+:root .timeline-marker {
+  justify-content: center;
+  padding: 0;
+}
+:root .timeline-outside {
+  position: absolute;
+  padding: 0 12px;
+  font-size: var(--font-size-meta);
+  color: var(--text-secondary);
+}
+@media (max-width: 1050px) {
+  :root .task-view-toolbar {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px) {
+  :root .task-sort-control {
+    order: 1;
+    margin-left: 0;
+    flex: 1 1 180px;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+  :root .task-sort-control select {
+    min-width: 0;
+  }
+  :root .task-date-filter {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+  :root .task-date-filter select {
+    flex: 1;
+    min-width: 0;
+  }
+  :root .task-sort-control select,
+  :root .task-date-filter select,
+  :root .timeline-controls input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  :root .timeline-controls {
+    padding: 16px;
+  }
+  :root .timeline-controls > label {
+    flex: 1 1 100%;
+  }
+  :root .timeline-controls input {
+    min-width: 0;
+    flex: 1;
+  }
+  :root .timeline-bar {
+    min-height: 44px;
+  }
+  :root .timeline-header,
+  :root .timeline-row {
+    min-width: calc(160px + 28 * 44px);
+  }
+  :root .timeline-header > span,
+  :root .timeline-row > button {
+    width: 160px;
+  }
+}

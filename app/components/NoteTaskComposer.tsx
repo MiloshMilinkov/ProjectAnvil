@@ -290,6 +290,7 @@ export default function NoteTaskComposer({
       type: "task",
       projectId,
       assigneeId,
+      startDate: "",
       dueDate: "",
       estimate: 0,
       tags: [],

@@ -32,78 +32,12 @@ import { Avatar, Empty, StatusIcon } from "./WorkspacePrimitives";
 import Markdown from "./Markdown";
 import SourceNoteCard from "./SourceNoteCard";
 import { useWorkspaceFetch } from "./WorkspaceScope";
+import {
+  parseRecoverableTask,
+  parseTaskDraft,
+  type TaskForm,
+} from "../lib/task-drafts";
 import "./entity-editors.css";
-type TaskForm = {
-  task: Task;
-  tagText: string;
-  comment: string;
-  subtask: string;
-};
-
-function isTask(value: unknown): value is Task {
-  if (!value || typeof value !== "object") return false;
-  const task = value as Partial<Task>;
-  const strings = [
-    "id",
-    "key",
-    "title",
-    "description",
-    "projectId",
-    "assigneeId",
-    "dueDate",
-    "createdAt",
-    "updatedAt",
-  ] as const;
-  const stringArray = (items: unknown, limit: number) =>
-    Array.isArray(items) &&
-    items.length <= limit &&
-    items.every((item) => typeof item === "string");
-  return (
-    strings.every((key) => typeof task[key] === "string") &&
-    statuses.some((status) => status.id === task.status) &&
-    priorities.includes(task.priority as Task["priority"]) &&
-    ["task", "story", "bug", "epic"].includes(task.type || "") &&
-    typeof task.estimate === "number" &&
-    Number.isFinite(task.estimate) &&
-    stringArray(task.tags, 40) &&
-    stringArray(task.noteIds, 500) &&
-    stringArray(task.blockedBy, 500) &&
-    Array.isArray(task.subtasks) &&
-    task.subtasks.length <= 200 &&
-    task.subtasks.every(
-      (item) =>
-        item &&
-        typeof item.id === "string" &&
-        typeof item.title === "string" &&
-        typeof item.done === "boolean",
-    ) &&
-    Array.isArray(task.comments) &&
-    task.comments.length <= 500 &&
-    task.comments.every(
-      (item) =>
-        item &&
-        typeof item.id === "string" &&
-        typeof item.personId === "string" &&
-        typeof item.body === "string" &&
-        typeof item.createdAt === "string",
-    ) &&
-    (task.source === undefined ||
-      (!!task.source &&
-        typeof task.source.noteId === "string" &&
-        typeof task.source.excerpt === "string"))
-  );
-}
-
-function isTaskForm(value: unknown): value is TaskForm {
-  if (!value || typeof value !== "object") return false;
-  const form = value as Partial<TaskForm>;
-  return (
-    isTask(form.task) &&
-    typeof form.tagText === "string" &&
-    typeof form.comment === "string" &&
-    typeof form.subtask === "string"
-  );
-}
 export default function TaskDialog({
   workspace: w,
   task,
@@ -128,24 +62,12 @@ export default function TaskDialog({
   const scope = useDraftScope();
   const scopedFetch = useWorkspaceFetch();
   const draftId = task?.id || "new-task";
-  const [initialRecovery] = useState(() => {
-    const saved = readDraft<unknown, unknown>(scope, "tasks", draftId);
-    if (
-      !saved ||
-      !isTaskForm(saved.value) ||
-      (saved.baseline !== null &&
-        (!isTask(saved.baseline) || saved.baseline.id !== saved.value.task.id))
-    )
-      return null;
-    if (
-      task &&
-      (saved.value.task.id !== task.id ||
-        !saved.baseline ||
-        saved.baseline.id !== task.id)
-    )
-      return null;
-    return { ...saved, value: saved.value, baseline: saved.baseline };
-  });
+  const [initialRecovery] = useState(() =>
+    parseTaskDraft(
+      readDraft<unknown, unknown>(scope, "tasks", draftId),
+      task?.id,
+    ),
+  );
   const [recovered, setRecovered] = useState(!!initialRecovery);
   const [exists, setExists] = useState(!!task || !!initialRecovery?.baseline);
   const originalTask = useRef<Task | null>(
@@ -163,6 +85,7 @@ export default function TaskDialog({
         type: "task",
         projectId: w.projects.some((p) => p.id === projectId) ? projectId : "",
         assigneeId: w.people.some((p) => p.id === personId) ? personId : "",
+        startDate: "",
         dueDate: "",
         estimate: 0,
         tags: [],
@@ -320,6 +243,12 @@ export default function TaskDialog({
       setError("Give your task a title.");
       return false;
     }
+    const { startDate, dueDate } = latestForm.current.task;
+    if (startDate && dueDate && startDate > dueDate) {
+      setTab("details");
+      setError("Planned start date must be on or before the due date.");
+      return false;
+    }
     // Save any unfinished discussion/checklist text with the task, rather than losing it on close.
     if (latestForm.current.comment.trim() && !addComment()) return false;
     if (latestForm.current.subtask.trim() && !addSubtask()) return false;
@@ -413,10 +342,12 @@ export default function TaskDialog({
       };
       if (!response.ok || !result.workspace)
         throw new Error(result.error || "The latest task could not be loaded.");
-      const latest = result.workspace.tasks.find(
-        (item) => item.id === latestForm.current.task.id,
+      const latest = parseRecoverableTask(
+        result.workspace.tasks.find(
+          (item) => item.id === latestForm.current.task.id,
+        ),
       );
-      if (!isTask(latest))
+      if (!latest)
         throw new Error(
           "No saved version was found. Your unfinished task is kept; retry saving or copy it before closing.",
         );
@@ -492,6 +423,11 @@ export default function TaskDialog({
     (id) => w.tasks.find((t) => t.id === id)?.status !== "done",
   );
   const fieldId = useId();
+  const invalidDateRange = !!(
+    draft.startDate &&
+    draft.dueDate &&
+    draft.startDate > draft.dueDate
+  );
   return (
     <div
       className="modal-shade task-shade"
@@ -719,15 +655,47 @@ export default function TaskDialog({
                     <h3 id={`${fieldId}-planning`}>Planning</h3>
                     <span>Optional details</span>
                   </div>
+                  <p
+                    id={`${fieldId}-schedule-help`}
+                    className="task-schedule-help"
+                  >
+                    Set either date or both. Planned start and due date can be
+                    the same day.
+                  </p>
                   <div className="task-meta-grid">
+                    <label>
+                      Planned start date
+                      <input
+                        type="date"
+                        value={draft.startDate}
+                        max={draft.dueDate || undefined}
+                        aria-invalid={invalidDateRange || undefined}
+                        aria-describedby={`${fieldId}-schedule-help${invalidDateRange ? ` ${fieldId}-schedule-error` : ""}`}
+                        onChange={(e) => set("startDate", e.target.value)}
+                      />
+                    </label>
                     <label>
                       Due date
                       <input
                         type="date"
                         value={draft.dueDate}
+                        min={draft.startDate || undefined}
+                        aria-invalid={invalidDateRange || undefined}
+                        aria-describedby={`${fieldId}-schedule-help${invalidDateRange ? ` ${fieldId}-schedule-error` : ""}`}
                         onChange={(e) => set("dueDate", e.target.value)}
                       />
                     </label>
+                  </div>
+                  {invalidDateRange && (
+                    <p
+                      id={`${fieldId}-schedule-error`}
+                      className="task-schedule-error"
+                      role="alert"
+                    >
+                      Planned start date must be on or before the due date.
+                    </p>
+                  )}
+                  <div className="task-meta-grid task-planning-options">
                     <label>
                       Effort points
                       <input

@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
   useSyncExternalStore,
 } from "react";
 import {
@@ -91,6 +92,17 @@ import PendingChanges from "./PendingChanges";
 import { useMediaQuery } from "./useMediaQuery";
 import { useDialog } from "./useDialog";
 import "./workspace-shell.css";
+import TaskTimeline from "./TaskTimeline";
+import { TaskDates, useCalendarToday } from "./TaskSchedule";
+import {
+  dateFilterOptions,
+  taskSortOptions,
+  matchesTaskDate,
+  sortTasks,
+  type DateFilter,
+  type TaskSort,
+} from "../lib/task-scheduling";
+import "./task-scheduling.css";
 
 type Page = TourPage;
 const nav = [
@@ -1139,6 +1151,7 @@ function Overview(
     onResumeRoom: (room: WorkRoom) => void;
   },
 ) {
+  const referenceDate = useCalendarToday();
   const {
       workspace: w,
       currentPerson,
@@ -1153,7 +1166,7 @@ function Overview(
     active = tasks.filter((t) => t.status !== "done"),
     mine = active.filter((t) => t.assigneeId === currentPerson),
     done = tasks.filter((t) => t.status === "done"),
-    overdue = mine.filter((t) => t.dueDate && t.dueDate < today()),
+    overdue = mine.filter((t) => t.dueDate && t.dueDate < referenceDate),
     upcoming = [...active]
       .sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"))
       .slice(0, 5),
@@ -1362,7 +1375,7 @@ function Overview(
             All tasks <ArrowRight size={13} />
           </button>
         </div>
-        <TaskTable {...props} tasks={upcoming} />
+        <TaskTable {...props} tasks={upcoming} referenceDate={referenceDate} />
         {!upcoming.length && (
           <Empty
             title="No upcoming tasks"
@@ -1384,12 +1397,14 @@ function TaskTable({
   tasks,
   openTask,
   mutate,
+  referenceDate,
 }: {
   workspace: Workspace;
   tasks: Task[];
   openTask: (id: string) => void;
   mutate: FeatureProps["mutate"];
   notify: FeatureProps["notify"];
+  referenceDate: string;
 }) {
   return (
     <div className="table-scroll">
@@ -1400,7 +1415,7 @@ function TaskTable({
             <th>Status</th>
             <th>Priority</th>
             <th>Assignee</th>
-            <th>Due date</th>
+            <th>Schedule</th>
           </tr>
         </thead>
         <tbody>
@@ -1461,18 +1476,8 @@ function TaskTable({
                   </span>
                 </span>
               </td>
-              <td data-label="Due date">
-                <span
-                  className={
-                    "due-date " +
-                    (t.dueDate && t.dueDate < today() && t.status !== "done"
-                      ? "overdue"
-                      : "")
-                  }
-                >
-                  <CalendarDays size={12} />
-                  {dateLabel(t.dueDate)}
-                </span>
+              <td data-label="Schedule">
+                <TaskDates task={t} referenceDate={referenceDate} />
               </td>
             </tr>
           ))}
@@ -1499,6 +1504,9 @@ function TaskView(
     notify,
   } = props;
   const phoneLayout = useMediaQuery("(max-width: 760px)");
+  const referenceDate = useCalendarToday();
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [sort, setSort] = useState<TaskSort>("priority");
   const [chosenView, setView] = useState<string | null>(null),
     [query, setQuery] = useState(""),
     [assignee, setAssignee] = useState(""),
@@ -1516,30 +1524,48 @@ function TaskView(
     (!mine && assignee) ||
     priority ||
     status ||
-    projectFilter
+    projectFilter ||
+    dateFilter !== "all"
   );
-  const tasks = w.tasks
-    .filter(
-      (t) =>
-        (!projectFilter || t.projectId === projectFilter) &&
-        (!mine || t.assigneeId === currentPerson) &&
-        (mine || !assignee || t.assigneeId === assignee) &&
-        (!priority || t.priority === priority) &&
-        (!status || t.status === status) &&
-        [t.title, t.description, t.key, ...t.tags]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-    )
-    .sort(
-      (a, b) => priorities.indexOf(a.priority) - priorities.indexOf(b.priority),
-    );
+  const tasks = useMemo(
+    () =>
+      sortTasks(
+        w.tasks.filter(
+          (t) =>
+            (!projectFilter || t.projectId === projectFilter) &&
+            (!mine || t.assigneeId === currentPerson) &&
+            (mine || !assignee || t.assigneeId === assignee) &&
+            (!priority || t.priority === priority) &&
+            (!status || t.status === status) &&
+            matchesTaskDate(t, dateFilter, referenceDate) &&
+            [t.title, t.description, t.key, ...t.tags]
+              .join(" ")
+              .toLowerCase()
+              .includes(query.toLowerCase()),
+        ),
+        sort,
+      ),
+    [
+      w.tasks,
+      projectFilter,
+      mine,
+      currentPerson,
+      assignee,
+      priority,
+      status,
+      dateFilter,
+      referenceDate,
+      query,
+      sort,
+    ],
+  );
   function clear() {
     setQuery("");
     setAssignee("");
     setPriority("");
     setStatus("");
     setProjectFilter("");
+    setDateFilter("all");
   }
   async function saveView() {
     if (!viewName.trim() || viewSaveGuard.current) return;
@@ -1557,6 +1583,8 @@ function TaskView(
           priority,
           project: projectFilter,
           status,
+          dateFilter,
+          sort,
         },
       });
       setSavingView(false);
@@ -1621,6 +1649,20 @@ function TaskView(
         <span className="result-count" role="status">
           {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
         </span>
+        <label className="task-sort-control" data-tour="task-sorting">
+          <span>Sort by</span>
+          <select
+            aria-label="Sort tasks"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as TaskSort)}
+          >
+            {taskSortOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           className="btn btn-subtle"
           disabled={viewPending}
@@ -1699,6 +1741,22 @@ function TaskView(
             </option>
           ))}
         </select>
+        <label className="task-date-filter" data-tour="task-date-filter">
+          <span>Dates</span>
+          <select
+            aria-label="Task date filter"
+            value={dateFilter}
+            onChange={(event) =>
+              setDateFilter(event.target.value as DateFilter)
+            }
+          >
+            {dateFilterOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {filtered && (
           <button className="text-button" onClick={clear}>
             <X size={13} />
@@ -1750,6 +1808,8 @@ function TaskView(
                   setPriority(v.priority);
                   setStatus(v.status);
                   setProjectFilter(v.project);
+                  setDateFilter(v.dateFilter || "all");
+                  setSort(v.sort || "priority");
                 }}
               >
                 {v.name}
@@ -1875,22 +1935,8 @@ function TaskView(
                         </div>
                       )}
                       <div className="task-card-bottom">
-                        <span
-                          className={
-                            "due-date " +
-                            (t.dueDate &&
-                            t.dueDate < today() &&
-                            t.status !== "done"
-                              ? "overdue"
-                              : "")
-                          }
-                        >
-                          {t.dueDate && (
-                            <>
-                              <CalendarDays size={11} />
-                              {dateLabel(t.dueDate)}
-                            </>
-                          )}
+                        <span className="task-card-schedule">
+                          <TaskDates task={t} referenceDate={referenceDate} />
                           {t.subtasks.length > 0 && (
                             <span className="subtask-count">
                               <CheckSquare size={11} />
@@ -1937,7 +1983,7 @@ function TaskView(
       )}
       {view === "list" && (
         <section className="panel">
-          <TaskTable {...props} tasks={tasks} />
+          <TaskTable {...props} tasks={tasks} referenceDate={referenceDate} />
           {!tasks.length && (
             <Empty
               title={filtered ? "No tasks match" : "No tasks yet"}
@@ -1959,102 +2005,13 @@ function TaskView(
         </section>
       )}
       {view === "timeline" && (
-        <Timeline workspace={w} tasks={tasks} openTask={openTask} />
+        <TaskTimeline
+          tasks={tasks}
+          referenceDate={referenceDate}
+          openTask={openTask}
+        />
       )}
     </div>
-  );
-}
-function Timeline({
-  workspace: w,
-  tasks,
-  openTask,
-}: {
-  workspace: Workspace;
-  tasks: Task[];
-  openTask: (id: string) => void;
-}) {
-  const dated = tasks
-    .filter((t) => t.dueDate)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  const anchor = new Date(today() + "T12:00:00");
-  anchor.setDate(anchor.getDate() - 3);
-  const days = Array.from({ length: 28 }, (_, i) => {
-    const d = new Date(anchor);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-  return (
-    <section className="panel timeline-panel">
-      <div className="timeline-scroll">
-        <div className="timeline-header">
-          <span>Scheduled work</span>
-          <div>
-            {days.map((d) => (
-              <span
-                key={d.toISOString()}
-                className={
-                  d.toDateString() === new Date().toDateString()
-                    ? "is-today"
-                    : ""
-                }
-              >
-                <small>
-                  {d.toLocaleDateString(undefined, { weekday: "narrow" })}
-                </small>
-                {d.getDate()}
-              </span>
-            ))}
-          </div>
-        </div>
-        {dated.map((t) => {
-          const end = Math.round(
-              (new Date(t.dueDate + "T12:00:00").getTime() - anchor.getTime()) /
-                86400000,
-            ),
-            start = Math.max(0, end - Math.max(1, t.estimate || 2) + 1);
-          return (
-            <div key={t.id} className="timeline-row">
-              <button onClick={() => openTask(t.id)}>
-                <StatusIcon status={t.status} />
-                <span>{t.title}</span>
-              </button>
-              <div className="timeline-track">
-                {Array.from({ length: 28 }, (_, i) => (
-                  <i key={i} />
-                ))}
-                {end >= 0 && start < 28 && (
-                  <button
-                    title={`${t.title} · due ${dateLabel(t.dueDate)}`}
-                    onClick={() => openTask(t.id)}
-                    className="timeline-bar"
-                    style={{
-                      left: `${(start / 28) * 100}%`,
-                      width: `${(Math.max(1, Math.min(28, end + 1) - start) / 28) * 100}%`,
-                      background:
-                        (w.projects.find((p) => p.id === t.projectId)?.color ||
-                          "#a192fc") + "45",
-                      borderColor:
-                        w.projects.find((p) => p.id === t.projectId)?.color ||
-                        "#a192fc",
-                    }}
-                  >
-                    {t.key}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <p className="timeline-foot">
-        Planning window: {dateLabel(days[0].toISOString().slice(0, 10))} –{" "}
-        {dateLabel(days[27].toISOString().slice(0, 10))}. Bars show an
-        approximate working span using effort points; set due dates in task
-        details.{" "}
-        {tasks.length - dated.length > 0 &&
-          `${tasks.length - dated.length} tasks are unscheduled.`}
-      </p>
-    </section>
   );
 }
 function ProjectCard({

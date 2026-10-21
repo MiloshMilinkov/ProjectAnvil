@@ -1,5 +1,23 @@
 export type Status = "backlog" | "todo" | "in-progress" | "review" | "done";
 export type Priority = "urgent" | "high" | "medium" | "low";
+export const taskDateFilters = [
+  "all",
+  "due-today",
+  "overdue",
+  "due-next-7-days",
+  "no-due-date",
+  "start-today",
+  "start-next-7-days",
+  "no-start-date",
+] as const;
+export type DateFilter = (typeof taskDateFilters)[number];
+export const taskSorts = [
+  "priority",
+  "due-date",
+  "start-date",
+  "updated",
+] as const;
+export type TaskSort = (typeof taskSorts)[number];
 export interface Person {
   id: string;
   name: string;
@@ -32,6 +50,7 @@ export interface Task {
   type: "task" | "bug" | "story" | "epic";
   projectId: string;
   assigneeId: string;
+  startDate: string;
   dueDate: string;
   estimate: number;
   tags: string[];
@@ -96,6 +115,8 @@ export interface SavedView {
   priority: string;
   project: string;
   status: string;
+  dateFilter?: DateFilter;
+  sort?: TaskSort;
 }
 export interface EntityRef {
   type: "note" | "task" | "project";

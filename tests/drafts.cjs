@@ -177,8 +177,100 @@ function checkNoteDraftValues() {
   assert.equal(parseNoteCopyDraft({ note, operationId: null }), null);
 }
 
+function checkTaskDraftValues() {
+  const {
+    parseTaskDraft,
+    parseRecoverableTask,
+  } = require("./compiled/app/lib/task-drafts");
+  const timestamp = "2026-10-21T12:00:00.000Z";
+  const task = {
+    id: "task-draft",
+    key: "PLAN-1",
+    title: "",
+    description: "Keep this unfinished plan",
+    status: "todo",
+    priority: "medium",
+    type: "task",
+    projectId: "",
+    assigneeId: "",
+    dueDate: "2026-10-25",
+    estimate: 3,
+    tags: ["planning"],
+    noteIds: [],
+    blockedBy: [],
+    subtasks: [{ id: "step-a", title: "First step", done: false }],
+    comments: [],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const record = {
+    value: {
+      task,
+      tagText: "planning",
+      comment: "Unsent discussion",
+      subtask: "Unadded step",
+    },
+    baseline: { ...task, title: "Saved title" },
+    token: "draft-token-unchanged",
+    owner: "other-window",
+    updatedAt: timestamp,
+  };
+  const unchanged = structuredClone(record);
+  const recovered = parseTaskDraft(record, task.id);
+  assert.ok(recovered, "Old unfinished forms remain recoverable");
+  assert.equal(recovered.value.task.startDate, "");
+  assert.equal(recovered.baseline.startDate, "");
+  assert.equal(
+    recovered.value.task.title,
+    "",
+    "An unfinished empty title is preserved",
+  );
+  assert.equal(recovered.value.comment, record.value.comment);
+  assert.equal(recovered.value.subtask, record.value.subtask);
+  assert.equal(recovered.token, record.token);
+  assert.equal(recovered.owner, record.owner);
+  assert.equal(recovered.updatedAt, record.updatedAt);
+  assert.deepEqual(
+    record,
+    unchanged,
+    "Normalization never mutates the stored recovery copy",
+  );
+  const unfinishedRange = { ...task, startDate: "2026-10-30" };
+  const recoveredRange = parseTaskDraft(
+    { ...record, value: { ...record.value, task: unfinishedRange } },
+    task.id,
+  );
+  assert.equal(
+    recoveredRange.value.task.startDate,
+    unfinishedRange.startDate,
+    "A conflicting date range remains editable instead of being discarded",
+  );
+  assert.equal(recoveredRange.value.task.dueDate, task.dueDate);
+  const newTask = parseTaskDraft({ ...record, baseline: null });
+  assert.equal(newTask.baseline, null);
+  assert.equal(newTask.value.task.startDate, "");
+  assert.equal(parseTaskDraft(record, "another-task"), null);
+  assert.equal(
+    parseTaskDraft({ ...record, baseline: { ...task, id: "another-task" } }),
+    null,
+  );
+  assert.equal(
+    parseTaskDraft({ ...record, value: { ...record.value, comment: {} } }),
+    null,
+  );
+  assert.equal(
+    parseTaskDraft({ ...record, baseline: { ...task, startDate: 42 } }),
+    null,
+  );
+  assert.equal(parseRecoverableTask({ ...task, startDate: 42 }), null);
+  assert.equal(parseRecoverableTask({ ...task, startDate: null }), null);
+  assert.equal(parseRecoverableTask(null), null);
+  assert.equal(parseTaskDraft(null), null);
+}
+
 async function checkDrafts() {
   checkNoteDraftValues();
+  checkTaskDraftValues();
   const {
     defaultPreferences,
     parseWorkspacePreferences,

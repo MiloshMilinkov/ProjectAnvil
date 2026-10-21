@@ -50,6 +50,13 @@ async function rawWorkspace(access: ResolvedWorkspace): Promise<Workspace> {
   if (!row) throw new WorkspaceError("The workspace could not be opened.", 404);
   const workspace = JSON.parse(row.data) as Workspace;
   workspace.relationships ??= [];
+  // Normalize optional scheduling fields from workspaces saved before scheduling
+  // was introduced. Reading a workspace never rewrites its stored records.
+  for (const task of workspace.tasks) task.startDate ??= "";
+  for (const view of workspace.savedViews) {
+    view.dateFilter ??= "all";
+    view.sort ??= "priority";
+  }
   workspace.revision = row.revision;
   return workspace;
 }

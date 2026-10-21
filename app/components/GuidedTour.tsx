@@ -63,7 +63,7 @@ export const tourSteps: TourStep[] = [
     id: "new-task",
     page: "tasks",
     title: "Turn the plan into a task",
-    body: "Create task starts with a title, status, priority, assignee, and project. In Details, write a Markdown description and add a checklist; Planning holds the optional date, estimate, type, and tags. Connections holds linked notes and dependencies; Discussion holds comments.",
+    body: "Create task starts with a title, status, priority, assignee, and project. In Details, write a description and checklist. Planning holds optional planned start and due dates, effort, type, and tags. Either date can stay blank; a planned start cannot fall after its due date. Connections holds linked work; Discussion holds comments.",
     tip: "Closing keeps a browser draft for this account and workspace. Save confirms the changes; conflicting teammate edits need review.",
     anchors: [
       '[data-tour="new-task"]',
@@ -75,7 +75,7 @@ export const tourSteps: TourStep[] = [
     id: "task-layouts",
     page: "tasks",
     title: "Choose how to see the work",
-    body: "Board organizes tasks into status columns; drag a card to move work forward. List makes many tasks easy to scan and edit. Timeline puts dated tasks on a calendar so you can spot upcoming work.",
+    body: "Board organizes tasks into status columns; drag a card to move work forward. List shows assignments and schedules together. Timeline draws planned start through due date as a range, or a marker when only one date is known. Choose Window starts, previous/next 28 days, or Today to explore the schedule.",
     tip: "Phones start with a readable List. Board and Timeline remain available. Use the status field as an alternative to dragging.",
     anchors: ['[data-tour="task-layouts"]', ".task-view-toolbar .view-tabs"],
   },
@@ -83,7 +83,8 @@ export const tourSteps: TourStep[] = [
     id: "task-filters",
     page: "tasks",
     title: "Find exactly what matters",
-    body: "Filter tasks by text, project, person, priority, or status. Combine filters for a focused view, then use Save view to keep that combination available. Clear the filters to return to the wider picture.",
+    body: "Filter tasks by text, project, person, priority, status, or dates. Dates finds due today, overdue, due in the next seven days, starts today or soon, and missing dates. Sort by priority, due date, planned start, or recent changes. Save view remembers the filters and sorting together.",
+    tip: "Next seven days includes today and six more local calendar days. Overdue excludes completed tasks. Date sorting puts undated tasks last; recently updated puts the newest changes first. Clear filters keeps your chosen sort.",
     anchors: ['[data-tour="task-filters"]', ".view-tasks .filters"],
   },
   {
