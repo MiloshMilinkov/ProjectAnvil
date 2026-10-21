@@ -90,4 +90,3 @@ npm test
 npm run build
 ```
 
-Backend tests use temporary in-memory storage. Keep this README and the guided tour updated alongside user-facing feature changes; contributor instructions live in [AGENTS.md](AGENTS.md).
