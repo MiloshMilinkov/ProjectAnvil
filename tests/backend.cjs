@@ -7,7 +7,7 @@ const { createSeedWorkspace } = require('./compiled/app/lib/seed');
 const { applyMutation, validateWorkspace } = require('./compiled/app/lib/workspace-model');
 
 const now = '2026-10-19T12:00:00Z';
-const collections = ['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews'];
+const collections = ['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews', 'relationships'];
 
 // Explicit test data belongs here rather than in a new user's workspace.
 function fixtureWorkspace() {
@@ -90,10 +90,10 @@ async function main() {
   const sql = new DatabaseSync(':memory:');
   sql.exec('PRAGMA foreign_keys = ON');
   const root = process.env.PROJECTANVIL_CHECK_ROOT || process.cwd();
-  for (const relative of ['drizzle/0000_dear_mimic.sql', 'db/auth.sql', 'db/access.sql']) sql.exec(fs.readFileSync(path.join(root, relative), 'utf8'));
-  const requiredTables = ['workspaces', 'user', 'session', 'account', 'verification', 'rateLimit', 'workspace_access', 'appmembers', 'appinvites'];
+  for (const relative of ['drizzle/0000_dear_mimic.sql', 'db/auth.sql', 'db/access.sql', 'db/workrooms.sql']) sql.exec(fs.readFileSync(path.join(root, relative), 'utf8'));
+  const requiredTables = ['workspaces', 'user', 'session', 'account', 'verification', 'rateLimit', 'workspace_access', 'appmembers', 'appinvites', 'workrooms'];
   const migratedTables = new Set(sql.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(row => row.name));
-  assert.equal(requiredTables.filter(name => migratedTables.has(name)).length, 9, 'Runtime bootstrap must create every auth and access table');
+  assert.equal(requiredTables.filter(name => migratedTables.has(name)).length, 10, 'Runtime bootstrap must create every auth, access and work room table');
   const userColumns = sql.prepare('PRAGMA table_info("user")').all().map(row => row.name);
   assert.ok(userColumns.includes('username'));
   assert.equal(userColumns.includes('displayUsername'), false, 'Username is the display name; the disabled displayUsername feature must not be assumed by fixtures');
@@ -206,6 +206,7 @@ async function main() {
   const reopened = await store.readWorkspace(request());
   for (const key of collections) assert.equal(reopened[key].length, 0, `Reopening a cleared workspace must not repopulate ${key}`);
   await require('./account-boundaries.cjs')({ sql, store, access: require('./compiled/app/lib/access-store'), users, request });
+  await require('./connected-work.cjs')({ store, access: require('./compiled/app/lib/access-store'), request });
   Module._load = originalLoad;
   sql.close();
   console.log('PASS: clean guest initialization, project-free tasks/notes/canvas/media, guest comments and export/import, partial merges, references, dependency cycles, dates, snapshot history, cleanup, stale import, unsafe URLs, concurrent SQLite CAS/task key allocation, media persistence/safe downloads, malformed JSON, empty workspace reopening.');

@@ -2,10 +2,12 @@
 import {useWorkspaceFetch} from './WorkspaceScope';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowUpRight, BookOpen, Bookmark, CalendarDays, Check, ChevronLeft, ChevronRight, Columns2, Copy, ExternalLink, FileText, Folder, GitMerge, History, ImagePlus, Link2, LoaderCircle, Mic, MoreHorizontal, Plus, Presentation, Scissors, Search, Settings2, Square, Tag, Trash2, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpRight, BookOpen, Bookmark, CalendarDays, Check, CheckSquare, ChevronLeft, ChevronRight, Columns2, Copy, ExternalLink, FileText, Folder, GitMerge, History, ImagePlus, Link2, LoaderCircle, Mic, MoreHorizontal, Plus, Presentation, Scissors, Search, Settings2, Square, Tag, Trash2, X } from 'lucide-react';
 import type { FeatureProps, Media, Note, Workspace } from '../lib/types';
 import { today, uid } from '../lib/types';
 import Markdown from './Markdown';
+import NoteTaskComposer from './NoteTaskComposer';
+import LinkedNoteTasks from './LinkedNoteTasks';
 import './knowledge.css';
 import './templates.css';
 
@@ -44,7 +46,7 @@ function newNote(templateId:TemplateId,title:string,projectId:string):Note {
 const shortDate=(value:string)=>new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
 const kindLabel=(kind:Kind)=>noteKinds.find(item=>item.kind===kind)?.label || 'Note';
 
-export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mode,tourActive=false,projectFilter,openTask,openNote,notify}:Props){
+export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mode,tourActive=false,projectFilter,currentPerson,openTask,openNote,notify}:Props){
   const scopedFetch=useWorkspaceFetch();
   const [draft,setDraft]=useState<Note|null>(workspace.notes.find(note=>note.id===selectedNote) || null);
   const [view,setView]=useState<'edit'|'preview'|'split'>('split');
@@ -75,6 +77,9 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
   const [recordError,setRecordError]=useState('');
   const [mobileBrowser,setMobileBrowser]=useState(false);
   const [linkOpen,setLinkOpen]=useState(false);
+  const [taskSource, setTaskSource] = useState<{ note: Note; excerpt: string } | null>(null);
+  const [preparingTask, setPreparingTask] = useState(false);
+  const [taskSourceError, setTaskSourceError] = useState('');
   const draftRef=useRef(draft);
   const draftCache=useRef(new Map<string,Note>());
   const localEdits=useRef(new Map<string,Map<EditableKey,LocalEdit>>());
@@ -87,6 +92,8 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
   const version=useRef(0);
   const mounted=useRef(true);
   const editor=useRef<HTMLTextAreaElement>(null);
+  const previewPane = useRef<HTMLDivElement>(null);
+  const selectedTaskExcerpt = useRef('');
   const fileInput=useRef<HTMLInputElement>(null);
   const recorder=useRef<MediaRecorder|null>(null);
   const recordingStream=useRef<MediaStream|null>(null);
@@ -257,6 +264,57 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
   const backlinks=draft?workspace.notes.filter(note=>note.id!==draft.id && new RegExp(`\\[\\[${draft.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?:[#|\\]])`,'i').test(note.content)):[];
   const wordCount=draft?.content.trim().split(/\s+/).filter(Boolean).length || 0;
 
+  function selectedNoteText(): string {
+    const current = draftRef.current;
+    if (!current) return '';
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed
+      && previewPane.current?.contains(selection.anchorNode)
+      && previewPane.current?.contains(selection.focusNode)) {
+      return selection.toString().trim();
+    }
+    const field = editor.current;
+    const visibleEditor = field && field.getBoundingClientRect().width > 0;
+    if (visibleEditor && field.selectionEnd > field.selectionStart) {
+      return current.content.slice(field.selectionStart, field.selectionEnd).trim();
+    }
+    return '';
+  }
+
+  function defaultTaskExcerpt(content: string): string {
+    const checklist = content.split('\n').find(line => /^\s*[-*+]\s+\[[ xX]\]\s+\S/.test(line));
+    if (checklist) return checklist.trim().slice(0, 8_000);
+    const paragraphs = content.split(/\n\s*\n/).map(text => text.trim()).filter(Boolean);
+    const paragraph = paragraphs.find(text => !/^#{1,6}\s+[^\n]+$/.test(text));
+    return (paragraph || paragraphs[0] || '').slice(0, 8_000);
+  }
+
+  async function prepareLinkedTask() {
+    const note = draftRef.current;
+    if (!note || preparingTask) return;
+    const excerpt = (selectedTaskExcerpt.current || selectedNoteText() || defaultTaskExcerpt(note.content)).slice(0, 8_000);
+    selectedTaskExcerpt.current = '';
+    if (!excerpt.trim()) {
+      setTaskSourceError('Write some note content before creating a linked task.');
+      return;
+    }
+
+    setPreparingTask(true);
+    setTaskSourceError('');
+    try {
+      await flush();
+      if (localEdits.current.get(note.id)?.size) {
+        throw new Error('Save this note successfully before creating its linked task. Your note edits are still here.');
+      }
+      const saved = draftRef.current;
+      if (mounted.current && saved?.id === note.id) setTaskSource({ note: saved, excerpt });
+    } catch (cause) {
+      if (mounted.current) setTaskSourceError(cause instanceof Error ? cause.message : 'The note could not be saved. Please retry.');
+    } finally {
+      if (mounted.current) setPreparingTask(false);
+    }
+  }
+
   const insert=(text:string)=>{
     const current=draftRef.current;
     if(!current)return;
@@ -357,12 +415,27 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
 
         <div className="note-content-shell"><div className="note-document">
           <div className="note-heading"><div className="note-kind-label"><span/>{kindLabel(draft.kind)}<span className="note-heading-date">Updated {shortDate(draft.updatedAt)}</span></div><input className="note-title-input" aria-label="Note title" value={draft.title} placeholder="Untitled note" onChange={event=>edit({title:event.target.value})}/><div className="note-tags">{draft.tags.map(item=><span className="note-tag" key={item}>#{item}<button aria-label={`Remove tag ${item}`} onClick={()=>edit({tags:draft.tags.filter(value=>value!==item)})}><X size={10}/></button></span>)}<input aria-label="Add tag" placeholder="+ Add tag" value={tagInput} onChange={event=>setTagInput(event.target.value)} onKeyDown={event=>{if(event.key==='Enter' || event.key===','){event.preventDefault();const value=tagInput.trim().replace(/^#/,'').replace(/,/g,'');if(value && !draft.tags.includes(value))edit({tags:[...draft.tags,value]});setTagInput('');}}}/></div></div>
-          <div className="note-editor-toolbar"><div className="note-view-switch"><button className={view==='edit'?'active':''} onClick={()=>setView('edit')}>Write</button><button className={view==='split'?'active':''} onClick={()=>setView('split')}><Columns2 size={13}/>Split</button><button className={view==='preview'?'active':''} onClick={()=>setView('preview')}>Read</button></div><div className="note-format-tools"><button title="Heading" onClick={()=>insert('\n## Heading\n')}>H₂</button><button title="Bold text" onClick={()=>insert('**bold text**')}><strong>B</strong></button><button title="Checklist" onClick={()=>insert('\n- [ ] ')}>☑</button><button title="Link a note" onClick={()=>setLinkOpen(value=>!value)}><Link2 size={15}/></button><button title="Attach an image, PDF, audio, or video" onClick={()=>fileInput.current?.click()} disabled={uploading}>{uploading?<LoaderCircle size={15} className="spin"/>:<ImagePlus size={15}/>}</button><button className={recording?'is-recording':''} title={recording?'Stop recording':'Record audio'} onClick={()=>void startRecording()}>{recording?<Square size={13} fill="currentColor"/>:<Mic size={15}/>}</button>{recording && <span className="record-time">{Math.floor(recordSeconds/60)}:{String(recordSeconds%60).padStart(2,'0')}</span>}</div></div>
+          <div className="note-editor-toolbar"><div className="note-view-switch"><button className={view==='edit'?'active':''} onClick={()=>setView('edit')}>Write</button><button className={view==='split'?'active':''} onClick={()=>setView('split')}><Columns2 size={13}/>Split</button><button className={view==='preview'?'active':''} onClick={()=>setView('preview')}>Read</button></div>
+          <button
+            type="button"
+            className="note-task-trigger"
+            data-tour="note-to-task"
+            aria-label="Create linked task"
+            disabled={preparingTask || !draft.content.trim()}
+            onPointerDown={() => { selectedTaskExcerpt.current = selectedNoteText(); }}
+            onClick={() => void prepareLinkedTask()}
+          >
+            {preparingTask ? <LoaderCircle size={16} className="spin" /> : <CheckSquare size={16} />}
+            <span>{preparingTask ? 'Saving source…' : 'Create linked task'}</span>
+          </button>
+          <div className="note-format-tools"><button title="Heading" onClick={()=>insert('\n## Heading\n')}>H₂</button><button title="Bold text" onClick={()=>insert('**bold text**')}><strong>B</strong></button><button title="Checklist" onClick={()=>insert('\n- [ ] ')}>☑</button><button title="Link a note" onClick={()=>setLinkOpen(value=>!value)}><Link2 size={15}/></button><button title="Attach an image, PDF, audio, or video" onClick={()=>fileInput.current?.click()} disabled={uploading}>{uploading?<LoaderCircle size={15} className="spin"/>:<ImagePlus size={15}/>}</button><button className={recording?'is-recording':''} title={recording?'Stop recording':'Record audio'} onClick={()=>void startRecording()}>{recording?<Square size={13} fill="currentColor"/>:<Mic size={15}/>}</button>{recording && <span className="record-time">{Math.floor(recordSeconds/60)}:{String(recordSeconds%60).padStart(2,'0')}</span>}</div></div>
+          {taskSourceError && <p className="note-task-error" role="alert">{taskSourceError}</p>}
+          <LinkedNoteTasks tasks={linkedTasks} onOpenTask={openTask}/>
           {linkOpen && <div className="note-link-picker"><div><span>Link to a note</span><button className="btn-icon" aria-label="Close note picker" onClick={()=>setLinkOpen(false)}><X size={14}/></button></div>{workspace.notes.filter(note=>note.id!==draft.id).map(note=><button key={note.id} onClick={()=>{insert(`[[${note.title}]]`);setLinkOpen(false);}}><FileText size={13}/>{note.title}<span>{note.folder}</span></button>)}{workspace.notes.length<2 && <p>Create another note to connect it here.</p>}</div>}
           {recordError && <div className="note-inline-error">{recordError}<button onClick={()=>setRecordError('')} aria-label="Dismiss microphone message"><X size={13}/></button></div>}
           <div className={`note-editing-area view-${view}`} onDragOver={event=>{if(event.dataTransfer.types.includes('Files'))event.preventDefault();}} onDrop={event=>{if(event.dataTransfer.files.length){event.preventDefault();void upload(event.dataTransfer.files[0]);}}}>
             {view!=='preview' && <div className="note-source-pane"><div className="note-pane-label">MARKDOWN</div><textarea ref={editor} aria-label="Note content" spellCheck value={draft.content} placeholder="Start writing. Use [[note names]] to connect your ideas…" onChange={event=>edit({content:event.target.value})} onKeyDown={event=>{if(event.key==='Tab'){event.preventDefault();insert('  ');}}}/></div>}
-            {view!=='edit' && <div className="note-preview-pane">{view==='split' && <div className="note-pane-label">PREVIEW</div>}<Markdown content={draft.content} workspace={workspace} onNoteClick={openNote}/>{!draft.content && <div className="note-preview-empty">Your next great idea starts here.</div>}</div>}
+            {view!=='edit' && <div className="note-preview-pane" ref={previewPane}>{view==='split' && <div className="note-pane-label">PREVIEW</div>}<Markdown content={draft.content} workspace={workspace} onNoteClick={openNote}/>{!draft.content && <div className="note-preview-empty">Your next great idea starts here.</div>}</div>}
           </div>
           <div className="note-statusbar"><span>{wordCount} words <i>·</i> {draft.content.length.toLocaleString()} characters</span><span>Markdown <i>·</i> {Math.max(1,Math.ceil(wordCount/200))} min read</span></div>
         </div>
@@ -377,6 +450,19 @@ export default function Knowledge({workspace,mutate,selectedNote,onSelectNote,mo
     </main>
     <input ref={fileInput} type="file" className="note-hidden-input" accept="image/*,audio/*,video/*,application/pdf,.txt,.md" onChange={event=>{if(event.target.files?.[0])void upload(event.target.files[0]);}}/>
 
+    {taskSource && <NoteTaskComposer
+      note={taskSource.note}
+      initialExcerpt={taskSource.excerpt}
+      workspace={workspace}
+      currentPerson={currentPerson}
+      mutate={mutate}
+      onClose={() => setTaskSource(null)}
+      onCreated={() => {
+        setTaskSource(null);
+        notify('Task created and linked to this note');
+      }}
+      onOpenTask={openTask}
+    />}
     {newOpen && <div className="knowledge-modal-backdrop" onClick={()=>!creating && setNewOpen(false)}><section className="knowledge-modal new-note-modal" onClick={event=>event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Create note">
       <div className="knowledge-modal-heading"><div><span className="eyebrow">MAKE SPACE FOR AN IDEA</span><h2>Create a note</h2></div><button className="btn-icon" aria-label="Close" onClick={()=>setNewOpen(false)}><X size={19}/></button></div>
       <label className="note-new-title">Note title<input className="field" autoFocus value={newTitle} onChange={event=>setNewTitle(event.target.value)} placeholder={selectedTemplate.kind==='daily'?today():newTemplateId==='blank'?'Give your idea a name…':selectedTemplate.label} onKeyDown={event=>{if(event.key==='Enter')void create(newTemplateId,newTitle);}}/></label>

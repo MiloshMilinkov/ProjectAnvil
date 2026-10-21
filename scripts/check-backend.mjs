@@ -12,8 +12,10 @@ const output = fs.mkdtempSync(path.join(os.tmpdir(), 'projectanvil-backend-check
 const files = [
   'app/lib/types.ts', 'app/lib/seed.ts', 'app/lib/workspace-model.ts',
   'app/lib/access-store.ts', 'app/lib/workspace-store.ts',
+  'app/lib/relationships.ts', 'app/lib/workrooms.ts', 'app/lib/workroom-store.ts',
   'app/api/state/route.ts', 'app/api/media/route.ts', 'app/api/media/[id]/route.ts',
   'app/api/export/route.ts', 'app/api/account/route.ts', 'app/api/teams/route.ts',
+  'app/api/rooms/route.ts',
 ];
 try {
   fs.writeFileSync(path.join(output, 'package.json'), JSON.stringify({ type: 'commonjs' }));
@@ -26,6 +28,7 @@ try {
   }
   fs.copyFileSync(path.join(root, 'tests', 'backend.cjs'), path.join(output, 'check.cjs'));
   fs.copyFileSync(path.join(root, 'tests', 'account-boundaries.cjs'), path.join(output, 'account-boundaries.cjs'));
+  fs.copyFileSync(path.join(root, 'tests', 'connected-work.cjs'), path.join(output, 'connected-work.cjs'));
   const result = spawnSync(process.execPath, [path.join(output, 'check.cjs')], {
     cwd: root, stdio: 'inherit', env: { ...process.env, PROJECTANVIL_CHECK_ROOT: root, NODE_PATH: [path.join(root, 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter) },
   });

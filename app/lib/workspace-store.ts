@@ -16,6 +16,7 @@ async function rawWorkspace(access: ResolvedWorkspace): Promise<Workspace> {
   }
   if (!row) throw new WorkspaceError('The workspace could not be opened.', 404);
   const workspace = JSON.parse(row.data) as Workspace;
+  workspace.relationships ??= [];
   workspace.revision = row.revision;
   return workspace;
 }

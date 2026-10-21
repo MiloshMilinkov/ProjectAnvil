@@ -333,7 +333,7 @@
   :root .filters > select { height: 44px; flex: 1 1 140px; max-width: 100%; }
   :root .view-tabs button { min-height: 40px; font-size: 13px; padding: 8px 11px; }
   :root .task-view-toolbar > .result-count { font-size: 12px; }
-  :root .task-view-toolbar > .btn { min-width: 44px; width: 44px; height: 44px; min-height: 44px; }
+  :root .task-view-toolbar > .btn { min-width: 44px; width: auto; height: 44px; min-height: 44px; font-size: 13px; }
   :root .kanban-board { grid-template-columns: repeat(5, 270px); margin-right: 0; padding-right: 0; }
   :root .task-card h3 { font-size: 14px; }
   :root .projects-grid, :root .team-grid, :root .collection-grid { grid-template-columns: 1fr; }

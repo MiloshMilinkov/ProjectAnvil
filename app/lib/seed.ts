@@ -5,6 +5,6 @@ import type { Workspace } from './types';
 export function createSeedWorkspace(_now = new Date()): Workspace {
   return {
     name: 'My workspace', revision: 0,
-    people: [], projects: [], tasks: [], notes: [], media: [], canvases: [], savedViews: [],
+    people: [], projects: [], tasks: [], notes: [], media: [], canvases: [], savedViews: [], relationships: [],
   };
 }

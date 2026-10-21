@@ -37,7 +37,7 @@ To make a complete backup:
 
 To restore a backup, first stop the app. Preserve a copy of the current state and `.dev.vars` before replacing them with their matching backup, then start ProjectAnvil again. Do not merge individual database files between backups.
 
-You can also use **Workspace settings → Export workspace** for a readable JSON backup of the active workspace’s notes, tasks, discussions, people labels, projects, and canvas layouts. **That JSON does not contain uploaded files, accounts, sessions, team memberships, or invitations.** A complete state-and-secret backup preserves the local account system and files too. Import replaces records only in the active workspace after confirmation, so export before importing.
+You can also use **Workspace settings → Export workspace** for a readable JSON backup of the active workspace’s notes, tasks, discussions, people labels, projects, and canvas layouts. **That JSON does not contain personal work rooms, uploaded files, accounts, sessions, team memberships, or invitations.** A complete state-and-secret backup preserves the local account system and files too. Import replaces records only in the active workspace after confirmation, so export before importing.
 
 The former hosted app and this local copy used separate databases and attachment stores. A JSON downloaded from the hosted app is a snapshot of its records; it does not automatically transfer its attachments. Preserve downloaded original attachments as well before removing the hosted storage. Import a hosted snapshot only if you intend to replace the current local workspace.
 
@@ -58,6 +58,20 @@ Keep these backups. The online archive is separate from the active local databas
 - **Attachments and history:** upload images, PDFs, audio, and video. Record audio with microphone permission and a supported browser. Note changes save automatically, and history can restore earlier content.
 
 New workspaces start empty: no example projects, people, tasks, notes, saved filters, or canvases. Create only what you need. Move or delete a project's notes and tasks before deleting the project.
+
+## Connected work: notes, rooms, and meaningful relationships
+
+Select note text and choose **Create linked task**. On mobile, the task form also offers a paragraph and checklist picker. The note is saved first, and its text remains intact. A task keeps the selected source quote, links back to the note, and appears with its current status beside the note. Repeating the same source quote offers the existing task. A new linked task automatically gets a **depends on** relationship to its source note.
+
+Open **Work rooms** to save a working view with a project, focus task, notes, and canvas. Save a checkpoint containing **What changed**, **Next step**, and **Open question**. Resume restores the view and captured canvas position; the active room strip keeps pinned references available. Overview also offers the latest room. Rooms belong to your account inside the selected workspace, including team workspaces. Guest rooms are shared only within the local guest workspace. They are stored separately from shared workspace records and are preserved by a complete local state backup; ordinary workspace JSON exports do not include personal rooms.
+
+In **Relationship graph**, use **Meaningful relationships** to connect notes, tasks, and projects. Choose **depends on**, **supports**, **contradicts**, or **was decided because of**; the form explains the direction of impact. Changes to a relevant source highlight directly affected items and downstream work, including task dependencies. Review the connected content, then use **Mark reviewed** to acknowledge the current sources. A review cannot silently acknowledge content changed after the version you saw. Removing a relationship keeps both items, and deleting an item cleans up its connections.
+
+Importing a workspace starts its relationships reviewed against the imported content, clearing earlier review markers. Keep a complete local state backup if you need to restore those markers and personal room checkpoints.
+
+Impact highlighting indicates possible consequences, rather than proving a task is wrong. Typed relationships and their review state are shared workspace records. Room checkpoints are personal context. No AI service or external account is required for these features.
+
+The guided tour includes these workflows and never creates records while explaining them.
 
 ## Templates for work and everyday life
 
@@ -90,7 +104,7 @@ Registration and login use **Better Auth 1.7.11** with its username plugin. Goog
 
 You can use the workspace features as a guest without creating an account. Accounts add private personal workspaces and team access.
 
-The **? guide button beside the appearance button** starts a 21-step tour. It highlights each area and navigates between pages with Previous and Next. You can Skip, close with Escape, or Finish. The guide opens automatically once per browser and can be replayed at any time. It does not add notes, tasks, or other content.
+The **? guide button beside the appearance button** starts a 27-step tour. It highlights each area and navigates between pages with Previous and Next. You can Skip, close with Escape, or Finish. The guide opens automatically once per browser and can be replayed at any time. It does not add notes, tasks, or other content.
 
 ## Git and VS Code
 

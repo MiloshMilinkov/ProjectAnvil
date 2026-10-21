@@ -1,0 +1,90 @@
+/* Shared semantic colors keep note actions and task context readable in every theme. */
+:root .note-editor-toolbar { flex-wrap: wrap; }
+:root .note-format-tools { flex-wrap: wrap; margin-left: auto; }
+:root .note-task-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 7px 10px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+}
+:root .note-task-trigger:disabled { opacity: .55; cursor: default; }
+:root .note-task-error { margin: 0; padding: 10px 24px; color: var(--danger); font-size: 13px; }
+:root .linked-note-tasks { flex-shrink: 0; border-bottom: 1px solid var(--border); background: var(--panel-2); min-width: 0; }
+:root .linked-note-task-summary { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 8px 24px; text-align: left; color: var(--text); }
+:root .linked-note-task-summary > svg:first-child { color: var(--accent); flex-shrink: 0; }
+:root .linked-note-task-summary strong { font-size: 13px; font-weight: 550; }
+:root .linked-note-task-summary strong span { color: var(--muted); margin-left: 5px; }
+:root .linked-note-task-summary small { margin-left: auto; color: var(--muted); font-size: 12px; }
+:root .linked-note-task-summary > svg:last-child { flex-shrink: 0; transition: transform .15s; }
+:root .linked-note-task-summary > svg.is-expanded { transform: rotate(180deg); }
+:root .linked-note-task-list { max-height: 150px; overflow-y: auto; padding: 0 12px 8px; }
+:root .linked-note-task { width: 100%; display: flex; align-items: center; gap: 9px; text-align: left; min-height: 50px; padding: 8px 12px; color: var(--text); border-radius: 6px; }
+:root .linked-note-task:hover { background: var(--accent-soft); }
+:root .linked-note-task-state { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; }
+:root .linked-note-task-copy { min-width: 0; flex: 1; }
+:root .linked-note-task-copy strong { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+:root .linked-note-task-copy strong > span { color: var(--muted); flex-shrink: 0; font-size: 11px; }
+:root .linked-note-task-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; margin-top: 3px; }
+:root .linked-note-task-status { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+:root .linked-note-task > svg { color: var(--muted); flex-shrink: 0; }
+
+:root .linked-task-backdrop { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; padding: 20px; background: #0008; backdrop-filter: blur(4px); }
+:root .linked-task-dialog { width: 600px; max-width: 100%; max-height: calc(100dvh - 40px); overflow-y: auto; padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 25px 90px #0004; }
+:root .linked-task-dialog-heading, :root .linked-task-dialog-heading > div { display: flex; align-items: center; gap: 10px; }
+:root .linked-task-dialog-heading { justify-content: space-between; }
+:root .linked-task-dialog-heading > div { min-width: 0; }
+:root .linked-task-dialog-heading h2 { font-size: 21px; line-height: 1.35; margin: 0; letter-spacing: -.4px; }
+:root .linked-task-dialog-heading svg { flex-shrink: 0; }
+:root .linked-task-intro { margin: 13px 0 20px; color: var(--muted); line-height: 1.65; font-size: 14px; overflow-wrap: anywhere; }
+:root .linked-task-field { display: flex; flex-direction: column; min-width: 0; gap: 7px; margin-bottom: 17px; font-size: 13px; }
+:root .linked-task-field > span { color: var(--text); font-weight: 550; }
+:root .linked-task-field input, :root .linked-task-field textarea, :root .linked-task-field select { display: block; width: 100%; min-width: 0; min-height: 44px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 10px 11px; font: inherit; font-size: 14px; }
+:root .linked-task-field textarea { resize: vertical; line-height: 1.55; max-height: 220px; }
+:root .linked-task-field small { color: var(--muted); line-height: 1.55; font-size: 12px; }
+:root .linked-task-field-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+:root .linked-task-field-grid .linked-task-field { margin-bottom: 4px; }
+:root .linked-task-dialog-footer { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--border); }
+:root .linked-task-button, :root .linked-task-icon { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 9px 13px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); font: inherit; font-size: 14px; }
+:root .linked-task-icon { width: 44px; padding: 9px; flex-shrink: 0; }
+:root .linked-task-primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
+:root .linked-task-button:disabled, :root .linked-task-icon:disabled { opacity: .55; cursor: default; }
+:root .linked-task-error { color: var(--danger); font-size: 13px; line-height: 1.6; margin: 16px 0 0; }
+:root .linked-task-duplicate { padding: 13px; margin-top: 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--accent-soft); }
+:root .linked-task-duplicate p { margin: 0 0 9px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+:root .linked-task-field :is(input, textarea, select):focus-visible, :root :is(.linked-task-button, .linked-task-icon, .note-task-trigger, .linked-note-task-summary, .linked-note-task):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+:root .task-source-note { border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); padding: 14px; margin-bottom: 18px; }
+:root .task-source-note header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+:root .task-source-note header > span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+:root .task-source-note header button { display: inline-flex; align-items: center; justify-content: flex-start; gap: 7px; min-height: 36px; max-width: 100%; padding: 5px 0; text-align: left; color: var(--accent); font-size: 13px; overflow-wrap: anywhere; }
+:root .task-source-note header button > svg { flex-shrink: 0; }
+:root .task-source-note blockquote { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; margin: 9px 0; padding-left: 12px; border-left: 2px solid var(--accent); color: var(--text); font-size: 14px; line-height: 1.65; }
+:root .task-source-note p { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 0 0; }
+
+@media (max-width: 750px) {
+  :root .note-task-trigger { min-height: 44px; width: 100%; order: 3; }
+  :root .note-format-tools { margin-left: 0; }
+  :root .linked-note-task-summary { padding: 8px 20px; gap: 7px; }
+  :root .linked-note-task-summary small { font-size: 11px; }
+  :root .linked-note-task-list { max-height: 125px; padding: 0 8px 6px; }
+  :root .linked-note-task { min-height: 52px; padding: 7px 12px; flex-wrap: wrap; }
+  :root .linked-note-task-copy { flex-basis: calc(100% - 50px); }
+  :root .linked-note-task-status { margin-left: 16px; }
+  :root .linked-note-task > svg { margin-left: auto; }
+  :root .linked-task-backdrop { padding: 12px; }
+  :root .linked-task-dialog { padding: 20px 16px; max-height: calc(100dvh - 24px); }
+  :root .linked-task-dialog-heading h2 { font-size: 20px; }
+  :root .linked-task-field-grid { grid-template-columns: 1fr; gap: 12px; }
+  :root .linked-task-field input, :root .linked-task-field textarea, :root .linked-task-field select { font-size: 16px; }
+  :root .linked-task-dialog-footer > button { flex: 1; }
+  :root .task-source-note header button { min-height: 44px; }
+}

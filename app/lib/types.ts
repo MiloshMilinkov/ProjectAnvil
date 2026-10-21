@@ -2,16 +2,36 @@ export type Status = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done';
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 export interface Person { id: string; name: string; role: string; color: string; userId?: string; inactive?: boolean }
 export interface Project { id: string; name: string; key: string; description: string; color: string; status: string; goal: string; targetDate: string }
-export interface Task { id: string; key: string; title: string; description: string; status: Status; priority: Priority; type: 'task' | 'bug' | 'story' | 'epic'; projectId: string; assigneeId: string; dueDate: string; estimate: number; tags: string[]; noteIds: string[]; blockedBy: string[]; subtasks: {id:string; title:string; done:boolean}[]; comments: {id:string; personId:string; body:string; createdAt:string}[]; createdAt: string; updatedAt: string }
+export interface TaskSource {
+  noteId: string;
+  excerpt: string;
+}
+export interface Task { id: string; key: string; title: string; description: string; status: Status; priority: Priority; type: 'task' | 'bug' | 'story' | 'epic'; projectId: string; assigneeId: string; dueDate: string; estimate: number; tags: string[]; noteIds: string[]; blockedBy: string[]; subtasks: {id:string; title:string; done:boolean}[]; comments: {id:string; personId:string; body:string; createdAt:string}[]; createdAt: string; updatedAt: string; source?: TaskSource }
 export interface Note { id: string; title: string; content: string; folder: string; tags: string[]; projectId: string; kind: 'note' | 'world' | 'character' | 'research' | 'daily' | 'meeting'; bookmarked: boolean; properties: Record<string,string>; snapshots: {id:string; content:string; savedAt:string}[]; createdAt: string; updatedAt: string }
 export interface Media { id: string; name: string; url: string; type: string; size: number; createdAt: string }
 export interface CanvasCard { id: string; x: number; y: number; width: number; height: number; type: 'note' | 'task' | 'text' | 'media' | 'url'; entityId?: string; text: string; color: string }
 export interface CanvasEdge { id: string; from: string; to: string; label: string }
 export interface Canvas { id: string; title: string; cards: CanvasCard[]; edges: CanvasEdge[] }
 export interface SavedView { id:string; name:string; query:string; assignee:string; priority:string; project:string; status:string }
-export interface Workspace { name: string; people: Person[]; projects: Project[]; tasks: Task[]; notes: Note[]; media: Media[]; canvases: Canvas[]; savedViews: SavedView[]; revision: number }
-export type Entity = 'people' | 'projects' | 'tasks' | 'notes' | 'media' | 'canvases' | 'savedViews';
-export interface Mutation { action:'upsert' | 'delete' | 'rename' | 'import'; entity?:Entity; item?:any; id?:string; name?:string; workspace?:Workspace }
+export interface EntityRef {
+  type: 'note' | 'task' | 'project';
+  id: string;
+}
+export type RelationshipKind = 'depends-on' | 'supports' | 'contradicts' | 'decided-because';
+export interface Relationship {
+  id: string;
+  from: EntityRef;
+  to: EntityRef;
+  kind: RelationshipKind;
+  label: string;
+  createdAt: string;
+  reviewedAt: string;
+  fromSignature: string;
+  toSignature: string;
+}
+export interface Workspace { name: string; people: Person[]; projects: Project[]; tasks: Task[]; notes: Note[]; media: Media[]; canvases: Canvas[]; savedViews: SavedView[]; relationships: Relationship[]; revision: number }
+export type Entity = 'people' | 'projects' | 'tasks' | 'notes' | 'media' | 'canvases' | 'savedViews' | 'relationships';
+export interface Mutation { action:'upsert' | 'delete' | 'rename' | 'import' | 'review-relationship'; entity?:Entity; item?:any; id?:string; name?:string; workspace?:Workspace; expectedFromSignature?:string; expectedToSignature?:string }
 export type Mutate = (mutation:Mutation) => Promise<Workspace>;
 export interface FeatureProps { workspace:Workspace; mutate:Mutate; openTask:(id:string)=>void; openNote:(id:string)=>void; currentPerson:string; projectFilter:string; notify:(message:string)=>void }
 export const statuses: {id:Status; label:string; color:string}[] = [{id:'backlog',label:'Backlog',color:'#8c91a5'},{id:'todo',label:'To do',color:'#a6adbf'},{id:'in-progress',label:'In progress',color:'#8a78fa'},{id:'review',label:'In review',color:'#f4bd62'},{id:'done',label:'Done',color:'#63c9a0'}];

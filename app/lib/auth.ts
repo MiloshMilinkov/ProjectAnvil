@@ -5,13 +5,14 @@ import type {AccountUser} from './access-types';
 import authSQL from '../../db/auth.sql?raw';
 import workspaceSQL from '../../drizzle/0000_dear_mimic.sql?raw';
 import accessSQL from '../../db/access.sql?raw';
+import workroomSQL from '../../db/workrooms.sql?raw';
 
 let schemaReady:Promise<unknown>|undefined;
 const instances=new Map<string,ReturnType<typeof betterAuth>>();
 export async function getAuth(request:Request) {
   if(!env.DB) throw new Error('Account storage is unavailable.');
   if(!env.BETTER_AUTH_SECRET||env.BETTER_AUTH_SECRET.length<32) throw new Error('Run the local launcher to initialize the account signing secret.');
-  schemaReady??=env.DB.batch((workspaceSQL.replace('CREATE TABLE ','CREATE TABLE IF NOT EXISTS ')+'\n'+authSQL+'\n'+accessSQL).replace(/^--.*$/gm,'').split(';').map(sql=>sql.trim()).filter(sql=>sql&&!/^--[^\n]*$/.test(sql)).map(sql=>env.DB!.prepare(sql))).catch(error=>{schemaReady=undefined;throw error});
+  schemaReady??=env.DB.batch((workspaceSQL.replace('CREATE TABLE ','CREATE TABLE IF NOT EXISTS ')+'\n'+authSQL+'\n'+accessSQL+'\n'+workroomSQL).replace(/^--.*$/gm,'').split(';').map(sql=>sql.trim()).filter(sql=>sql&&!/^--[^\n]*$/.test(sql)).map(sql=>env.DB!.prepare(sql))).catch(error=>{schemaReady=undefined;throw error});
   await schemaReady;
   const configured=new URL(env.BETTER_AUTH_URL||'http://127.0.0.1:5173').origin;
   const requested=new URL(request.url).origin;

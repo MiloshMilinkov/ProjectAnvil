@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Entity, Mutation, Workspace } from './types';
+import { createSignatureReader, entityKey } from './relationships';
 
 export class WorkspaceError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -30,6 +31,7 @@ const tasks = z.object({
   subtasks: z.array(z.object({ id, title, done: z.boolean() }).strict()).max(200).refine(uniqueIds, 'Subtask IDs must be unique.'),
   comments: z.array(z.object({ id, personId: reference, body: z.string().min(1).max(10_000), createdAt: timestamp }).strict()).max(500).refine(uniqueIds, 'Comment IDs must be unique.'),
   createdAt: timestamp, updatedAt: timestamp,
+  source: z.object({ noteId: id, excerpt: z.string().trim().min(1).max(8000) }).strict().optional(),
 }).strict();
 const notes = z.object({
   id, title, content, folder: z.string().max(300), tags, projectId: reference,
@@ -48,7 +50,19 @@ const canvases = z.object({
   edges: z.array(z.object({ id, from: id, to: id, label: z.string().max(300) }).strict()).max(1500).refine(uniqueIds, 'Canvas connection IDs must be unique.'),
 }).strict();
 const savedViews = z.object({ id, name: title, query: z.string().max(500), assignee: reference, priority: z.union([z.literal(''), z.enum(['urgent', 'high', 'medium', 'low'])]), project: reference, status: z.union([z.literal(''), z.enum(['backlog', 'todo', 'in-progress', 'review', 'done'])]) }).strict();
-const entitySchemas = { people, projects, tasks, notes, media, canvases, savedViews };
+const entityReference = z.object({ type: z.enum(['note', 'task', 'project']), id }).strict();
+const relationships = z.object({
+  id,
+  from: entityReference,
+  to: entityReference,
+  kind: z.enum(['depends-on', 'supports', 'contradicts', 'decided-because']),
+  label: short,
+  createdAt: timestamp,
+  reviewedAt: timestamp,
+  fromSignature: z.string().max(100),
+  toSignature: z.string().max(100),
+}).strict();
+const entitySchemas = { people, projects, tasks, notes, media, canvases, savedViews, relationships };
 const workspaceSchema = z.object({
   name: title, revision: z.number().int().nonnegative(),
   people: z.array(people).max(500).refine(uniqueIds, 'Person IDs must be unique.'),
@@ -58,12 +72,18 @@ const workspaceSchema = z.object({
   media: z.array(media).max(500).refine(uniqueIds, 'Media IDs must be unique.'),
   canvases: z.array(canvases).max(100).refine(uniqueIds, 'Canvas IDs must be unique.'),
   savedViews: z.array(savedViews).max(100).refine(uniqueIds, 'Saved view IDs must be unique.'),
+  relationships: z.array(relationships).max(2000).refine(uniqueIds, 'Relationship IDs must be unique.').default([]),
 }).strict();
 const mutationSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('upsert'), entity: z.enum(['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews']), item: z.record(z.string(), z.unknown()) }).strict(),
-  z.object({ action: z.literal('delete'), entity: z.enum(['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews']), id }).strict(),
+  z.object({ action: z.literal('upsert'), entity: z.enum(['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews', 'relationships']), item: z.record(z.string(), z.unknown()) }).strict(),
+  z.object({ action: z.literal('delete'), entity: z.enum(['people', 'projects', 'tasks', 'notes', 'media', 'canvases', 'savedViews', 'relationships']), id }).strict(),
   z.object({ action: z.literal('rename'), name: title }).strict(),
   z.object({ action: z.literal('import'), workspace: workspaceSchema }).strict(),
+  z.object({
+    action: z.literal('review-relationship'), id,
+    expectedFromSignature: z.string().max(100).optional(),
+    expectedToSignature: z.string().max(100).optional(),
+  }).strict(),
 ]);
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -94,6 +114,10 @@ export function validateWorkspace(value: unknown): Workspace {
     check(task.projectId, 'projects', task.title);
     check(task.assigneeId, 'people', task.title);
     task.noteIds.forEach(value => check(value, 'notes', task.title));
+    if (task.source) {
+      check(task.source.noteId, 'notes', task.title);
+      if (!task.noteIds.includes(task.source.noteId)) throw new WorkspaceError('A task’s source note must also be included in its linked notes.');
+    }
     task.blockedBy.forEach(value => {
       check(value, 'tasks', task.title);
       if (value === task.id) throw new WorkspaceError('A task cannot block itself.');
@@ -148,6 +172,19 @@ export function validateWorkspace(value: unknown): Workspace {
     check(view.assignee, 'people', view.name);
     check(view.project, 'projects', view.name);
   }
+  const connectionKeys = new Set<string>();
+  for (const relationship of workspace.relationships) {
+    for (const endpoint of [relationship.from, relationship.to]) {
+      check(endpoint.id, endpoint.type === 'note' ? 'notes' : endpoint.type === 'task' ? 'tasks' : 'projects', 'Relationship');
+    }
+    const from = entityKey(relationship.from);
+    const to = entityKey(relationship.to);
+    if (from === to) throw new WorkspaceError('Connect two different items.');
+    const endpoints = relationship.kind === 'contradicts' ? [from, to].sort() : [from, to];
+    const key = `${relationship.kind}:${endpoints.join('>')}`;
+    if (connectionKeys.has(key)) throw new WorkspaceError('That relationship already exists.');
+    connectionKeys.add(key);
+  }
   if (new TextEncoder().encode(JSON.stringify(workspace)).byteLength > 1_500_000) {
     throw new WorkspaceError('This workspace has reached its 1.5 MB text storage limit. Export a backup and remove unused notes or snapshots. Media files are stored separately.');
   }
@@ -164,22 +201,67 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
     case 'canvases': return { ...base, cards: [], edges: [] };
     case 'savedViews': return { ...base, query: '', assignee: '', priority: '', project: '', status: '' };
     case 'media': return base;
+    case 'relationships': return { ...base, label: '', createdAt: now, reviewedAt: now, fromSignature: '', toSignature: '' };
   }
 }
 
 export function applyMutation(current: Workspace, input: unknown, now = new Date().toISOString()): Workspace {
   const mutation = parse(mutationSchema, input) as Mutation;
-  const next = structuredClone(current);
+  const next = structuredClone({ ...current, relationships: current.relationships || [] });
   if (mutation.action === 'rename') next.name = mutation.name!.trim();
   if (mutation.action === 'import') {
     if (mutation.workspace!.revision !== current.revision) throw new WorkspaceError('The workspace changed since this backup was opened. Refresh, export the current version, and retry the import with the latest revision.', 409);
-    return validateWorkspace({ ...mutation.workspace!, revision: current.revision + 1 });
+    const imported = validateWorkspace({ ...mutation.workspace!, revision: current.revision + 1 });
+    // An import is an explicit replacement, so its relationships start reviewed
+    // against the imported content rather than accepting supplied signatures.
+    const readSignature = createSignatureReader(imported);
+    imported.relationships = imported.relationships.map(relationship => ({
+      ...relationship, reviewedAt: now,
+      fromSignature: readSignature(relationship.from),
+      toSignature: readSignature(relationship.to),
+    }));
+    return imported;
+  }
+  if (mutation.action === 'review-relationship') {
+    const relationship = next.relationships.find(item => item.id === mutation.id);
+    if (!relationship) throw new WorkspaceError('This relationship is no longer available.', 404);
+    const readSignature = createSignatureReader(next);
+    const fromSignature = readSignature(relationship.from);
+    const toSignature = readSignature(relationship.to);
+    if ((mutation.expectedFromSignature !== undefined && mutation.expectedFromSignature !== fromSignature)
+      || (mutation.expectedToSignature !== undefined && mutation.expectedToSignature !== toSignature)) {
+      throw new WorkspaceError('This relationship changed after you opened it. Refresh and review the latest content before acknowledging it.', 409);
+    }
+    relationship.fromSignature = fromSignature;
+    relationship.toSignature = toSignature;
+    relationship.reviewedAt = now;
   }
   if (mutation.action === 'upsert') {
     const entity = mutation.entity!;
     const values = next[entity] as { id: string }[];
     const existing = values.find(item => item.id === mutation.item.id);
     const merged = { ...defaults(entity, now), ...existing, ...mutation.item };
+    if (entity === 'relationships') {
+      const previous = existing as Workspace['relationships'][number] | undefined;
+      const from = parse(entityReference, merged.from);
+      const to = parse(entityReference, merged.to);
+      const changedEndpoints = !previous || entityKey(previous.from) !== entityKey(from)
+        || entityKey(previous.to) !== entityKey(to) || previous.kind !== merged.kind;
+      const readSignature = createSignatureReader(next);
+      merged.createdAt = previous?.createdAt || now;
+      merged.reviewedAt = changedEndpoints ? now : previous.reviewedAt;
+      merged.fromSignature = changedEndpoints ? readSignature(from) : previous.fromSignature;
+      merged.toSignature = changedEndpoints ? readSignature(to) : previous.toSignature;
+    }
+    if (entity === 'tasks' && merged.source) {
+      const source = parse(tasks.shape.source.unwrap(), merged.source);
+      merged.source = source;
+      const linkedNotes = parse(references, merged.noteIds);
+      merged.noteIds = [...new Set([...linkedNotes, source.noteId])];
+      if (next.tasks.some(task => task.id !== merged.id && task.source?.noteId === source.noteId && task.source.excerpt === source.excerpt)) {
+        throw new WorkspaceError('This note excerpt already has a linked task. Open the existing linked task instead.', 409);
+      }
+    }
     if (entity === 'tasks' && !existing) {
       const requestedKey = typeof merged.key === 'string' ? merged.key.trim() : '';
       if (!requestedKey || next.tasks.some(task => task.key === requestedKey)) {
@@ -210,6 +292,23 @@ export function applyMutation(current: Workspace, input: unknown, now = new Date
     const parsed = parse(entitySchemas[entity] as z.ZodType<{ id: string }>, merged);
     if (existing) values[values.indexOf(existing)] = parsed;
     else values.push(parsed);
+    if (entity === 'tasks') {
+      const task = parsed as Workspace['tasks'][number];
+      const previous = existing as Workspace['tasks'][number] | undefined;
+      if (task.source && task.source.noteId !== previous?.source?.noteId) {
+        const from = { type: 'task' as const, id: task.id };
+        const to = { type: 'note' as const, id: task.source.noteId };
+        if (!next.relationships.some(relationship => relationship.kind === 'depends-on'
+          && entityKey(relationship.from) === entityKey(from) && entityKey(relationship.to) === entityKey(to))) {
+          const readSignature = createSignatureReader(next);
+          next.relationships.push({
+            id: crypto.randomUUID(), from, to, kind: 'depends-on', label: 'Created from note',
+            createdAt: now, reviewedAt: now,
+            fromSignature: readSignature(from), toSignature: readSignature(to),
+          });
+        }
+      }
+    }
   }
   if (mutation.action === 'delete') {
     const entity = mutation.entity!;
@@ -228,7 +327,10 @@ export function applyMutation(current: Workspace, input: unknown, now = new Date
       next.savedViews.forEach(view => { if (view.assignee === deletedId) view.assignee = ''; });
     }
     if (entity === 'projects') next.savedViews.forEach(view => { if (view.project === deletedId) view.project = ''; });
-    if (entity === 'notes') next.tasks.forEach(task => { task.noteIds = task.noteIds.filter(value => value !== deletedId); });
+    if (entity === 'notes') next.tasks.forEach(task => {
+      task.noteIds = task.noteIds.filter(value => value !== deletedId);
+      if (task.source?.noteId === deletedId) delete task.source;
+    });
     if (entity === 'tasks') next.tasks.forEach(task => { task.blockedBy = task.blockedBy.filter(value => value !== deletedId); });
     const cardType = entity === 'notes' ? 'note' : entity === 'tasks' ? 'task' : entity === 'media' ? 'media' : '';
     if (cardType) next.canvases.forEach(canvas => {
@@ -236,6 +338,10 @@ export function applyMutation(current: Workspace, input: unknown, now = new Date
       const remaining = new Set(canvas.cards.map(card => card.id));
       canvas.edges = canvas.edges.filter(edge => remaining.has(edge.from) && remaining.has(edge.to));
     });
+    const relationshipType = entity === 'notes' ? 'note' : entity === 'tasks' ? 'task' : entity === 'projects' ? 'project' : '';
+    if (relationshipType) next.relationships = next.relationships.filter(relationship =>
+      !(relationship.from.type === relationshipType && relationship.from.id === deletedId)
+      && !(relationship.to.type === relationshipType && relationship.to.id === deletedId));
   }
   next.revision = current.revision + 1;
   return validateWorkspace(next);
