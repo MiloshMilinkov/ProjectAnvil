@@ -61,6 +61,7 @@ next-env.d.ts
 # Generated compiler caches and local Cloudflare secrets.
 *.tsbuildinfo
 .dev.vars*
+.projectanvil-maintenance.lock
 
 # Keep machine-specific editor state out; share project tasks.
 /.vscode/*

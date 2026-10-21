@@ -2,6 +2,13 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Check ProjectAnvil",
+      "type": "npm",
+      "script": "check",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
       "label": "Run ProjectAnvil",
       "type": "process",
       "command": "node",

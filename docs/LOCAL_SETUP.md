@@ -28,7 +28,7 @@ Keep the console open while using the app. Wait for pending saves, then press **
 
 The default address is available only on the host computer. Another browser on that computer can sign in to a different account. The local setup does not provide remote phone or team access, and it does not start automatically with Windows.
 
-Once dependencies are installed, core local notes, tasks, media, graphs, and canvases can work without internet access. External websites and externally hosted media still require a connection. This is not an offline editing queue or a synchronization service.
+Once dependencies are installed, core local notes, tasks, media, graphs, and canvases can work without internet access while the local server is running. External websites and externally hosted media still require a connection. Browser drafts and pending saves can be recovered and retried after an interruption; background cloud synchronization is not provided.
 
 ## Accounts and workspace access
 
@@ -44,28 +44,57 @@ ProjectAnvil stores its database and uploaded files under **`.wrangler/state`**.
 
 | Backup option | Includes | Excludes |
 | --- | --- | --- |
-| **Workspace settings → Export workspace** | Active workspace notes, tasks, discussions, labels, projects, saved views, relationships, and canvas layouts | Attachment files, accounts, sessions, membership, invitations, and personal rooms/checkpoints |
-| **Complete local backup** | Database, uploads, accounts, membership, sessions, room checkpoints, and relationship review state | Nothing in the copied state; preserve the matching source version and signing secret too |
+| **Workspace settings → Export workspace** | Active workspace notes, tasks, discussions, labels, projects, saved views, relationships, and canvas layouts | Archived note history, attachment files, accounts, sessions, membership, invitations, and personal rooms/checkpoints |
+| **Complete local backup** | Database, archived note history, uploads, accounts, membership, sessions, room checkpoints, and relationship review state | Unsaved browser drafts, browser preferences, and source code; preserve the matching source version too |
 
 ### Make a complete backup
 
-1. Stop ProjectAnvil and wait for the server to exit.
-2. Copy the entire **`.wrangler/state`** folder and **`.dev.vars`** file to a dated backup on another drive.
-3. Keep the matching project source version with it. Preserve hidden files when copying the entire project folder, and keep the backup private.
+1. Finish pending saves and resolve conflicts, or download recovery copies of unfinished edits. Browser drafts are stored in this browser and are separate from the database.
+2. Stop ProjectAnvil and wait for the server to exit.
+3. Run `npm run backup:create`. It copies the state and matching secret to a dated directory under `backups`, checks SQLite integrity, and records file checksums. The command prints the exact backup path.
+4. Copy the complete backup directory to another drive. Keep it private and preserve the matching source version.
+
+To choose another location or verify an existing backup:
+
+```sh
+npm run backup:create -- --output "E:\ProjectAnvil-backups"
+npm run backup:verify -- --backup "E:\ProjectAnvil-backups\projectanvil-DATE-ID"
+```
+
+Replace `projectanvil-DATE-ID` with the exact directory printed by create. `--output` chooses the parent directory; each backup gets its own dated subdirectory. Verification checks the manifest, file checksums, safe paths, and SQLite integrity. It does not restore data. A complete manual copy of `.wrangler/state` and `.dev.vars`, made while the server is stopped, also preserves confirmed data; the verified restore command requires its own generated manifest.
 
 Git commits preserve source code. They do not preserve your app records, uploaded media, or private signing secret.
 
+If Windows temporarily locks a backup file, create/restore retries the move briefly. A persistent lock stops the command and prints the retained staging path; no backup is silently deleted. Close the process holding the file before retrying, and keep the retained directory until a complete backup verifies.
+
 ### Restore a complete backup
 
-1. Stop the app.
-2. Preserve a separate copy of the current state and `.dev.vars`.
-3. Replace them with the matching backed-up state and secret, then start the matching project version.
+1. Stop the app and keep the backup directory intact.
+2. Run the restore command below, pointing to a generated complete backup.
+3. Start the matching project version and check the restored workspace.
+
+```sh
+npm run backup:restore -- --backup "E:\ProjectAnvil-backups\projectanvil-DATE-ID"
+```
+
+Restore verifies the entire backup before replacing anything, stages its files, and preserves the previous state and secret under `backups/rollback-*`. A running local server blocks create/restore. Startup is blocked while `.projectanvil-maintenance.lock` exists. If a backup process was interrupted, confirm it has exited and inspect its backup/rollback directories before removing a stale lock; do not start the app midway through a restore.
 
 Do not combine individual database files from different backups or reinitialize the database as a troubleshooting shortcut.
 
 ### Import a workspace export
 
-Export the current workspace first. Import replaces records only in the active workspace after confirmation. Imported relationships start reviewed against the imported content, clearing previous review markers. Personal work rooms are stored separately and are not restored from JSON; pins to removed records are pruned. Attachment references in JSON need their corresponding files in storage.
+Export the current workspace first. Import replaces records only in the active workspace after confirmation and rejects an outdated workspace revision. Imported relationships start reviewed against the imported content, clearing previous review markers. Personal work rooms are stored separately and are not restored from JSON; pins to removed records are pruned. Existing archived note history and unreferenced attachment bytes are retained. Attachment references in JSON need their corresponding files in storage.
+
+## Drafts, conflicts, and save recovery
+
+- Notes and canvases keep recovery drafts as you edit. Task, project, assignment-label, linked-task, and room forms keep their own unfinished drafts. Recovery is scoped to the account and workspace in this browser.
+- Close an unfinished form with **Keep draft** to return later, or explicitly discard it. A browser-storage failure is shown and blocks unsafe in-app navigation; keep the page open until saved or copy/download your text.
+- **Saved**, **Saving**, and **Unsaved changes** describe the actual save state. A successful refresh does not dismiss a failed save. Use **Retry saves** for interrupted requests, or **Review unsaved changes** to download recovery data and discard individual pending saves.
+- When another window replaces a browser draft, its displaced copy is kept separately. Use **Review recovery copies** to inspect, download, and manually merge useful text before discarding the copy.
+- Editing different fields can merge safely. Conflicting changes to the same field are rejected with an explanation; local edits remain available. Review/copy your draft before choosing the latest saved version. A stale editor cannot recreate a deleted item.
+- Failed recordings remain available for Retry, Download, or Discard while the page is open. Raw audio is not a durable browser draft; navigation is blocked until it is saved or explicitly discarded. Browser crash recovery cannot preserve an in-memory recording.
+
+Drafts are device/browser recovery copies, not confirmed database saves. Save or download them before clearing browser data, changing browser profiles, or making a complete backup.
 
 ## Storage limits
 
@@ -75,11 +104,11 @@ Export the current workspace first. Import replaces records only in the active w
 | Uploaded file | 20 MB per file |
 | Note content or task description | 100,000 characters, subject to total workspace size |
 | Workspace collections | 1,500 tasks · 1,000 notes · 500 people · 100 projects · 100 canvases · 500 attachments · 2,000 meaningful relationships |
-| Note history | Up to 12 earlier content versions, normally spaced at least 30 seconds apart |
+| Note history | Archived separately from active records; normal edits capture versions at least 30 seconds apart, with explicit restores and deletions also preserving replaced content |
 | Linked task source quote | 8,000 characters |
 | Work rooms | 30 per account/workspace; up to 20 pinned notes per room |
 
-History counts toward the workspace text allowance. Use exports or complete backups for longer-term recovery. Change-impact markers indicate possible consequences; review the connected content before acknowledging them.
+Archived history and uploaded file bytes do not count toward the active workspace allowance. History and unreferenced attachment files are retained without automatic deletion; complete backups preserve them. **Settings → Storage & recovery** checks usage, retained files, and missing attachments without deleting files. History is loaded in pages of 20 versions. Change-impact markers indicate possible consequences; review the connected content before acknowledging them.
 
 ## Troubleshooting
 
@@ -90,21 +119,19 @@ History counts toward the workspace text allowance. Use exports or complete back
 | Port 5173 is occupied | Wait for a starting ProjectAnvil instance or close the program using that port. The launcher does not kill other programs. |
 | Node is missing | Install Node.js 22.13+ and restart your terminal or VS Code. The Windows launcher expects the standard installation path. |
 | Dependencies are missing | Run `npm run install:ci` from the repository folder. This needs internet access. |
-| Saving failed | Keep the tab open, read the error, and retry before closing the app. |
+| Saving failed | Read the error and use Retry saves; review conflicting edits in their editor. Download a recovery copy before discarding pending work. |
 | Database or migration error | Back up the complete state and secret. Do not delete `.wrangler` or blindly rerun initial SQL. |
 
 ## Development notes
 
 The portable execution profile is the default for a fresh checkout. `.openai/hosting.json` declares the local `DB` and `BUCKET` bindings; it does not publish the app. Preserve that tracked configuration when moving or updating the source.
 
-Startup creates a signing secret if missing and applies the idempotent account, access, and work-room schemas without resetting existing records. Schema definitions live in `db/auth.sql`, `db/access.sql`, and `db/workrooms.sql`. Other schema changes need a reviewed migration and a complete backup; generating SQL does not apply it.
+Startup creates a signing secret if missing and applies the idempotent account, access, work-room, and reliability schemas without resetting existing records. Schema definitions live in `db/auth.sql`, `db/access.sql`, `db/workrooms.sql`, and `db/reliability.sql`. Legacy note snapshots migrate atomically into the archive alongside a successful workspace write. Other schema changes need a reviewed migration and a complete backup; generating SQL does not apply it.
 
 Useful checks:
 
 ```sh
-npx tsc --noEmit
-npm test
-npm run build
+npm run check
 ```
 
-Backend checks use an in-memory SQLite database and a fake file bucket; they do not modify saved workspaces. Building the app does not publish it. See [GitHub setup](../GITHUB.md) for source control and [LOCAL_ONLY.md](../LOCAL_ONLY.md) for the current local-operation policy.
+Checks include TypeScript, lint, backend/draft regressions, temporary-fixture backup restoration, and a production build. Backend tests use in-memory SQLite and a fake file bucket; backup tests use temporary fixture directories. They do not modify saved workspaces. GitHub Actions runs the same checks on pushes and pull requests. Building the app does not publish it. See [GitHub setup](../GITHUB.md) for source control and [LOCAL_ONLY.md](../LOCAL_ONLY.md) for the current local-operation policy.

@@ -26,7 +26,7 @@
   margin: 7px 0 9px;
   font-size: 30px;
   line-height: 1.25;
-  letter-spacing: -.7px;
+  letter-spacing: -0.7px;
 }
 
 :root .work-rooms-heading p,
@@ -99,7 +99,7 @@
 :root .room-button:disabled,
 :root .room-icon-button:disabled,
 :root .room-fieldset:disabled {
-  opacity: .6;
+  opacity: 0.6;
   cursor: default;
 }
 
@@ -363,7 +363,7 @@
 :root .room-editor-heading h2 {
   font-size: 22px;
   line-height: 1.3;
-  letter-spacing: -.4px;
+  letter-spacing: -0.4px;
   margin: 3px 0 0;
 }
 
@@ -424,7 +424,7 @@
 :root .room-field textarea::placeholder,
 :root .room-search input::placeholder {
   color: var(--muted);
-  opacity: .9;
+  opacity: 0.9;
 }
 
 :root .room-form-grid,
@@ -571,14 +571,14 @@
 }
 
 :root .room-view-options > summary::after {
-  content: '+';
+  content: "+";
   margin-left: auto;
   color: var(--accent);
   font-size: 18px;
 }
 
 :root .room-view-options[open] > summary::after {
-  content: '−';
+  content: "−";
 }
 
 :root .room-view-options > summary > span {
@@ -705,7 +705,7 @@
 }
 
 :root .room-spinner {
-  animation: room-spin .9s linear infinite;
+  animation: room-spin 0.9s linear infinite;
 }
 
 :root .active-work-room {
@@ -834,47 +834,124 @@
 }
 
 @keyframes room-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 1180px) {
-  :root .work-room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .work-room-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
-  :root .work-rooms-heading { flex-direction: column; gap: 17px; }
-  :root .work-rooms-heading h1 { font-size: 27px; }
-  :root .work-room-grid { grid-template-columns: minmax(0, 1fr); }
-  :root .work-room-card { padding: 18px; }
-  :root .room-modal-shade { padding: 10px; }
-  :root .room-editor { max-height: calc(100dvh - 20px); padding: 19px 16px; border-radius: 12px; }
-  :root .room-editor-heading { gap: 8px; }
-  :root .room-editor-heading h2 { font-size: 20px; }
-  :root .room-editor-heading .room-eyebrow { font-size: 9px; }
-  :root .room-form-grid, :root .room-view-fields { grid-template-columns: minmax(0, 1fr); }
-  :root .room-field input, :root .room-field select, :root .room-field textarea, :root .room-search input { font-size: 16px; }
-  :root .room-view-options > summary { flex-wrap: wrap; }
-  :root .room-view-options > summary > span { font-size: 11px; margin-left: 0; }
-  :root .resume-work-card { align-items: flex-start; flex-wrap: wrap; gap: 12px; padding: 17px; }
-  :root .resume-work-card > div:not(.resume-work-actions) { flex-basis: calc(100% - 58px); }
-  :root .resume-work-actions { width: 100%; justify-content: flex-end; }
-  :root .room-privacy-note { padding: 14px; }
-  :root .active-work-room > header { padding: 6px 11px; gap: 5px; }
-  :root .active-work-room > header > .room-button { width: 44px; padding: 8px; }
-  :root .active-work-room > header > .room-button > span { display: none; }
-  :root .room-shelf-toggle { gap: 8px; }
-  :root .room-shelf-indicator { padding: 0 4px; }
-  :root .room-shelf-content { padding: 2px 13px 14px; }
-  :root .room-shelf-checkpoint { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  :root .work-rooms-heading {
+    flex-direction: column;
+    gap: 17px;
+  }
+  :root .work-rooms-heading h1 {
+    font-size: 27px;
+  }
+  :root .work-room-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root .work-room-card {
+    padding: 18px;
+  }
+  :root .room-modal-shade {
+    padding: 10px;
+  }
+  :root .room-editor {
+    max-height: calc(100dvh - 20px);
+    padding: 19px 16px;
+    border-radius: 12px;
+  }
+  :root .room-editor-heading {
+    gap: 8px;
+  }
+  :root .room-editor-heading h2 {
+    font-size: 20px;
+  }
+  :root .room-editor-heading .room-eyebrow {
+    font-size: 9px;
+  }
+  :root .room-form-grid,
+  :root .room-view-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root .room-field input,
+  :root .room-field select,
+  :root .room-field textarea,
+  :root .room-search input {
+    font-size: 16px;
+  }
+  :root .room-view-options > summary {
+    flex-wrap: wrap;
+  }
+  :root .room-view-options > summary > span {
+    font-size: 11px;
+    margin-left: 0;
+  }
+  :root .resume-work-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 17px;
+  }
+  :root .resume-work-card > div:not(.resume-work-actions) {
+    flex-basis: calc(100% - 58px);
+  }
+  :root .resume-work-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  :root .room-privacy-note {
+    padding: 14px;
+  }
+  :root .active-work-room > header {
+    padding: 6px 11px;
+    gap: 5px;
+  }
+  :root .active-work-room > header > .room-button {
+    width: 44px;
+    padding: 8px;
+  }
+  :root .active-work-room > header > .room-button > span {
+    display: none;
+  }
+  :root .room-shelf-toggle {
+    gap: 8px;
+  }
+  :root .room-shelf-indicator {
+    padding: 0 4px;
+  }
+  :root .room-shelf-content {
+    padding: 2px 13px 14px;
+  }
+  :root .room-shelf-checkpoint {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
 }
 
 @media (max-width: 390px) {
-  :root .room-editor-heading > .room-mark { display: none; }
-  :root .room-editor-footer { gap: 7px; }
-  :root .room-button { padding: 10px 12px; }
-  :root .work-room-card > footer > .room-button { flex: 1; }
+  :root .room-editor-heading > .room-mark {
+    display: none;
+  }
+  :root .room-editor-footer {
+    gap: 7px;
+  }
+  :root .room-button {
+    padding: 10px 12px;
+  }
+  :root .work-room-card > footer > .room-button {
+    flex: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root .room-spinner { animation: none; }
+  :root .room-spinner {
+    animation: none;
+  }
 }

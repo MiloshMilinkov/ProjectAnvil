@@ -12,7 +12,21 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "dist/**",
+    ".wrangler/**",
+    ".vinext/**",
+    ".sites-runtime/**",
+    "backups/**",
+    "outputs/**",
+    "work/**",
   ]),
+  {
+    files: ["tests/**/*.cjs"],
+    rules: {
+      // The isolated backend harness deliberately transpiles modules to CommonJS.
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {

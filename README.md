@@ -36,11 +36,12 @@
 | **Visual canvases** | Arrange notes, tasks, text, images, PDFs, media, and web references on separate canvases. Move and resize cards, connect them with labeled arrows, and pan or zoom. |
 | **Structured collections** | Browse notes as tables, lists, galleries, or Kanban boards. Filter, sort, group, rearrange columns, edit properties, and calculate counts, sums, and averages. |
 | **Daily planning & templates** | Use dated journals and reusable starting points for projects, research, creative work, fitness, and everyday routines. |
-| **Media & note history** | Upload images, PDFs, audio, and video; record audio in supported browsers. Autosave notes, restore recent versions, and export individual notes as Markdown. |
+| **Media & note history** | Upload images, PDFs, audio, and video; record audio in supported browsers. Autosave notes, browse paginated version history, restore saved versions, and export individual notes as Markdown. |
+| **Recovery & reliable saves** | Recover browser drafts after interruptions, retry failed saves, and review conflicts before replacing newer edits. Keep or discard unfinished forms; check workspace storage and missing attachments. |
 | **Personal & team workspaces** | Work as a guest, register an account, or join a team. Keep personal work private and share a team's projects, tasks, notes, canvases, and attachments with accepted members. |
 | **Workspace tools** | Search across tasks, notes, and projects. Write beside a preview, extract or combine notes, present basic slides, open notes in another window, and use focus mode. |
 | **Appearance & onboarding** | Choose Light, Dark, Warp, Focus, or Soft. Adjust spacing, save a startup view, customize the new-task shortcut, and replay the 27-step guided tour. Layouts adapt to desktop and mobile screens. |
-| **Portable records** | Export and import workspace JSON. Preserve accounts, attachments, personal work rooms, and review state with a complete local backup. |
+| **Portable records & backups** | Export and import workspace JSON. Create and verify complete local backups of accounts, attachments, archived history, personal work rooms, and review state; restore with a rollback copy. |
 
 ## Templates
 
@@ -76,17 +77,15 @@ For storage, backup, restore, and troubleshooting, see the [local setup guide](d
 ## Current limitations
 
 - Sharing is managed per workspace; separate project permissions and transfers between workspaces are not available yet.
-- Open tabs refresh about every ten seconds. Simultaneous text coediting, an offline editing queue, and automatic Markdown-folder sync are not implemented.
+- Open tabs refresh about every ten seconds. Interrupted edits have browser recovery copies and manual save retries; simultaneous text coediting, background cloud sync, and automatic Markdown-folder sync are not implemented.
 - Google sign-in, verification emails, password-reset emails, and invitation emails are not configured.
-- Workspace JSON excludes personal rooms, uploaded files, and accounts. Importing resets relationship review markers against the imported content. See [backup options and storage limits](docs/LOCAL_SETUP.md#data-and-backups).
+- Workspace JSON excludes archived note history, personal rooms, uploaded files, and accounts. Complete backups preserve confirmed local data; unsaved browser drafts must be saved or downloaded separately. Importing resets relationship review markers against the imported content. See [backup options and storage limits](docs/LOCAL_SETUP.md#data-and-backups).
 
 ## Development
 
 Built with **React, TypeScript, Vinext/Vite, Better Auth, and local D1/R2 emulation**.
 
 ```sh
-npx tsc --noEmit
-npm test
-npm run build
+npm run check
 ```
 

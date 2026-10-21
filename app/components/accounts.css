@@ -1,129 +1,866 @@
 /* Account surfaces inherit the active appearance, including Focus's dark frame. */
-:root .account-menu,:root .account-workspace-switcher{position:relative;min-width:0;color:var(--text)}
-:root .account-trigger,:root .account-workspace-trigger,:root .account-dropdown button,:root .account-workspace-dropdown button,:root .account-button,:root .account-icon-button,:root .account-auth-tabs button{min-height:44px;font:inherit;line-height:1.4;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);cursor:pointer;transition:background .15s,border-color .15s}
-:root .account-trigger{padding:5px 10px;max-width:230px;font-size:13px;background:var(--panel-2)}
-:root .account-trigger-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
-:root .account-avatar{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:9px;color:var(--accent);background:var(--accent-soft);font-size:11px;letter-spacing:.3px;font-weight:650}
-:root .account-dropdown,:root .account-workspace-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:75;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;box-shadow:0 15px 45px #0003;padding:7px;max-height:calc(100dvh - 100px);overflow-y:auto;overscroll-behavior:contain}
-:root .account-dropdown{width:290px;max-width:calc(100vw - 28px)}
-:root .account-identity{padding:10px 12px 14px;margin-bottom:5px;border-bottom:1px solid var(--border);overflow:hidden}
-:root .account-identity strong,:root .account-identity span{display:block;overflow-wrap:anywhere}
-:root .account-identity strong{font-size:15px;margin-bottom:4px}
-:root .account-identity span{font-size:12px;color:var(--muted)}
-:root .account-dropdown button,:root .account-workspace-dropdown button{justify-content:flex-start;text-align:left;width:100%;border:0;background:transparent;padding:10px;font-size:13px}
-:root .account-dropdown button:hover,:root .account-workspace-dropdown button:hover,:root .account-workspace-dropdown button[aria-checked=true]{background:var(--accent-soft)}
-:root .account-count{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600;flex-shrink:0}
-:root .account-dropdown button .account-count{margin-left:auto}
-:root .account-workspace-switcher{margin:12px 0 22px}
-:root .account-workspace-trigger{width:100%;justify-content:flex-start;text-align:left;min-height:66px;padding:10px;background:var(--panel-2);gap:10px}
-:root .account-workspace-icon{display:grid;place-items:center;width:34px;height:38px;flex-shrink:0;border-radius:8px;background:var(--accent-soft);color:var(--accent)}
-:root .account-workspace-trigger>span:nth-child(2){flex:1;min-width:0}
-:root .account-workspace-trigger strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600}
-:root .account-workspace-trigger small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
-:root .account-workspace-trigger>svg{flex-shrink:0;color:var(--muted)}
-:root .account-workspace-dropdown{left:0;right:auto;width:300px;max-width:calc(100vw - 30px)}
-:root .account-workspace-dropdown button>span{min-width:0;flex:1}
-:root .account-workspace-dropdown button strong{display:block;font-size:13px;font-weight:550;overflow-wrap:anywhere}
-:root .account-workspace-dropdown button small{display:block;font-size:11px;color:var(--muted);margin-top:2px}
-:root .account-workspace-dropdown button>svg{flex-shrink:0;color:var(--accent)}
-:root .account-menu-caption{display:block;font-size:10px;letter-spacing:1.2px;padding:10px;color:var(--muted)}
-:root .account-workspace-dropdown button.account-manage-workspaces{border-top:1px solid var(--border);border-radius:0;margin-top:5px;padding-top:14px;color:var(--accent)}
-:root .account-dialog-shade{position:fixed;inset:0;z-index:250;display:flex;align-items:center;justify-content:center;padding:24px;background:#0008;backdrop-filter:blur(4px);color:var(--text);overflow-y:auto}
-:root .account-dialog{width:460px;max-width:100%;max-height:calc(100dvh - 48px);overflow-y:auto;overscroll-behavior:contain;padding:25px;border:1px solid var(--border);border-radius:15px;background:var(--panel);color:var(--text);box-shadow:0 24px 90px #0004}
-:root .account-dialog-heading{display:flex;align-items:center;gap:11px;margin-bottom:21px}
-:root .account-dialog-heading h2{font-size:22px;line-height:1.3;margin:0;letter-spacing:-.5px;flex:1}
-:root .account-dialog-mark{width:42px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--accent-soft);color:var(--accent);flex-shrink:0}
-:root .account-icon-button{width:44px;height:44px;padding:8px;background:transparent;border-color:transparent;flex-shrink:0}
-:root .account-icon-button:hover{background:var(--accent-soft)}
-:root .account-dialog-heading>.account-icon-button{margin-right:-8px}
-:root .account-auth-tabs{display:grid;grid-template-columns:1fr 1fr;padding:4px;border:1px solid var(--border);background:var(--bg);border-radius:10px;gap:4px}
-:root .account-auth-tabs button{border:0;background:transparent;font-size:14px}
-:root .account-auth-tabs button[aria-pressed=true]{background:var(--panel-2);color:var(--accent);box-shadow:0 1px 3px #0001;font-weight:600}
-:root .account-intro{color:var(--muted);font-size:13px;line-height:1.7;margin:17px 0 20px}
-:root .account-auth-form{display:flex;flex-direction:column;gap:17px}
-:root .account-field{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--text);min-width:0}
-:root .account-field>span{font-weight:550}
-:root .account-field input{width:100%;min-width:0;min-height:46px;padding:11px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:14px;line-height:1.4;box-shadow:none}
-:root .account-field input::placeholder{color:var(--muted);opacity:.9}
-:root .account-field small{font-size:12px;line-height:1.6;color:var(--muted)}
-:root .account-password{position:relative;display:flex;align-items:center}
-:root .account-password input{padding-right:50px}
-:root .account-password>.account-icon-button{position:absolute;right:2px;border-radius:5px;color:var(--muted);height:42px;min-height:42px}
-:root .account-button{padding:10px 14px;font-size:13px;min-width:0;text-decoration:none}
-:root .account-primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600}
-:root .account-button:not(.account-primary):hover{background:var(--accent-soft);border-color:var(--accent)}
-:root .account-primary:hover{filter:brightness(1.08)}
-:root .account-submit{width:100%;margin-top:2px}
-:root .account-submit>svg:last-child{margin-left:auto}
-:root .account-submit:before{content:'';width:17px}
-:root .account-submit>.account-spinner{margin-left:0}
-:root .account-footnote{display:flex;align-items:flex-start;gap:8px;color:var(--muted);font-size:12px;line-height:1.6;margin:20px 0 0;border-top:1px solid var(--border);padding-top:17px}
-:root .account-footnote>svg{flex-shrink:0;margin-top:2px}
-:root .account-error{padding:11px 13px;border:1px solid var(--danger);background:var(--panel-2);color:var(--danger);font-size:13px;line-height:1.6;border-radius:8px;margin:0;overflow-wrap:anywhere}
-:root .account-dropdown .account-error,:root .account-workspace-dropdown .account-error{font-size:12px;margin:5px 2px}
-:root .account-error>.account-button{margin:10px 0 0;display:flex}
-:root .account-page-error{margin-bottom:22px}
-:root .account-spinner{animation:account-spin .9s linear infinite;flex-shrink:0}
-:root .account-trigger:focus-visible,:root .account-button:focus-visible,:root .account-icon-button:focus-visible,:root .account-auth-tabs button:focus-visible,:root .account-workspace-trigger:focus-visible,:root .account-dropdown button:focus-visible,:root .account-workspace-dropdown button:focus-visible,:root .account-field input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-:root .account-trigger:disabled,:root .account-button:disabled,:root .account-field input:disabled,:root .account-dropdown button:disabled,:root .account-workspace-dropdown button:disabled{cursor:default;opacity:.6}
-:root .account-team-page{max-width:1500px;margin:0 auto}
-:root .account-page-heading{margin-bottom:25px}
-:root .account-eyebrow{display:block;color:var(--accent);font-size:11px;letter-spacing:1.4px;margin-bottom:9px}
-:root .account-page-heading h1{font-size:30px;line-height:1.25;letter-spacing:-.7px;margin:0 0 10px;color:var(--text)}
-:root .account-page-heading p{color:var(--muted);font-size:14px;line-height:1.7;margin:0;max-width:720px}
-:root .account-workspace-explanation{display:flex;align-items:flex-start;gap:12px;padding:17px 20px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);color:var(--muted);margin-bottom:24px}
-:root .account-workspace-explanation>svg{color:var(--accent);flex-shrink:0;margin-top:3px}
-:root .account-workspace-explanation p{font-size:13px;line-height:1.8;margin:0}
-:root .account-workspace-explanation strong{color:var(--text)}
-:root .account-workspace-grid,:root .account-model-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:stretch}
-:root .account-model-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-:root .account-card{padding:23px;border:1px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);min-width:0}
-:root .account-card>svg{color:var(--accent);margin-bottom:14px}
-:root .account-card h2{font-size:18px;line-height:1.4;letter-spacing:-.3px;margin:0 0 10px;overflow-wrap:anywhere}
-:root .account-card h3{font-size:15px;line-height:1.4;margin:0 0 8px}
-:root .account-card p{color:var(--muted);font-size:13px;line-height:1.75;margin:0 0 17px}
-:root .account-section-heading{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
-:root .account-section-heading>svg{color:var(--accent);flex-shrink:0}
-:root .account-section-heading h2{margin:0;flex:1}
-:root .account-kind{font-size:10px;font-weight:600;letter-spacing:1.1px;color:var(--muted)}
-:root .account-active-label{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--accent);margin-left:auto}
-:root .account-is-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-soft)}
-:root .account-workspace-card{display:flex;flex-direction:column;align-items:flex-start;min-height:220px}
-:root .account-workspace-card>.account-section-heading{width:100%}
-:root .account-workspace-card>.account-button{margin-top:auto}
-:root .account-create-team form{display:flex;flex-direction:column;gap:13px}
-:root .account-create-team .account-button{align-self:flex-start}
-:root .account-invitations{margin-bottom:24px}
-:root .account-invitations>.account-section-heading{margin-bottom:10px}
-:root .account-invitation-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 0;border-top:1px solid var(--border)}
-:root .account-invitation-row>div:first-child{min-width:0}
-:root .account-invitation-row strong{display:block;font-size:15px;overflow-wrap:anywhere}
-:root .account-invitation-row span{display:block;font-size:12px;color:var(--muted);margin-top:4px}
-:root .account-row-actions{display:flex;gap:9px;flex-wrap:wrap}
-:root .account-members-panel{margin-top:25px}
-:root .account-role{font-size:12px;color:var(--accent);padding:5px 9px;border:1px solid var(--border);border-radius:20px}
-:root .account-loading{display:flex;align-items:center;gap:10px;padding:22px 0;color:var(--muted);font-size:13px}
-:root .account-member-list{list-style:none;padding:0;margin:10px 0 0}
-:root .account-member-list>li{display:flex;align-items:center;gap:13px;padding:15px 0;border-top:1px solid var(--border)}
-:root .account-member-name{flex:1;min-width:0}
-:root .account-member-name strong{font-size:14px;font-weight:550;display:block;overflow-wrap:anywhere}
-:root .account-member-name strong small{font-size:12px;font-weight:400;color:var(--muted)}
-:root .account-member-name>span{display:block;font-size:12px;color:var(--muted);margin-top:3px}
-:root .account-subtle{background:transparent;color:var(--muted);font-size:12px}
-:root .account-invite-area,:root .account-pending,:root .account-leave-area{border-top:1px solid var(--border);padding-top:22px;margin-top:20px}
-:root .account-invite-area form{display:flex;align-items:flex-end;gap:12px;max-width:620px}
-:root .account-invite-area .account-field{flex:1}
-:root .account-pending-row{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0}
-:root .account-pending-row>span{min-width:0}
-:root .account-pending-row strong{display:block;font-size:13px;overflow-wrap:anywhere}
-:root .account-pending-row small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
-:root .account-danger{color:var(--danger);border-color:var(--danger);background:transparent}
-:root .account-danger:hover{background:var(--panel-2)}
-:root .account-confirm-description{font-size:14px;line-height:1.8;color:var(--muted);margin-bottom:24px}
-:root .account-confirm-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:22px}
-:root .account-guest-explanation{margin-top:22px}
-@keyframes account-spin{to{transform:rotate(360deg)}}
-@media(max-width:1150px){:root .account-workspace-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){:root .account-workspace-grid,:root .account-model-grid{grid-template-columns:1fr}:root .account-card{padding:20px}:root .account-page-heading h1{font-size:26px}:root .account-invitation-row{align-items:flex-start;flex-direction:column}:root .account-workspace-card{min-height:200px}:root .account-trigger{padding:5px 8px;gap:6px;max-width:150px}:root .account-trigger-name{max-width:85px}:root .account-field input{font-size:16px}:root .account-workspace-explanation{padding:15px}:root .account-invite-area form{align-items:stretch;flex-direction:column}:root .account-invite-area form>.account-button{align-self:flex-start}:root .account-role{font-size:11px}:root .account-workspace-dropdown{width:280px}:root .account-trigger>.account-avatar{width:27px;height:27px}:root .account-dialog-shade{padding:14px}:root .account-dialog{max-height:calc(100dvh - 28px);padding:21px}:root .account-dialog-heading h2{font-size:20px}}
-@media(max-width:430px){:root .account-trigger-name{display:none}:root .account-trigger{min-width:44px}:root .account-guest-trigger{padding:5px 8px}:root .account-guest-trigger>span{font-size:12px}:root .account-dialog-heading{gap:8px}:root .account-dialog-mark{width:34px;height:38px}:root .account-dialog-heading h2{font-size:19px}:root .account-dialog{padding:18px}:root .account-member-list>li{gap:9px}:root .account-member-list .account-button{padding-left:9px;padding-right:9px}:root .account-pending-row{align-items:flex-start;flex-direction:column}:root .account-row-actions{width:100%}:root .account-row-actions>.account-button{flex:1}}
-@media(prefers-reduced-motion:reduce){:root .account-spinner{animation-duration:2s}:root .account-button,:root .account-trigger{transition:none}}
+:root .account-menu,
+:root .account-workspace-switcher {
+  position: relative;
+  min-width: 0;
+  color: var(--text);
+}
+:root .account-trigger,
+:root .account-workspace-trigger,
+:root .account-dropdown button,
+:root .account-workspace-dropdown button,
+:root .account-button,
+:root .account-icon-button,
+:root .account-auth-tabs button {
+  min-height: 44px;
+  font: inherit;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+:root .account-trigger {
+  padding: 5px 10px;
+  max-width: 230px;
+  font-size: 13px;
+  background: var(--panel-2);
+}
+:root .account-trigger-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+:root .account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  font-weight: 650;
+}
+:root .account-dropdown,
+:root .account-workspace-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 75;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 10px;
+  box-shadow: 0 15px 45px #0003;
+  padding: 7px;
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+:root .account-dropdown {
+  width: 290px;
+  max-width: calc(100vw - 28px);
+}
+:root .account-identity {
+  padding: 10px 12px 14px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+:root .account-identity strong,
+:root .account-identity span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+:root .account-identity strong {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+:root .account-identity span {
+  font-size: 12px;
+  color: var(--muted);
+}
+:root .account-dropdown button,
+:root .account-workspace-dropdown button {
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 10px;
+  font-size: 13px;
+}
+:root .account-dropdown button:hover,
+:root .account-workspace-dropdown button:hover,
+:root .account-workspace-dropdown button[aria-checked="true"] {
+  background: var(--accent-soft);
+}
+:root .account-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+:root .account-dropdown button .account-count {
+  margin-left: auto;
+}
+:root .account-workspace-switcher {
+  margin: 12px 0 22px;
+}
+:root .account-workspace-trigger {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  min-height: 66px;
+  padding: 10px;
+  background: var(--panel-2);
+  gap: 10px;
+}
+:root .account-workspace-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+:root .account-workspace-trigger > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+:root .account-workspace-trigger strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+:root .account-workspace-trigger small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+:root .account-workspace-trigger > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+:root .account-workspace-dropdown {
+  left: 0;
+  right: auto;
+  width: 300px;
+  max-width: calc(100vw - 30px);
+}
+:root .account-workspace-dropdown button > span {
+  min-width: 0;
+  flex: 1;
+}
+:root .account-workspace-dropdown button strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+:root .account-workspace-dropdown button small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+:root .account-workspace-dropdown button > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+:root .account-menu-caption {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  padding: 10px;
+  color: var(--muted);
+}
+:root .account-workspace-dropdown button.account-manage-workspaces {
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  margin-top: 5px;
+  padding-top: 14px;
+  color: var(--accent);
+}
+:root .account-dialog-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0008;
+  backdrop-filter: blur(4px);
+  color: var(--text);
+  overflow-y: auto;
+}
+:root .account-dialog {
+  width: 460px;
+  max-width: 100%;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 25px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 90px #0004;
+}
+:root .account-dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 21px;
+}
+:root .account-dialog-heading h2 {
+  font-size: 22px;
+  line-height: 1.3;
+  margin: 0;
+  letter-spacing: -0.5px;
+  flex: 1;
+}
+:root .account-dialog-mark {
+  width: 42px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+:root .account-icon-button {
+  width: 44px;
+  height: 44px;
+  padding: 8px;
+  background: transparent;
+  border-color: transparent;
+  flex-shrink: 0;
+}
+:root .account-icon-button:hover {
+  background: var(--accent-soft);
+}
+:root .account-dialog-heading > .account-icon-button {
+  margin-right: -8px;
+}
+:root .account-auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 10px;
+  gap: 4px;
+}
+:root .account-auth-tabs button {
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+}
+:root .account-auth-tabs button[aria-pressed="true"] {
+  background: var(--panel-2);
+  color: var(--accent);
+  box-shadow: 0 1px 3px #0001;
+  font-weight: 600;
+}
+:root .account-intro {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 17px 0 20px;
+}
+:root .account-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+:root .account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+:root .account-field > span {
+  font-weight: 550;
+}
+:root .account-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 11px 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: none;
+}
+:root .account-field input::placeholder {
+  color: var(--muted);
+  opacity: 0.9;
+}
+:root .account-field small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+:root .account-password {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+:root .account-password input {
+  padding-right: 50px;
+}
+:root .account-password > .account-icon-button {
+  position: absolute;
+  right: 2px;
+  border-radius: 5px;
+  color: var(--muted);
+  height: 42px;
+  min-height: 42px;
+}
+:root .account-button {
+  padding: 10px 14px;
+  font-size: 13px;
+  min-width: 0;
+  text-decoration: none;
+}
+:root .account-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+:root .account-button:not(.account-primary):hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+:root .account-primary:hover {
+  filter: brightness(1.08);
+}
+:root .account-submit {
+  width: 100%;
+  margin-top: 2px;
+}
+:root .account-submit > svg:last-child {
+  margin-left: auto;
+}
+:root .account-submit:before {
+  content: "";
+  width: 17px;
+}
+:root .account-submit > .account-spinner {
+  margin-left: 0;
+}
+:root .account-footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 20px 0 0;
+  border-top: 1px solid var(--border);
+  padding-top: 17px;
+}
+:root .account-footnote > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+:root .account-error {
+  padding: 11px 13px;
+  border: 1px solid var(--danger);
+  background: var(--panel-2);
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.6;
+  border-radius: 8px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+:root .account-dropdown .account-error,
+:root .account-workspace-dropdown .account-error {
+  font-size: 12px;
+  margin: 5px 2px;
+}
+:root .account-error > .account-button {
+  margin: 10px 0 0;
+  display: flex;
+}
+:root .account-page-error {
+  margin-bottom: 22px;
+}
+:root .account-spinner {
+  animation: account-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+:root .account-trigger:focus-visible,
+:root .account-button:focus-visible,
+:root .account-icon-button:focus-visible,
+:root .account-auth-tabs button:focus-visible,
+:root .account-workspace-trigger:focus-visible,
+:root .account-dropdown button:focus-visible,
+:root .account-workspace-dropdown button:focus-visible,
+:root .account-field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+:root .account-trigger:disabled,
+:root .account-button:disabled,
+:root .account-field input:disabled,
+:root .account-dropdown button:disabled,
+:root .account-workspace-dropdown button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+:root .account-team-page {
+  max-width: 1500px;
+  margin: 0 auto;
+}
+:root .account-page-heading {
+  margin-bottom: 25px;
+}
+:root .account-eyebrow {
+  display: block;
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  margin-bottom: 9px;
+}
+:root .account-page-heading h1 {
+  font-size: 30px;
+  line-height: 1.25;
+  letter-spacing: -0.7px;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+:root .account-page-heading p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 720px;
+}
+:root .account-workspace-explanation {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 17px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+:root .account-workspace-explanation > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+:root .account-workspace-explanation p {
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 0;
+}
+:root .account-workspace-explanation strong {
+  color: var(--text);
+}
+:root .account-workspace-grid,
+:root .account-model-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+:root .account-model-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+:root .account-card {
+  padding: 23px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  min-width: 0;
+}
+:root .account-card > svg {
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+:root .account-card h2 {
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: -0.3px;
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+:root .account-card h3 {
+  font-size: 15px;
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+:root .account-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.75;
+  margin: 0 0 17px;
+}
+:root .account-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+:root .account-section-heading > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+:root .account-section-heading h2 {
+  margin: 0;
+  flex: 1;
+}
+:root .account-kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+  color: var(--muted);
+}
+:root .account-active-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--accent);
+  margin-left: auto;
+}
+:root .account-is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+}
+:root .account-workspace-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 220px;
+}
+:root .account-workspace-card > .account-section-heading {
+  width: 100%;
+}
+:root .account-workspace-card > .account-button {
+  margin-top: auto;
+}
+:root .account-create-team form {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+:root .account-create-team .account-button {
+  align-self: flex-start;
+}
+:root .account-invitations {
+  margin-bottom: 24px;
+}
+:root .account-invitations > .account-section-heading {
+  margin-bottom: 10px;
+}
+:root .account-invitation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 0;
+  border-top: 1px solid var(--border);
+}
+:root .account-invitation-row > div:first-child {
+  min-width: 0;
+}
+:root .account-invitation-row strong {
+  display: block;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+:root .account-invitation-row span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+:root .account-row-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+:root .account-members-panel {
+  margin-top: 25px;
+}
+:root .account-role {
+  font-size: 12px;
+  color: var(--accent);
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+}
+:root .account-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+:root .account-member-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+:root .account-member-list > li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 15px 0;
+  border-top: 1px solid var(--border);
+}
+:root .account-member-name {
+  flex: 1;
+  min-width: 0;
+}
+:root .account-member-name strong {
+  font-size: 14px;
+  font-weight: 550;
+  display: block;
+  overflow-wrap: anywhere;
+}
+:root .account-member-name strong small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+:root .account-member-name > span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+:root .account-subtle {
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+:root .account-invite-area,
+:root .account-pending,
+:root .account-leave-area {
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+  margin-top: 20px;
+}
+:root .account-invite-area form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  max-width: 620px;
+}
+:root .account-invite-area .account-field {
+  flex: 1;
+}
+:root .account-pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 12px 0;
+}
+:root .account-pending-row > span {
+  min-width: 0;
+}
+:root .account-pending-row strong {
+  display: block;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+:root .account-pending-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+:root .account-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+}
+:root .account-danger:hover {
+  background: var(--panel-2);
+}
+:root .account-confirm-description {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+:root .account-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+:root .account-guest-explanation {
+  margin-top: 22px;
+}
+@keyframes account-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 1150px) {
+  :root .account-workspace-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  :root .account-workspace-grid,
+  :root .account-model-grid {
+    grid-template-columns: 1fr;
+  }
+  :root .account-card {
+    padding: 20px;
+  }
+  :root .account-page-heading h1 {
+    font-size: 26px;
+  }
+  :root .account-invitation-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  :root .account-workspace-card {
+    min-height: 200px;
+  }
+  :root .account-trigger {
+    padding: 5px 8px;
+    gap: 6px;
+    max-width: 150px;
+  }
+  :root .account-trigger-name {
+    max-width: 85px;
+  }
+  :root .account-field input {
+    font-size: 16px;
+  }
+  :root .account-workspace-explanation {
+    padding: 15px;
+  }
+  :root .account-invite-area form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  :root .account-invite-area form > .account-button {
+    align-self: flex-start;
+  }
+  :root .account-role {
+    font-size: 11px;
+  }
+  :root .account-workspace-dropdown {
+    width: 280px;
+  }
+  :root .account-trigger > .account-avatar {
+    width: 27px;
+    height: 27px;
+  }
+  :root .account-dialog-shade {
+    padding: 14px;
+  }
+  :root .account-dialog {
+    max-height: calc(100dvh - 28px);
+    padding: 21px;
+  }
+  :root .account-dialog-heading h2 {
+    font-size: 20px;
+  }
+}
+@media (max-width: 430px) {
+  :root .account-trigger-name {
+    display: none;
+  }
+  :root .account-trigger {
+    min-width: 44px;
+  }
+  :root .account-guest-trigger {
+    padding: 5px 8px;
+  }
+  :root .account-guest-trigger > span {
+    font-size: 12px;
+  }
+  :root .account-dialog-heading {
+    gap: 8px;
+  }
+  :root .account-dialog-mark {
+    width: 34px;
+    height: 38px;
+  }
+  :root .account-dialog-heading h2 {
+    font-size: 19px;
+  }
+  :root .account-dialog {
+    padding: 18px;
+  }
+  :root .account-member-list > li {
+    gap: 9px;
+  }
+  :root .account-member-list .account-button {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  :root .account-pending-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  :root .account-row-actions {
+    width: 100%;
+  }
+  :root .account-row-actions > .account-button {
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .account-spinner {
+    animation-duration: 2s;
+  }
+  :root .account-button,
+  :root .account-trigger {
+    transition: none;
+  }
+}

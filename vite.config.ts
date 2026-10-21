@@ -4,6 +4,7 @@ import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
+import { fileURLToPath } from "node:url";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -56,9 +57,25 @@ export default defineConfig(async ({ command }) => {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
         : { host: "127.0.0.1", port: 5173, strictPort: true }),
-      ...(isCodexSeatbeltSandbox
-        ? { watch: { useFsEvents: false, usePolling: true } }
-        : {}),
+      watch: {
+        ...(isCodexSeatbeltSandbox
+          ? { useFsEvents: false, usePolling: true }
+          : {}),
+        // Runtime databases, verified backups, and test copies are not source.
+        ignored: [
+          ".wrangler",
+          "backups",
+          "outputs",
+          "work",
+          ".sites-runtime",
+        ].map(
+          (folder) =>
+            fileURLToPath(new URL(`./${folder}/`, import.meta.url)).replace(
+              /\\/g,
+              "/",
+            ) + "**",
+        ),
+      },
     },
     plugins: [
       vinext(),

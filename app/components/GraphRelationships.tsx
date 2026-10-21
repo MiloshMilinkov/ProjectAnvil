@@ -1,13 +1,36 @@
-'use client';
+"use client";
 
-import { useMemo, useState, type FormEvent } from 'react';
-import { ArrowRight, Check, Link2, Plus, Search, Trash2, TriangleAlert, X } from 'lucide-react';
-import { entityKey, entitySignature, relationshipImpact } from '../lib/relationships';
-import { relationshipLabel, relationshipOptions, workspaceEntities } from '../lib/relationship-display';
-import { uid, type EntityRef, type FeatureProps, type Relationship, type RelationshipKind } from '../lib/types';
-import './relationships.css';
+import { useMemo, useState, type FormEvent } from "react";
+import {
+  ArrowRight,
+  Check,
+  Link2,
+  Plus,
+  Search,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import {
+  entityKey,
+  entitySignature,
+  relationshipImpact,
+} from "../lib/relationships";
+import {
+  relationshipLabel,
+  relationshipOptions,
+  workspaceEntities,
+} from "../lib/relationship-display";
+import {
+  uid,
+  type EntityRef,
+  type FeatureProps,
+  type Relationship,
+  type RelationshipKind,
+} from "../lib/types";
+import "./relationships.css";
 
-type Props = Pick<FeatureProps, 'workspace' | 'mutate' | 'notify'> & {
+type Props = Pick<FeatureProps, "workspace" | "mutate" | "notify"> & {
   impact: ReturnType<typeof relationshipImpact>;
   selectedKey: string;
   onSelect: (ref: EntityRef) => void;
@@ -24,45 +47,71 @@ export default function GraphRelationships({
   onOpen,
 }: Props) {
   const [composing, setComposing] = useState(false);
-  const [fromKey, setFromKey] = useState('');
-  const [toKey, setToKey] = useState('');
-  const [kind, setKind] = useState<RelationshipKind>('depends-on');
-  const [label, setLabel] = useState('');
-  const [query, setQuery] = useState('');
+  const [fromKey, setFromKey] = useState("");
+  const [toKey, setToKey] = useState("");
+  const [kind, setKind] = useState<RelationshipKind>("depends-on");
+  const [label, setLabel] = useState("");
+  const [query, setQuery] = useState("");
   const [reviewOnly, setReviewOnly] = useState(false);
   const [visibleCount, setVisibleCount] = useState(12);
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-  const [removingId, setRemovingId] = useState('');
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [removingId, setRemovingId] = useState("");
 
-  const entities = useMemo(() => workspaceEntities(workspace), [workspace.notes, workspace.tasks, workspace.projects]);
-  const byKey = useMemo(() => new Map(entities.map(ref => [entityKey(ref), ref])), [entities]);
-  const titles = useMemo(() => new Map<string, string>([
-    ...workspace.notes.map(note => [`note:${note.id}`, note.title] as const),
-    ...workspace.tasks.map(task => [`task:${task.id}`, task.title] as const),
-    ...workspace.projects.map(project => [`project:${project.id}`, project.name] as const),
-  ]), [workspace.notes, workspace.tasks, workspace.projects]);
-  const titleOf = (ref: EntityRef) => titles.get(entityKey(ref)) || 'Removed item';
+  const entities = useMemo(() => workspaceEntities(workspace), [workspace]);
+  const byKey = useMemo(
+    () => new Map(entities.map((ref) => [entityKey(ref), ref])),
+    [entities],
+  );
+  const titles = useMemo(
+    () =>
+      new Map<string, string>([
+        ...workspace.notes.map(
+          (note) => [`note:${note.id}`, note.title] as const,
+        ),
+        ...workspace.tasks.map(
+          (task) => [`task:${task.id}`, task.title] as const,
+        ),
+        ...workspace.projects.map(
+          (project) => [`project:${project.id}`, project.name] as const,
+        ),
+      ]),
+    [workspace.notes, workspace.tasks, workspace.projects],
+  );
+  const titleOf = (ref: EntityRef) =>
+    titles.get(entityKey(ref)) || "Removed item";
   const relationships = workspace.relationships ?? [];
-  const affectedEntities = entities.filter(ref => impact.affected.has(entityKey(ref)));
+  const affectedEntities = entities.filter((ref) =>
+    impact.affected.has(entityKey(ref)),
+  );
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const visibleRelationships = relationships.filter(relationship => {
-    if (reviewOnly && !impact.relationshipIds.has(relationship.id)) return false;
+  const visibleRelationships = relationships.filter((relationship) => {
+    if (reviewOnly && !impact.relationshipIds.has(relationship.id))
+      return false;
     if (!normalizedQuery) return true;
     return [
       titleOf(relationship.from),
       titleOf(relationship.to),
       relationshipLabel(relationship.kind),
       relationship.label,
-    ].join(' ').toLocaleLowerCase().includes(normalizedQuery);
+    ]
+      .join(" ")
+      .toLocaleLowerCase()
+      .includes(normalizedQuery);
   });
 
   function startRelationship() {
-    setFromKey(byKey.has(selectedKey) ? selectedKey : entities[0] ? entityKey(entities[0]) : '');
-    setToKey('');
-    setKind('depends-on');
-    setLabel('');
-    setError('');
+    setFromKey(
+      byKey.has(selectedKey)
+        ? selectedKey
+        : entities[0]
+          ? entityKey(entities[0])
+          : "",
+    );
+    setToKey("");
+    setKind("depends-on");
+    setLabel("");
+    setError("");
     setComposing(true);
   }
 
@@ -71,144 +120,395 @@ export default function GraphRelationships({
     const from = byKey.get(fromKey);
     const to = byKey.get(toKey);
     if (!from || !to || fromKey === toKey) {
-      setError('Choose two different items in this workspace.');
+      setError("Choose two different items in this workspace.");
       return;
     }
-    setBusy('create');
-    setError('');
+    setBusy("create");
+    setError("");
     try {
-      await mutate({ action: 'upsert', entity: 'relationships', item: { id: uid(), from, to, kind, label: label.trim() } });
+      await mutate({
+        action: "upsert",
+        entity: "relationships",
+        item: { id: uid(), from, to, kind, label: label.trim() },
+      });
       setComposing(false);
       onSelect(from);
-      notify('Relationship saved. Future source changes can flag connected work for review.');
+      notify(
+        "Relationship saved. Future source changes can flag connected work for review.",
+      );
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'The relationship could not be saved.');
+      setError(
+        error instanceof Error
+          ? error.message
+          : "The relationship could not be saved.",
+      );
     } finally {
-      setBusy('');
+      setBusy("");
     }
   }
 
   async function reviewRelationship(relationship: Relationship) {
     setBusy(relationship.id);
-    setError('');
+    setError("");
     try {
       await mutate({
-        action: 'review-relationship',
+        action: "review-relationship",
         id: relationship.id,
         expectedFromSignature: entitySignature(workspace, relationship.from),
         expectedToSignature: entitySignature(workspace, relationship.to),
       });
-      notify('Relationship reviewed for this workspace.');
+      notify("Relationship reviewed for this workspace.");
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'The review could not be saved.');
+      setError(
+        error instanceof Error
+          ? error.message
+          : "The review could not be saved.",
+      );
     } finally {
-      setBusy('');
+      setBusy("");
     }
   }
 
   async function removeRelationship(id: string) {
     setBusy(id);
-    setError('');
+    setError("");
     try {
-      await mutate({ action: 'delete', entity: 'relationships', id });
-      setRemovingId('');
-      notify('Relationship removed. Both connected items were kept.');
+      await mutate({ action: "delete", entity: "relationships", id });
+      setRemovingId("");
+      notify("Relationship removed. Both connected items were kept.");
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'The relationship could not be removed.');
+      setError(
+        error instanceof Error
+          ? error.message
+          : "The relationship could not be removed.",
+      );
     } finally {
-      setBusy('');
+      setBusy("");
     }
   }
 
-  function entityOptions(excludeKey = '') {
-    return (['note', 'task', 'project'] as const).map(type => (
-      <optgroup key={type} label={type === 'note' ? 'Notes' : type === 'task' ? 'Tasks' : 'Projects'}>
-        {entities.filter(ref => ref.type === type && entityKey(ref) !== excludeKey).map(ref => (
-          <option key={entityKey(ref)} value={entityKey(ref)}>{titleOf(ref)}</option>
-        ))}
+  function entityOptions(excludeKey = "") {
+    return (["note", "task", "project"] as const).map((type) => (
+      <optgroup
+        key={type}
+        label={
+          type === "note" ? "Notes" : type === "task" ? "Tasks" : "Projects"
+        }
+      >
+        {entities
+          .filter((ref) => ref.type === type && entityKey(ref) !== excludeKey)
+          .map((ref) => (
+            <option key={entityKey(ref)} value={entityKey(ref)}>
+              {titleOf(ref)}
+            </option>
+          ))}
       </optgroup>
     ));
   }
 
   return (
-    <section className="relationship-workspace" data-tour="meaningful-relationships" aria-labelledby="relationship-heading">
+    <section
+      className="relationship-workspace"
+      data-tour="meaningful-relationships"
+      aria-labelledby="relationship-heading"
+    >
       <header className="relationship-heading">
         <div>
-          <h2 id="relationship-heading"><Link2 size={19} />Meaningful relationships</h2>
-          <p>Explain what relies on an idea, supports a plan, or challenges a decision.</p>
+          <h2 id="relationship-heading">
+            <Link2 size={19} />
+            Meaningful relationships
+          </h2>
+          <p>
+            Explain what relies on an idea, supports a plan, or challenges a
+            decision.
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={startRelationship} disabled={entities.length < 2 || !!busy}>
-          <Plus size={16} />Add relationship
+        <button
+          className="btn btn-primary"
+          onClick={startRelationship}
+          disabled={entities.length < 2 || !!busy}
+        >
+          <Plus size={16} />
+          Add relationship
         </button>
       </header>
 
-      <section className="relationship-impact" data-tour="impact-review" aria-label="Change impact">
+      <section
+        className="relationship-impact"
+        data-tour="impact-review"
+        aria-label="Change impact"
+      >
         <div className="relationship-impact-summary" role="status">
           <TriangleAlert size={20} />
           <div>
-            <strong>{impact.relationshipIds.size ? `${impact.affected.size} connected ${impact.affected.size === 1 ? 'item needs' : 'items need'} review` : 'Connected work is up to date'}</strong>
-            <p>{impact.relationshipIds.size
-              ? 'A source changed since its relationship was last reviewed. Check direct and downstream effects before marking it reviewed.'
-              : 'New relationships start from the current content. Relevant source changes will highlight affected work here and on the graph.'}</p>
+            <strong>
+              {impact.relationshipIds.size
+                ? `${impact.affected.size} connected ${impact.affected.size === 1 ? "item needs" : "items need"} review`
+                : "Connected work is up to date"}
+            </strong>
+            <p>
+              {impact.relationshipIds.size
+                ? "A source changed since its relationship was last reviewed. Check direct and downstream effects before marking it reviewed."
+                : "New relationships start from the current content. Relevant source changes will highlight affected work here and on the graph."}
+            </p>
           </div>
         </div>
         {affectedEntities.length > 0 && (
           <div className="relationship-affected-items">
-            {affectedEntities.slice(0, 16).map(ref => (
-              <button key={entityKey(ref)} onClick={() => onSelect(ref)} title="Locate on graph">
+            {affectedEntities.slice(0, 16).map((ref) => (
+              <button
+                key={entityKey(ref)}
+                onClick={() => onSelect(ref)}
+                title="Locate on graph"
+              >
                 <span>{titleOf(ref)}</span>
-                <small>{impact.direct.has(entityKey(ref)) ? 'Direct impact' : 'Downstream impact'}</small>
+                <small>
+                  {impact.direct.has(entityKey(ref))
+                    ? "Direct impact"
+                    : "Downstream impact"}
+                </small>
               </button>
             ))}
-            {affectedEntities.length > 16 && <span className="muted">{affectedEntities.length - 16} more highlighted on the graph</span>}
+            {affectedEntities.length > 16 && (
+              <span className="muted">
+                {affectedEntities.length - 16} more highlighted on the graph
+              </span>
+            )}
           </div>
         )}
       </section>
 
       {composing && (
-        <form className="relationship-composer" onSubmit={saveRelationship} aria-label="Create relationship">
-          <div className="relationship-form-heading"><h3>Connect two items</h3><button type="button" className="btn-icon" aria-label="Close relationship form" onClick={() => setComposing(false)} disabled={!!busy}><X size={18} /></button></div>
-          <div className="relationship-form-grid">
-            <label>First item<select className="field" value={fromKey} onChange={event => { setFromKey(event.target.value); if (event.target.value === toKey) setToKey(''); }} required autoFocus disabled={!!busy}><option value="">Choose an item</option>{entityOptions()}</select></label>
-            <label>Relationship<select className="field" value={kind} onChange={event => setKind(event.target.value as RelationshipKind)} disabled={!!busy}>{relationshipOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-            <label>Second item<select className="field" value={toKey} onChange={event => setToKey(event.target.value)} required disabled={!!busy}><option value="">Choose an item</option>{entityOptions(fromKey)}</select></label>
+        <form
+          className="relationship-composer"
+          onSubmit={saveRelationship}
+          aria-label="Create relationship"
+        >
+          <div className="relationship-form-heading">
+            <h3>Connect two items</h3>
+            <button
+              type="button"
+              className="btn-icon"
+              aria-label="Close relationship form"
+              onClick={() => setComposing(false)}
+              disabled={!!busy}
+            >
+              <X size={18} />
+            </button>
           </div>
-          <p className="relationship-direction">{relationshipOptions.find(option => option.value === kind)?.explanation}</p>
-          <label className="relationship-label-field">Why they are connected <span className="muted">(optional)</span><input className="field" value={label} onChange={event => setLabel(event.target.value)} maxLength={240} placeholder="Describe the reason for this connection" disabled={!!busy} /></label>
-          <footer><button className="btn" type="button" onClick={() => setComposing(false)} disabled={!!busy}>Cancel</button><button className="btn btn-primary" disabled={!!busy}>{busy === 'create' ? 'Saving…' : 'Save relationship'}</button></footer>
+          <div className="relationship-form-grid">
+            <label>
+              First item
+              <select
+                className="field"
+                value={fromKey}
+                onChange={(event) => {
+                  setFromKey(event.target.value);
+                  if (event.target.value === toKey) setToKey("");
+                }}
+                required
+                autoFocus
+                disabled={!!busy}
+              >
+                <option value="">Choose an item</option>
+                {entityOptions()}
+              </select>
+            </label>
+            <label>
+              Relationship
+              <select
+                className="field"
+                value={kind}
+                onChange={(event) =>
+                  setKind(event.target.value as RelationshipKind)
+                }
+                disabled={!!busy}
+              >
+                {relationshipOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Second item
+              <select
+                className="field"
+                value={toKey}
+                onChange={(event) => setToKey(event.target.value)}
+                required
+                disabled={!!busy}
+              >
+                <option value="">Choose an item</option>
+                {entityOptions(fromKey)}
+              </select>
+            </label>
+          </div>
+          <p className="relationship-direction">
+            {
+              relationshipOptions.find((option) => option.value === kind)
+                ?.explanation
+            }
+          </p>
+          <label className="relationship-label-field">
+            Why they are connected <span className="muted">(optional)</span>
+            <input
+              className="field"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              maxLength={240}
+              placeholder="Describe the reason for this connection"
+              disabled={!!busy}
+            />
+          </label>
+          <footer>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => setComposing(false)}
+              disabled={!!busy}
+            >
+              Cancel
+            </button>
+            <button className="btn btn-primary" disabled={!!busy}>
+              {busy === "create" ? "Saving…" : "Save relationship"}
+            </button>
+          </footer>
         </form>
       )}
 
-      {error && <p className="relationship-error" role="alert">{error}</p>}
+      {error && (
+        <p className="relationship-error" role="alert">
+          {error}
+        </p>
+      )}
       <div className="relationship-list-tools">
-        <label className="relationship-search"><Search size={16} /><input aria-label="Search meaningful relationships" placeholder="Find a relationship…" value={query} onChange={event => { setQuery(event.target.value); setVisibleCount(12); }} /></label>
-        <button className="btn" aria-pressed={reviewOnly} onClick={() => { setReviewOnly(value => !value); setVisibleCount(12); }}>Needs review ({impact.relationshipIds.size})</button>
+        <label className="relationship-search">
+          <Search size={16} />
+          <input
+            aria-label="Search meaningful relationships"
+            placeholder="Find a relationship…"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setVisibleCount(12);
+            }}
+          />
+        </label>
+        <button
+          className="btn"
+          aria-pressed={reviewOnly}
+          onClick={() => {
+            setReviewOnly((value) => !value);
+            setVisibleCount(12);
+          }}
+        >
+          Needs review ({impact.relationshipIds.size})
+        </button>
       </div>
       <div className="relationship-list">
-        {visibleRelationships.slice(0, visibleCount).map(relationship => {
+        {visibleRelationships.slice(0, visibleCount).map((relationship) => {
           const needsReview = impact.relationshipIds.has(relationship.id);
           return (
-            <article key={relationship.id} className={`relationship-card${needsReview ? ' needs-review' : ''}`}>
+            <article
+              key={relationship.id}
+              className={`relationship-card${needsReview ? " needs-review" : ""}`}
+            >
               <div className="relationship-statement">
-                <button onClick={() => onOpen(relationship.from)}><small>{relationship.from.type}</small>{titleOf(relationship.from)}</button>
-                <span><ArrowRight size={15} />{relationshipLabel(relationship.kind)}</span>
-                <button onClick={() => onOpen(relationship.to)}><small>{relationship.to.type}</small>{titleOf(relationship.to)}</button>
+                <button onClick={() => onOpen(relationship.from)}>
+                  <small>{relationship.from.type}</small>
+                  {titleOf(relationship.from)}
+                </button>
+                <span>
+                  <ArrowRight size={15} />
+                  {relationshipLabel(relationship.kind)}
+                </span>
+                <button onClick={() => onOpen(relationship.to)}>
+                  <small>{relationship.to.type}</small>
+                  {titleOf(relationship.to)}
+                </button>
               </div>
-              {relationship.label && <p className="relationship-reason">{relationship.label}</p>}
+              {relationship.label && (
+                <p className="relationship-reason">{relationship.label}</p>
+              )}
               <footer>
-                <span className="relationship-review-state">{needsReview ? <><TriangleAlert size={15} />Source changed · review needed</> : <><Check size={15} />Reviewed against current sources</>}</span>
+                <span className="relationship-review-state">
+                  {needsReview ? (
+                    <>
+                      <TriangleAlert size={15} />
+                      Source changed · review needed
+                    </>
+                  ) : (
+                    <>
+                      <Check size={15} />
+                      Reviewed against current sources
+                    </>
+                  )}
+                </span>
                 <div className="relationship-card-actions">
-                  {needsReview && <button className="btn" disabled={!!busy} onClick={() => reviewRelationship(relationship)}><Check size={15} />{busy === relationship.id ? 'Saving…' : 'Mark reviewed'}</button>}
-                  <button className="btn-icon" aria-label={`Remove relationship: ${titleOf(relationship.from)} ${relationshipLabel(relationship.kind)} ${titleOf(relationship.to)}`} onClick={() => setRemovingId(relationship.id)} disabled={!!busy}><Trash2 size={16} /></button>
+                  {needsReview && (
+                    <button
+                      className="btn"
+                      disabled={!!busy}
+                      onClick={() => reviewRelationship(relationship)}
+                    >
+                      <Check size={15} />
+                      {busy === relationship.id ? "Saving…" : "Mark reviewed"}
+                    </button>
+                  )}
+                  <button
+                    className="btn-icon"
+                    aria-label={`Remove relationship: ${titleOf(relationship.from)} ${relationshipLabel(relationship.kind)} ${titleOf(relationship.to)}`}
+                    onClick={() => setRemovingId(relationship.id)}
+                    disabled={!!busy}
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </footer>
-              {removingId === relationship.id && <div className="relationship-remove-confirm"><p>Remove this connection? Both items stay in the workspace.</p><button className="btn" onClick={() => setRemovingId('')} disabled={!!busy}>Keep connection</button><button className="btn" onClick={() => removeRelationship(relationship.id)} disabled={!!busy}>Remove connection</button></div>}
+              {removingId === relationship.id && (
+                <div className="relationship-remove-confirm">
+                  <p>
+                    Remove this connection? Both items stay in the workspace.
+                  </p>
+                  <button
+                    className="btn"
+                    onClick={() => setRemovingId("")}
+                    disabled={!!busy}
+                  >
+                    Keep connection
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={() => removeRelationship(relationship.id)}
+                    disabled={!!busy}
+                  >
+                    Remove connection
+                  </button>
+                </div>
+              )}
             </article>
           );
         })}
-        {!visibleRelationships.length && <p className="relationship-empty">{relationships.length ? 'No relationships match this view.' : 'Create a linked task from a note, or add a relationship between two existing items.'}{entities.length < 2 && ' Add at least two notes, tasks, or projects to get started.'}</p>}
+        {!visibleRelationships.length && (
+          <p className="relationship-empty">
+            {relationships.length
+              ? "No relationships match this view."
+              : "Create a linked task from a note, or add a relationship between two existing items."}
+            {entities.length < 2 &&
+              " Add at least two notes, tasks, or projects to get started."}
+          </p>
+        )}
       </div>
-      {visibleRelationships.length > visibleCount && <button className="btn relationship-show-more" onClick={() => setVisibleCount(count => count + 12)}>Show more relationships</button>}
+      {visibleRelationships.length > visibleCount && (
+        <button
+          className="btn relationship-show-more"
+          onClick={() => setVisibleCount((count) => count + 12)}
+        >
+          Show more relationships
+        </button>
+      )}
     </section>
   );
 }

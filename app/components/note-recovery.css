@@ -1,0 +1,59 @@
+.note-recovery-message {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.note-recovery-message > span {
+  flex: 1 1 240px;
+}
+.note-recovery-message button {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 7px 10px;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.note-recovery-message button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 750px) {
+  .note-recovery-message {
+    flex-wrap: wrap;
+    padding: 10px 16px;
+  }
+  .note-recovery-message button {
+    min-height: 44px;
+  }
+  .knowledge .note-format-tools {
+    flex-wrap: wrap;
+  }
+  .knowledge .note-format-tools button,
+  .knowledge .note-view-switch button,
+  .knowledge .note-toolbar .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .knowledge .note-breadcrumb-current {
+    max-width: min(120px, 20vw);
+  }
+  .knowledge .note-search input,
+  .knowledge .note-tags input,
+  .knowledge .note-source-pane textarea,
+  .knowledge .note-property input,
+  .knowledge .note-property select,
+  .knowledge-modal input,
+  .knowledge-modal select {
+    font-size: 16px;
+  }
+}

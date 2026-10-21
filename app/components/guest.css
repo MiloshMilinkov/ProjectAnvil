@@ -1,1 +1,99 @@
-.guest-badge{display:flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid var(--theme-line-4b3659,#4b3659);border-radius:7px;color:var(--theme-ink-d5b8e6,#d5b8e6);font-size:11px;background:var(--theme-surface-2b1e35,#2b1e35)}.guest-badge svg{color:var(--theme-ink-a397f8,#a397f8)}.tour-trigger{flex-shrink:0}.tour-trigger:focus-visible{outline:2px solid var(--theme-ink-a397f8,#a397f8);outline-offset:3px}@media(max-width:400px){.guest-badge{padding:5px 7px;gap:4px;font-size:10px}.topbar-actions{gap:6px}.breadcrumbs{gap:4px}.breadcrumbs>span{display:none}}
+.guest-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--theme-line-4b3659, #4b3659);
+  border-radius: 7px;
+  color: var(--theme-ink-d5b8e6, #d5b8e6);
+  font-size: 11px;
+  background: var(--theme-surface-2b1e35, #2b1e35);
+}
+.guest-badge svg {
+  color: var(--theme-ink-a397f8, #a397f8);
+}
+.tour-trigger {
+  flex-shrink: 0;
+}
+.tour-trigger:focus-visible {
+  outline: 2px solid var(--theme-ink-a397f8, #a397f8);
+  outline-offset: 3px;
+}
+@media (max-width: 400px) {
+  .guest-badge {
+    padding: 5px 7px;
+    gap: 4px;
+    font-size: 10px;
+  }
+  .topbar-actions {
+    gap: 6px;
+  }
+  .breadcrumbs {
+    gap: 4px;
+  }
+  .breadcrumbs > span {
+    display: none;
+  }
+}
+/* Fieldsets freeze a submitted form without changing the established layout. */
+.dialog-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.draft-close-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.draft-close-prompt > span {
+  flex: 1 0 100%;
+}
+.draft-recovery-note {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.account-connection-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 150;
+}
+.storage-meter-label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.storage-meter {
+  width: 100%;
+  height: 14px;
+  accent-color: var(--accent);
+}
+.pending-changes-dialog {
+  max-height: 85dvh;
+  overflow: auto;
+  width: min(680px, calc(100vw - 24px));
+}
+.pending-change-list article {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pending-change-list article > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.recovery-copy-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 280px;
+  overflow: auto;
+  font-size: 12px;
+}
