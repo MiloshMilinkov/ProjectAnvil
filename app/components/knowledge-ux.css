@@ -1,0 +1,91 @@
+/* Keep editor controls discoverable with a mouse, keyboard, or touch. */
+:root .knowledge .note-browser-close {
+  display: none;
+}
+:root .knowledge .note-details-toggle {
+  min-height: 36px;
+  padding: 7px 10px;
+  gap: 6px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+:root .knowledge .note-details-toggle.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft, var(--panel));
+}
+:root .knowledge .note-details-toggle > span {
+  display: inline;
+}
+:root .knowledge .note-save-state > span:last-child {
+  display: inline;
+}
+:root .knowledge .note-save-state.error > span:last-child {
+  display: none;
+}
+:root .knowledge .note-property:focus-within > button {
+  display: flex;
+}
+:root .knowledge .note-custom-property > input {
+  padding-right: 32px;
+}
+:root .knowledge .note-custom-property > button {
+  min-width: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+}
+:root .knowledge .note-custom-property > button:hover,
+:root .knowledge .note-custom-property > button:focus-visible {
+  color: var(--text);
+  background: var(--panel-2, var(--panel));
+}
+:root .knowledge .note-filter-row select:focus-visible,
+:root .knowledge .note-tags > input:focus-visible,
+:root .knowledge .note-add-property input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+@media (hover: none), (pointer: coarse) {
+  :root .knowledge .note-custom-property > button {
+    display: flex;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root .knowledge .note-custom-property > input {
+    padding-right: 46px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 750px) {
+  :root .knowledge .note-browser-close {
+    display: flex;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root .knowledge .note-browser-title {
+    gap: 4px;
+    padding-left: 14px;
+    padding-right: 10px;
+  }
+  :root .knowledge .note-browser-title > span {
+    min-width: 0;
+    flex: 1;
+  }
+  :root .knowledge .note-details-toggle {
+    min-height: 44px;
+  }
+  :root .knowledge .note-custom-property > button {
+    display: flex;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root .knowledge .note-custom-property > input {
+    padding-right: 46px;
+    min-height: 44px;
+  }
+}

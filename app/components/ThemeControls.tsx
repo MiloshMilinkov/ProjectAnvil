@@ -4,8 +4,10 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 import { Check, Contrast, Flower2, Moon, Palette, Sun } from "lucide-react";
@@ -28,8 +30,8 @@ const options = [
     bg: "#f4f6f9",
     sidebar: "#eef0f5",
     panel: "#ffffff",
-    text: "#334155",
-    accent: "#6d55cc",
+    text: "#202938",
+    accent: "#6853c7",
   },
   {
     id: "dark" as const,
@@ -38,8 +40,8 @@ const options = [
     icon: Moon,
     bg: "#111318",
     sidebar: "#181b22",
-    panel: "#222630",
-    text: "#dce4ee",
+    panel: "#191c23",
+    text: "#e7eaf0",
     accent: "#92b9ec",
   },
   {
@@ -49,9 +51,9 @@ const options = [
     icon: Palette,
     bg: "#15151a",
     sidebar: "#19191f",
-    panel: "#2d2337",
-    text: "#dfd0eb",
-    accent: "#c3a3e8",
+    panel: "#1c1c22",
+    text: "#e7e5ed",
+    accent: "#b19aff",
   },
   {
     id: "focus" as const,
@@ -124,23 +126,56 @@ export function useAppearance() {
 
 export function AppearancePicker() {
   const { appearance, choose } = useAppearance();
+  const choices = useRef<(HTMLButtonElement | null)[]>([]);
+  const navigate = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let next = index;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        next = (index + 1) % options.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        next = (index - 1 + options.length) % options.length;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = options.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    choose(options[next].id);
+    choices.current[next]?.focus();
+  };
   return (
     <div
       className="appearance-options"
       role="radiogroup"
       aria-label="Workspace appearance"
     >
-      {options.map((option) => (
+      {options.map((option, index) => (
         <button
           type="button"
           role="radio"
           aria-checked={appearance === option.id}
+          tabIndex={appearance === option.id ? 0 : -1}
           key={option.id}
+          ref={(element) => {
+            choices.current[index] = element;
+          }}
           className={
             "appearance-option " +
             (appearance === option.id ? "is-selected" : "")
           }
           onClick={() => choose(option.id)}
+          onKeyDown={(event) => navigate(event, index)}
         >
           <div
             className="appearance-preview"
@@ -155,7 +190,11 @@ export function AppearancePicker() {
               className="appearance-preview-sidebar"
               style={{ background: option.sidebar }}
             >
-              <i style={{ background: option.accent }} />
+              <i
+                style={{
+                  background: option.id === "focus" ? "#92b9ec" : option.accent,
+                }}
+              />
               <span
                 style={{
                   background:
@@ -194,9 +233,9 @@ export function AppearancePicker() {
             </div>
           </div>
           <div className="appearance-option-label">
-            <option.icon size={15} />
+            <option.icon size={16} aria-hidden="true" />
             <strong>{option.label}</strong>
-            <span className="appearance-radio">
+            <span className="appearance-radio" aria-hidden="true">
               {appearance === option.id && <Check size={11} />}
             </span>
           </div>
@@ -211,14 +250,37 @@ export function AppearanceMenu() {
   const { appearance, choose } = useAppearance();
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const choices = useRef<(HTMLButtonElement | null)[]>([]);
+  const initialFocus = useRef<"selected" | "first" | "last">("selected");
+  const menuId = useId();
   const selected = options.find((o) => o.id === appearance)!;
+  const close = (restoreFocus = false) => {
+    setOpen(false);
+    if (restoreFocus) trigger.current?.focus();
+  };
+  const openMenu = (focus: "selected" | "first" | "last" = "selected") => {
+    initialFocus.current = focus;
+    setOpen(true);
+  };
   useEffect(() => {
     if (!open) return;
+    const index =
+      initialFocus.current === "first"
+        ? 0
+        : initialFocus.current === "last"
+          ? options.length - 1
+          : options.findIndex((option) => option.id === appearance);
+    choices.current[index]?.focus();
     const outside = (event: PointerEvent) => {
       if (!menu.current?.contains(event.target as Node)) setOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        trigger.current?.focus();
+      }
     };
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape);
@@ -226,44 +288,96 @@ export function AppearanceMenu() {
       document.removeEventListener("pointerdown", outside);
       document.removeEventListener("keydown", escape);
     };
-  }, [open]);
+  }, [open, appearance]);
+  const navigate = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const focusedIndex = choices.current.findIndex(
+      (choice) => choice === document.activeElement,
+    );
+    const index = focusedIndex >= 0 ? focusedIndex : 0;
+    let next: number;
+    switch (event.key) {
+      case "ArrowDown":
+        next = (index + 1) % options.length;
+        break;
+      case "ArrowUp":
+        next = (index - 1 + options.length) % options.length;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = options.length - 1;
+        break;
+      case "Tab":
+        // Start native tab navigation from the trigger after the menu unmounts.
+        close(true);
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
+    choices.current[next]?.focus();
+  };
   return (
-    <div className="appearance-menu" ref={menu}>
+    <div
+      className="appearance-menu"
+      ref={menu}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          close();
+      }}
+    >
       <button
         className={"btn-icon appearance-trigger " + (open ? "is-open" : "")}
         type="button"
+        ref={trigger}
         title={"Appearance: " + selected.label}
         aria-label={"Appearance: " + selected.label}
         aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
         aria-haspopup="menu"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => (open ? close() : openMenu())}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            openMenu(event.key === "ArrowDown" ? "first" : "last");
+          }
+        }}
       >
-        <selected.icon size={17} />
+        <selected.icon size={18} aria-hidden="true" />
       </button>
       {open && (
         <div
           role="menu"
+          id={menuId}
           aria-label="Choose appearance"
           className="appearance-dropdown"
+          onKeyDown={navigate}
         >
           <span>APPEARANCE</span>
-          {options.map((option) => (
+          {options.map((option, index) => (
             <button
               type="button"
               key={option.id}
+              ref={(element) => {
+                choices.current[index] = element;
+              }}
               role="menuitemradio"
+              tabIndex={-1}
               aria-checked={appearance === option.id}
               onClick={() => {
                 choose(option.id);
-                setOpen(false);
+                close(true);
               }}
             >
-              <option.icon size={15} />
+              <option.icon size={18} aria-hidden="true" />
               <div>
                 <strong>{option.label}</strong>
                 <small>{option.description}</small>
               </div>
-              {appearance === option.id && <Check size={14} />}
+              {appearance === option.id && (
+                <Check size={16} aria-hidden="true" />
+              )}
             </button>
           ))}
           <p>Saved on this device</p>

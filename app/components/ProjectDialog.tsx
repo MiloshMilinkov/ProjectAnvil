@@ -54,6 +54,7 @@ export default function ProjectDialog({
   });
   const dialog = useRef<HTMLFormElement>(null);
   const titleId = useId();
+  const prefixHelpId = useId();
   useDialog(dialog, editor.requestClose, editor.busy);
   const { draft, change } = editor;
 
@@ -96,10 +97,11 @@ export default function ProjectDialog({
     >
       <form
         ref={dialog}
-        className="small-dialog"
+        className="small-dialog entity-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-busy={editor.busy}
         onSubmit={(event) => void submit(event)}
       >
         <div className="dialog-heading">
@@ -140,7 +142,11 @@ export default function ProjectDialog({
                 maxLength={8}
                 onChange={(event) => change({ key: event.target.value })}
                 placeholder="PRJ"
+                aria-describedby={prefixHelpId}
               />
+              <small className="editor-field-help" id={prefixHelpId}>
+                Starts task IDs, such as PRJ-1.
+              </small>
             </label>
             <label className="form-label">
               Accent color
@@ -212,12 +218,13 @@ export default function ProjectDialog({
           {project && (
             <button
               type="button"
-              className="btn-icon danger"
+              className="btn danger editor-delete"
               aria-label="Delete project"
               disabled={editor.busy}
               onClick={() => void remove()}
             >
               <Trash2 size={16} />
+              <span>Delete</span>
             </button>
           )}
           <button

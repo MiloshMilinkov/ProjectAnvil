@@ -30,7 +30,6 @@ import {
   Database,
   Command,
   Menu,
-  Sparkles,
   Download,
   Upload,
   Link2,
@@ -91,6 +90,7 @@ import StorageHealth from "./StorageHealth";
 import PendingChanges from "./PendingChanges";
 import { useMediaQuery } from "./useMediaQuery";
 import { useDialog } from "./useDialog";
+import "./workspace-shell.css";
 
 type Page = TourPage;
 const nav = [
@@ -99,7 +99,7 @@ const nav = [
   { id: "tasks", title: "Task board", icon: Columns3 },
   { id: "projects", title: "Projects", icon: FolderKanban },
   { id: "rooms", title: "Work rooms", icon: PanelsTopLeft },
-  { id: "notes", title: "Knowledge", icon: BookOpen },
+  { id: "notes", title: "Notes", icon: BookOpen },
   { id: "graph", title: "Relationship graph", icon: Network },
   { id: "canvas", title: "Canvas", icon: PanelsTopLeft },
   { id: "collections", title: "Collections", icon: Database },
@@ -123,7 +123,9 @@ function PriorityMark({ value }: { value: Priority }) {
     <span
       className="priority-mark"
       style={{ color: priorityColor[value] }}
-      title={value}
+      role="img"
+      aria-label={"Priority: " + value}
+      title={"Priority: " + value}
     >
       <span style={{ height: value === "low" ? 5 : 8 }} />
       <span
@@ -144,6 +146,8 @@ function PriorityMark({ value }: { value: Priority }) {
 export default function ProjectAnvil() {
   const phoneLayout = useMediaQuery("(max-width: 760px)");
   const sidebarRef = useRef<HTMLElement>(null);
+  const paletteRef = useRef<HTMLElement>(null);
+  const shortcutsRef = useRef<HTMLDivElement>(null);
   const { account, activeId, onSwitch, onAuthChanged, onChanged } =
     useWorkspaceScope();
   const {
@@ -204,7 +208,19 @@ export default function ProjectAnvil() {
   const [tourPending, setTourPending] = useState(
     () => !readBrowserPreference("projectanvil-tour-v1"),
   );
-  useDialog(sidebarRef, () => setMobile(false), false, phoneLayout && mobile);
+  useDialog(
+    sidebarRef,
+    () => setMobile(false),
+    false,
+    !!workspace && phoneLayout && mobile,
+  );
+  useDialog(paletteRef, () => setPalette(false), false, !!workspace && palette);
+  useDialog(
+    shortcutsRef,
+    () => setShortcuts(false),
+    false,
+    !!workspace && shortcuts,
+  );
   const currentPerson =
     workspace?.people.find(
       (person) => person.userId === account.user?.id && !!account.user,
@@ -424,8 +440,15 @@ export default function ProjectAnvil() {
               <span className="brand-mark">
                 <Anvil size={19} />
               </span>
-              ProjectAnvil<span className="brand-beta">BETA</span>
+              ProjectAnvil
             </a>
+            <button
+              className="btn-icon sidebar-close"
+              aria-label="Close navigation"
+              onClick={() => setMobile(false)}
+            >
+              <X size={20} />
+            </button>
             <WorkspaceSwitcher
               account={account}
               activeId={activeId}
@@ -441,97 +464,96 @@ export default function ProjectAnvil() {
               <span>Search anything</span>
               <kbd>Ctrl K</kbd>
             </button>
-            <div className="nav-caption">WORKSPACE</div>
-            <nav>
-              {nav.slice(0, 5).map((n) => (
-                <button
-                  key={n.id}
-                  data-tour={"nav-" + n.id}
-                  className={"nav-item " + (page === n.id ? "active" : "")}
-                  onClick={() => go(n.id)}
-                >
-                  <n.icon size={17} />
-                  <span>{n.title}</span>
-                  {n.id === "my-work" && (
-                    <small>
-                      {
-                        w.tasks.filter(
-                          (t) =>
-                            t.assigneeId === currentPerson &&
-                            t.status !== "done",
-                        ).length
-                      }
-                    </small>
-                  )}
-                </button>
-              ))}
-              <div className="nav-caption knowledge-caption">
-                IDEAS & KNOWLEDGE
+            <div className="sidebar-scroll">
+              <div className="nav-caption">PLAN & WORK</div>
+              <nav aria-label="Main navigation">
+                {nav.slice(0, 5).map((n) => (
+                  <button
+                    key={n.id}
+                    data-tour={"nav-" + n.id}
+                    className={"nav-item " + (page === n.id ? "active" : "")}
+                    aria-current={page === n.id ? "page" : undefined}
+                    onClick={() => go(n.id)}
+                  >
+                    <n.icon size={17} />
+                    <span>{n.title}</span>
+                    {n.id === "my-work" && (
+                      <small>
+                        {
+                          w.tasks.filter(
+                            (t) =>
+                              t.assigneeId === currentPerson &&
+                              t.status !== "done",
+                          ).length
+                        }
+                      </small>
+                    )}
+                  </button>
+                ))}
+                <div className="nav-caption knowledge-caption">
+                  IDEAS & KNOWLEDGE
+                </div>
+                {nav.slice(5).map((n) => (
+                  <button
+                    key={n.id}
+                    data-tour={"nav-" + n.id}
+                    className={"nav-item " + (page === n.id ? "active" : "")}
+                    aria-current={page === n.id ? "page" : undefined}
+                    onClick={() => go(n.id)}
+                  >
+                    <n.icon size={17} />
+                    <span>{n.title}</span>
+                    {n.id === "graph" && <span className="nav-dot" />}
+                  </button>
+                ))}
+              </nav>
+              <div className="sidebar-projects">
+                <div className="nav-caption">
+                  YOUR PROJECTS
+                  <button
+                    title="Create project"
+                    aria-label="Create project"
+                    onClick={() => {
+                      setEditingProject(null);
+                      setNewProject(true);
+                    }}
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
+                {w.projects.map((p) => (
+                  <button
+                    key={p.id}
+                    className={
+                      "project-nav " +
+                      (projectFilter === p.id ? "selected" : "")
+                    }
+                    aria-pressed={projectFilter === p.id}
+                    onClick={() => {
+                      setProjectFilter(projectFilter === p.id ? "" : p.id);
+                      go("tasks");
+                    }}
+                  >
+                    <span
+                      className="project-dot"
+                      style={{ background: p.color }}
+                    />
+                    <span className="project-nav-name">{p.name}</span>
+                    <ChevronRight size={12} />
+                  </button>
+                ))}
+                {!w.projects.length && (
+                  <p className="sidebar-project-hint">
+                    Projects you create appear here.
+                  </p>
+                )}
               </div>
-              {nav.slice(5).map((n) => (
-                <button
-                  key={n.id}
-                  data-tour={"nav-" + n.id}
-                  className={"nav-item " + (page === n.id ? "active" : "")}
-                  onClick={() => go(n.id)}
-                >
-                  <n.icon size={17} />
-                  <span>{n.title}</span>
-                  {n.id === "graph" && <span className="nav-dot" />}
-                </button>
-              ))}
-            </nav>
-            <div className="sidebar-projects">
-              <div className="nav-caption">
-                YOUR PROJECTS
-                <button
-                  title="Create project"
-                  aria-label="Create project"
-                  onClick={() => {
-                    setEditingProject(null);
-                    setNewProject(true);
-                  }}
-                >
-                  <Plus size={13} />
-                </button>
-              </div>
-              {w.projects.map((p) => (
-                <button
-                  key={p.id}
-                  className={
-                    "project-nav " + (projectFilter === p.id ? "selected" : "")
-                  }
-                  onClick={() => {
-                    setProjectFilter(projectFilter === p.id ? "" : p.id);
-                    go("tasks");
-                  }}
-                >
-                  <span
-                    className="project-dot"
-                    style={{ background: p.color }}
-                  />
-                  {p.name}
-                  <ChevronRight size={12} />
-                </button>
-              ))}
             </div>
             <div className="sidebar-bottom">
-              <div className="connected-callout">
-                <Network size={20} />
-                <p>
-                  <strong>Big ideas need connections.</strong>
-                  <span>Explore your workspace’s knowledge.</span>
-                </p>
-                <button
-                  title="Open relationship graph"
-                  onClick={() => go("graph")}
-                >
-                  <ArrowUpRight size={16} />
-                </button>
-              </div>
               <button
                 data-tour="nav-team"
                 className={"nav-item " + (page === "team" ? "active" : "")}
+                aria-current={page === "team" ? "page" : undefined}
                 onClick={() => go("team")}
               >
                 <Users size={17} />
@@ -540,12 +562,13 @@ export default function ProjectAnvil() {
               <button
                 data-tour="nav-settings"
                 className={"nav-item " + (page === "settings" ? "active" : "")}
+                aria-current={page === "settings" ? "page" : undefined}
                 onClick={() => go("settings")}
               >
                 <Settings size={17} />
                 Workspace settings
               </button>
-              <div className="sidebar-footer">
+              <div className="sidebar-footer" role="status">
                 <span
                   className={
                     "connection-dot " +
@@ -561,6 +584,7 @@ export default function ProjectAnvil() {
                       : "Local workspace ready"}
                 <button
                   title="Keyboard shortcuts"
+                  aria-label="Keyboard shortcuts"
                   onClick={() => setShortcuts(true)}
                 >
                   <Command size={13} />
@@ -580,7 +604,7 @@ export default function ProjectAnvil() {
             >
               <Menu size={20} />
             </button>
-            <span>{project?.name || "Workspace"}</span>
+            <span>{w.name || "Workspace"}</span>
             <ChevronRight size={13} />
             <strong>
               {activeNav?.title ||
@@ -627,6 +651,33 @@ export default function ProjectAnvil() {
             </div>
           </div>
         </header>
+        {project &&
+          [
+            "overview",
+            "tasks",
+            "my-work",
+            "notes",
+            "daily",
+            "graph",
+            "collections",
+          ].includes(page) && (
+            <div
+              className="project-scope"
+              role="region"
+              aria-label="Project filter"
+            >
+              <FolderKanban size={16} aria-hidden="true" />
+              <span>
+                Project: <strong>{project.name}</strong>
+              </span>
+              <button
+                className="text-button"
+                onClick={() => setProjectFilter("")}
+              >
+                <X size={14} /> Clear project filter
+              </button>
+            </div>
+          )}
         {rooms.activeRoom && page !== "rooms" && (
           <WorkRoomShelf
             room={rooms.activeRoom}
@@ -715,7 +766,7 @@ export default function ProjectAnvil() {
               <PageHeader
                 eyebrow="THE BIG PICTURE"
                 title="Projects"
-                description="From the first spark to the final build."
+                description="Organize goals, tasks, and notes around a shared outcome."
                 action={
                   <button
                     className="btn btn-primary"
@@ -844,19 +895,35 @@ export default function ProjectAnvil() {
           }}
         >
           <section
+            ref={paletteRef}
             role="dialog"
+            aria-modal="true"
             aria-label="Search workspace"
             className="command-palette"
+            onKeyDown={(event) => {
+              if (
+                (event.ctrlKey || event.metaKey) &&
+                event.key.toLowerCase() === "k"
+              ) {
+                event.preventDefault();
+                setPalette(false);
+              }
+            }}
           >
             <div className="palette-input">
               <Search size={20} />
               <input
-                autoFocus
-                placeholder="Search tasks, knowledge, projects…"
+                data-initial-focus
+                aria-label="Search tasks, notes, and projects"
+                placeholder="Search tasks, notes, projects…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <button className="key-button" onClick={() => setPalette(false)}>
+              <button
+                className="key-button"
+                aria-label="Close search"
+                onClick={() => setPalette(false)}
+              >
                 esc
               </button>
             </div>
@@ -974,7 +1041,7 @@ export default function ProjectAnvil() {
                 <Search size={12} />
                 Searches your entire workspace
               </span>
-              <span>Click to open</span>
+              <span>Tab to choose · Enter to open</span>
             </footer>
           </section>
         </div>
@@ -982,14 +1049,20 @@ export default function ProjectAnvil() {
       {shortcuts && (
         <div className="modal-shade" onClick={() => setShortcuts(false)}>
           <div
+            ref={shortcutsRef}
             role="dialog"
+            aria-modal="true"
             aria-label="Keyboard shortcuts"
             className="small-dialog"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dialog-heading">
-              <h2>Make yourself at home</h2>
-              <button className="btn-icon" onClick={() => setShortcuts(false)}>
+              <h2>Keyboard shortcuts</h2>
+              <button
+                className="btn-icon"
+                aria-label="Close keyboard shortcuts"
+                onClick={() => setShortcuts(false)}
+              >
                 <X size={18} />
               </button>
             </div>
@@ -1080,14 +1153,18 @@ function Overview(
     active = tasks.filter((t) => t.status !== "done"),
     mine = active.filter((t) => t.assigneeId === currentPerson),
     done = tasks.filter((t) => t.status === "done"),
-    overdue = active.filter((t) => t.dueDate && t.dueDate < today()),
+    overdue = mine.filter((t) => t.dueDate && t.dueDate < today()),
     upcoming = [...active]
       .sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"))
       .slice(0, 5),
     projects = w.projects.filter(
       (p) => !props.projectFilter || p.id === props.projectFilter,
     ),
-    notes = [...w.notes]
+    notes = w.notes
+      .filter(
+        (note) =>
+          !props.projectFilter || note.projectId === props.projectFilter,
+      )
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, 4);
   return (
@@ -1101,12 +1178,12 @@ function Overview(
           })
           .toUpperCase()}
         title="Workspace overview"
-        description="A little less scattered. A lot more connected."
+        description="Track project progress, upcoming work, and recent notes."
         action={
           <>
             <button className="btn" onClick={() => onGo("tasks")}>
               <Columns3 size={15} />
-              View board
+              View tasks
             </button>
             <button className="btn btn-primary" onClick={onCreate}>
               <Plus size={16} />
@@ -1115,155 +1192,25 @@ function Overview(
           </>
         }
       />
-      <section className="overview-hero">
-        <div className="hero-copy">
-          <span className="hero-label">
-            <span />
-            YOUR PROJECT WORKSPACE
-          </span>
-          <h2>
-            Plan clearly.
-            <br />
-            <span>Make progress.</span>
-          </h2>
-          <p>Your projects, tasks, and ideas—connected in one place.</p>
-          <button onClick={() => onGo("canvas")}>
-            Open your canvas <ArrowUpRight size={16} />
-          </button>
-        </div>
-        <div className="hero-art" aria-hidden="true">
-          <svg viewBox="0 0 520 220">
-            <defs>
-              <radialGradient id="halo">
-                <stop
-                  stopColor="var(--theme-ink-9272db,#9272db)"
-                  stopOpacity=".24"
-                />
-                <stop
-                  offset="1"
-                  stopColor="var(--theme-ink-9272db,#9272db)"
-                  stopOpacity="0"
-                />
-              </radialGradient>
-              <linearGradient id="edge">
-                <stop
-                  stopColor="var(--theme-ink-6e5b95,#6e5b95)"
-                  stopOpacity=".1"
-                />
-                <stop
-                  offset=".5"
-                  stopColor="var(--theme-ink-9e8bc4,#9e8bc4)"
-                  stopOpacity=".6"
-                />
-                <stop
-                  offset="1"
-                  stopColor="var(--theme-ink-6e5b95,#6e5b95)"
-                  stopOpacity=".1"
-                />
-              </linearGradient>
-            </defs>
-            <ellipse cx="285" cy="115" rx="220" ry="110" fill="url(#halo)" />
-            {[
-              [80, 80, 258, 103],
-              [138, 174, 258, 103],
-              [258, 103, 416, 51],
-              [258, 103, 427, 159],
-              [258, 103, 325, 207],
-              [416, 51, 427, 159],
-              [80, 80, 138, 174],
-            ].map((l, i) => (
-              <line
-                key={i}
-                x1={l[0]}
-                y1={l[1]}
-                x2={l[2]}
-                y2={l[3]}
-                stroke="url(#edge)"
-                strokeWidth="1.5"
-              />
-            ))}
-            <circle
-              cx="258"
-              cy="103"
-              r="54"
-              fill="none"
-              stroke="var(--theme-line-a084d1,#a084d1)"
-              opacity=".12"
-            />
-            <circle
-              cx="258"
-              cy="103"
-              r="40"
-              fill="var(--theme-surface-292331,#292331)"
-              stroke="var(--theme-line-a086d0,#a086d0)"
-              strokeWidth="1"
-            />
-            <path
-              d="M258 80l21 12v24l-21 12-21-12V92zm0 0v24m-21-12 21 12 21-12m-21 12v24"
-              stroke="var(--theme-line-c3a7f2,#c3a7f2)"
-              fill="none"
-              strokeWidth="1.6"
-            />
-            {[
-              [80, 80],
-              [138, 174],
-              [416, 51],
-              [427, 159],
-              [325, 207],
-            ].map((p, i) => (
-              <g key={i}>
-                <circle
-                  cx={p[0]}
-                  cy={p[1]}
-                  r={i === 2 ? 23 : 17}
-                  fill="var(--theme-surface-24212c,#24212c)"
-                  stroke="var(--theme-line-645572,#645572)"
-                />
-                <circle
-                  cx={p[0]}
-                  cy={p[1]}
-                  r="4"
-                  fill={i % 2 ? "#9ac7ae" : "#ad98ce"}
-                />
-              </g>
-            ))}
-          </svg>
-          <div className="hero-note note-a">
-            <BookOpen size={13} />
-            Project notes
-          </div>
-          <div className="hero-note note-b">
-            <CheckSquare size={13} />
-            Next milestone
-          </div>
-          <div className="hero-note note-c">
-            <Sparkles size={13} />
-            The next big idea
-          </div>
-        </div>
-      </section>
-      <ResumeWorkCard
-        onResume={props.onResumeRoom}
-        onManage={() => onGo("rooms")}
-        notify={props.notify}
-      />
       <div className="stat-grid">
         {[
           {
             label: "Active tasks",
             value: active.length,
-            sub: tasks.length + " tasks across your projects",
+            sub:
+              tasks.length +
+              (tasks.length === 1
+                ? " task in this view"
+                : " tasks in this view"),
             icon: Layers,
             color: "violet",
-            action: () => onGo("tasks"),
           },
           {
             label: "In progress",
             value: tasks.filter((t) => t.status === "in-progress").length,
-            sub: "Ideas becoming something real",
+            sub: "Work currently underway",
             icon: CircleDashed,
             color: "blue",
-            action: () => onGo("tasks"),
           },
           {
             label: "Completed",
@@ -1271,38 +1218,38 @@ function Overview(
             sub: `${tasks.length ? Math.round((done.length / tasks.length) * 100) : 0}% of all tasks finished`,
             icon: CircleCheck,
             color: "green",
-            action: () => onGo("tasks"),
           },
           {
-            label: "Assigned to you",
+            label: currentPerson ? "Assigned to you" : "Unassigned tasks",
             value: mine.length,
             sub: overdue.length
-              ? `${overdue.length} overdue across the workspace`
-              : "You have room to make progress",
+              ? `${overdue.length} overdue`
+              : "No overdue tasks in this group",
             icon: Target,
             color: "orange",
-            action: () => onGo("my-work"),
           },
         ].map((s) => (
-          <button className="stat-card" key={s.label} onClick={s.action}>
+          <div className="stat-card" key={s.label}>
             <div className="stat-top">
               <span>{s.label}</span>
               <s.icon size={17} className={"color-" + s.color} />
             </div>
-            <strong>
-              {s.value}
-              <ArrowUpRight size={17} />
-            </strong>
+            <strong>{s.value}</strong>
             <small>{s.sub}</small>
-          </button>
+          </div>
         ))}
       </div>
+      <ResumeWorkCard
+        onResume={props.onResumeRoom}
+        onManage={() => onGo("rooms")}
+        notify={props.notify}
+      />
       <div className="dashboard-columns">
         <section className="panel project-section">
           <div className="section-heading">
             <h2>
               <FolderKanban size={17} />
-              On the drawing board
+              Projects
             </h2>
             <button className="text-button" onClick={() => onGo("projects")}>
               All projects <ArrowRight size={13} />
@@ -1359,11 +1306,11 @@ function Overview(
           <div className="section-heading">
             <h2>
               <BookOpen size={17} />
-              Recently in your mind
+              Recent notes
             </h2>
             <button
               className="icon-link"
-              aria-label="Open knowledge"
+              aria-label="Open notes"
               onClick={() => onGo("notes")}
             >
               <ArrowUpRight size={17} />
@@ -1391,6 +1338,12 @@ function Overview(
               )}
             </button>
           ))}
+          {!notes.length && (
+            <Empty
+              title="No notes yet"
+              text="Open Notes to capture a plan or reference."
+            />
+          )}
           <button className="knowledge-footer" onClick={() => onGo("graph")}>
             <Network size={16} />
             <span>See how your ideas connect</span>
@@ -1402,7 +1355,7 @@ function Overview(
         <div className="section-heading">
           <h2>
             <CheckSquare size={17} />
-            Coming into focus{" "}
+            Upcoming tasks{" "}
             <span className="count-badge">{upcoming.length}</span>
           </h2>
           <button className="text-button" onClick={() => onGo("tasks")}>
@@ -1412,7 +1365,7 @@ function Overview(
         <TaskTable {...props} tasks={upcoming} />
         {!upcoming.length && (
           <Empty
-            title="A clear horizon"
+            title="No upcoming tasks"
             text="Create a task to plan what comes next."
             action={
               <button className="btn" onClick={onCreate}>
@@ -1423,13 +1376,6 @@ function Overview(
           />
         )}
       </section>
-      <div className="dashboard-foot">
-        <span>
-          <span className="connection-dot" />
-          One workspace. Every connection.
-        </span>
-        <span>ProjectAnvil / Built for the way you work.</span>
-      </div>
     </div>
   );
 }
@@ -1477,7 +1423,7 @@ function TaskTable({
                   )}
                 </button>
               </td>
-              <td>
+              <td data-label="Status">
                 <select
                   className={"status-select status-" + t.status}
                   aria-label={"Status for " + t.key}
@@ -1497,26 +1443,25 @@ function TaskTable({
                   ))}
                 </select>
               </td>
-              <td>
+              <td data-label="Priority">
                 <span className="priority-inline">
                   <PriorityMark value={t.priority} />
                   <span>{t.priority}</span>
                 </span>
               </td>
-              <td>
+              <td data-label="Assignee">
                 <span className="assignee-inline">
                   <Avatar
                     person={w.people.find((p) => p.id === t.assigneeId)}
                     small
                   />
                   <span>
-                    {w.people
-                      .find((p) => p.id === t.assigneeId)
-                      ?.name.split(" ")[0] || "Unassigned"}
+                    {w.people.find((p) => p.id === t.assigneeId)?.name ||
+                      "Unassigned"}
                   </span>
                 </span>
               </td>
-              <td>
+              <td data-label="Due date">
                 <span
                   className={
                     "due-date " +
@@ -1553,21 +1498,32 @@ function TaskView(
     mutate,
     notify,
   } = props;
-  const [view, setView] = useState("board"),
+  const phoneLayout = useMediaQuery("(max-width: 760px)");
+  const [chosenView, setView] = useState<string | null>(null),
     [query, setQuery] = useState(""),
     [assignee, setAssignee] = useState(""),
     [priority, setPriority] = useState(""),
     [status, setStatus] = useState(""),
     [viewName, setViewName] = useState(""),
     [savingView, setSavingView] = useState(false),
+    [viewPending, setViewPending] = useState(false),
     [dragging, setDragging] = useState(""),
     [dragOver, setDragOver] = useState("");
+  const view = chosenView ?? (phoneLayout ? "list" : "board");
+  const viewSaveGuard = useRef(false);
+  const filtered = !!(
+    query ||
+    (!mine && assignee) ||
+    priority ||
+    status ||
+    projectFilter
+  );
   const tasks = w.tasks
     .filter(
       (t) =>
         (!projectFilter || t.projectId === projectFilter) &&
         (!mine || t.assigneeId === currentPerson) &&
-        (!assignee || t.assigneeId === assignee) &&
+        (mine || !assignee || t.assigneeId === assignee) &&
         (!priority || t.priority === priority) &&
         (!status || t.status === status) &&
         [t.title, t.description, t.key, ...t.tags]
@@ -1586,23 +1542,30 @@ function TaskView(
     setProjectFilter("");
   }
   async function saveView() {
-    if (!viewName.trim()) return;
-    await mutate({
-      action: "upsert",
-      entity: "savedViews",
-      item: {
-        id: uid(),
-        name: viewName.trim(),
-        query,
-        assignee,
-        priority,
-        project: projectFilter,
-        status,
-      },
-    });
-    setSavingView(false);
-    setViewName("");
-    notify("View saved");
+    if (!viewName.trim() || viewSaveGuard.current) return;
+    viewSaveGuard.current = true;
+    setViewPending(true);
+    try {
+      await mutate({
+        action: "upsert",
+        entity: "savedViews",
+        item: {
+          id: uid(),
+          name: viewName.trim(),
+          query,
+          assignee: mine ? "" : assignee,
+          priority,
+          project: projectFilter,
+          status,
+        },
+      });
+      setSavingView(false);
+      setViewName("");
+      notify("View saved");
+    } finally {
+      viewSaveGuard.current = false;
+      setViewPending(false);
+    }
   }
   return (
     <div className="page tasks-page">
@@ -1614,7 +1577,7 @@ function TaskView(
             ? currentPerson
               ? "Tasks assigned to you in this workspace."
               : "Your unassigned tasks, ready to work on as a guest."
-            : "Plan the next step. Keep your projects moving."
+            : "Organize tasks by status, priority, project, and person."
         }
         action={
           <button className="btn btn-primary" onClick={() => props.onCreate()}>
@@ -1624,9 +1587,15 @@ function TaskView(
         }
       />
       <div className="task-view-toolbar">
-        <div className="view-tabs">
+        <div
+          className="view-tabs"
+          role="group"
+          aria-label="Task layout"
+          data-tour="task-layouts"
+        >
           <button
             className={view === "board" ? "selected" : ""}
+            aria-pressed={view === "board"}
             onClick={() => setView("board")}
           >
             <Columns3 size={15} />
@@ -1634,6 +1603,7 @@ function TaskView(
           </button>
           <button
             className={view === "list" ? "selected" : ""}
+            aria-pressed={view === "list"}
             onClick={() => setView("list")}
           >
             <List size={15} />
@@ -1641,22 +1611,33 @@ function TaskView(
           </button>
           <button
             className={view === "timeline" ? "selected" : ""}
+            aria-pressed={view === "timeline"}
             onClick={() => setView("timeline")}
           >
             <CalendarDays size={15} />
             Timeline
           </button>
         </div>
-        <span className="result-count">{tasks.length} tasks</span>
+        <span className="result-count" role="status">
+          {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
+        </span>
         <button
           className="btn btn-subtle"
+          disabled={viewPending}
+          aria-expanded={savingView}
+          aria-controls="save-task-view"
           onClick={() => setSavingView((p) => !p)}
         >
           <Bookmark size={14} />
           Save view
         </button>
       </div>
-      <div className="filters">
+      <div
+        className="filters"
+        data-tour="task-filters"
+        role="group"
+        aria-label="Task filters"
+      >
         <label className="filter-search">
           <Search size={15} />
           <input
@@ -1702,7 +1683,7 @@ function TaskView(
           <option value="">All priorities</option>
           {priorities.map((p) => (
             <option key={p} value={p}>
-              {p}
+              {p[0].toUpperCase() + p.slice(1)}
             </option>
           ))}
         </select>
@@ -1718,33 +1699,41 @@ function TaskView(
             </option>
           ))}
         </select>
-        {(query || assignee || priority || status || projectFilter) && (
+        {filtered && (
           <button className="text-button" onClick={clear}>
             <X size={13} />
-            Clear
+            Clear filters
           </button>
         )}
       </div>
       {savingView && (
-        <div className="save-view-bar">
-          <Bookmark size={15} />
+        <div className="save-view-bar" id="save-task-view">
+          <label htmlFor="saved-view-name">View name</label>
           <input
+            id="saved-view-name"
             autoFocus
             className="field"
             placeholder="Name this filtered view"
             value={viewName}
+            disabled={viewPending}
             onChange={(e) => setViewName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") saveView();
+              if (e.key === "Enter") void saveView().catch(() => {});
             }}
           />
           <button
             className="btn btn-primary"
+            disabled={!viewName.trim() || viewPending}
             onClick={() => saveView().catch(() => {})}
           >
-            Save
+            {viewPending ? "Saving…" : "Save view"}
           </button>
-          <button className="btn-icon" onClick={() => setSavingView(false)}>
+          <button
+            className="btn-icon"
+            aria-label="Cancel saving view"
+            disabled={viewPending}
+            onClick={() => setSavingView(false)}
+          >
             <X size={16} />
           </button>
         </div>
@@ -1781,8 +1770,21 @@ function TaskView(
           ))}
         </div>
       )}
+      {view === "board" && filtered && !tasks.length && (
+        <div className="task-filter-empty" role="status">
+          <span>No tasks match these filters.</span>
+          <button className="text-button" onClick={clear}>
+            Clear filters
+          </button>
+        </div>
+      )}
       {view === "board" && (
-        <div className="kanban-board">
+        <div
+          className="kanban-board"
+          tabIndex={0}
+          role="region"
+          aria-label="Task status columns. Scroll horizontally to see more statuses."
+        >
           {statuses.map((s) => {
             const items = tasks.filter((t) => t.status === s.id);
             return (
@@ -1915,7 +1917,9 @@ function TaskView(
                   {!items.length && (
                     <div className="column-empty">
                       <CircleDashed size={20} />
-                      <span>Room for your next step</span>
+                      <span>
+                        {filtered ? "No matching tasks" : "No tasks yet"}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1936,11 +1940,18 @@ function TaskView(
           <TaskTable {...props} tasks={tasks} />
           {!tasks.length && (
             <Empty
-              title="No tasks match"
-              text="Adjust your filters or create a new task."
+              title={filtered ? "No tasks match" : "No tasks yet"}
+              text={
+                filtered
+                  ? "Try fewer filters to find your tasks."
+                  : "Create a task to plan your next step."
+              }
               action={
-                <button className="btn" onClick={clear}>
-                  Clear filters
+                <button
+                  className="btn"
+                  onClick={filtered ? clear : () => props.onCreate()}
+                >
+                  {filtered ? "Clear filters" : "Create task"}
                 </button>
               }
             />

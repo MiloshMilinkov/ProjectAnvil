@@ -2800,9 +2800,6 @@ kbd {
   .heading-actions {
     padding-top: 8px;
   }
-  .heading-actions > .btn:not(.btn-primary) {
-    display: none;
-  }
   .heading-actions .btn-primary {
     font-size: 10px;
     padding: 8px 11px;

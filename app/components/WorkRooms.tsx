@@ -83,7 +83,7 @@ const locationLabels: Record<WorkLocation["page"], string> = {
   "my-work": "My work",
   tasks: "Task board",
   projects: "Projects",
-  notes: "Knowledge",
+  notes: "Notes",
   graph: "Relationship graph",
   canvas: "Canvas",
   collections: "Collections",
@@ -783,7 +783,7 @@ function RoomEditor({
                   <p>
                     {workspace.notes.length
                       ? "No notes match this search."
-                      : "Create a note in Knowledge, then pin it here."}
+                      : "Create a note in Notes, then pin it here."}
                   </p>
                 )}
               </div>

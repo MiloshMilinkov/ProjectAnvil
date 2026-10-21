@@ -33,11 +33,208 @@
 .entity-editor-close .btn {
   min-height: 44px;
 }
+
+/* Editors share a calm hierarchy without changing their save behavior. */
+:root .entity-dialog .dialog-heading h2 {
+  line-height: 1.35;
+}
+:root .entity-dialog .form-label {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+:root .editor-field-help,
+:root .editor-optional {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+:root .entity-dialog > .dialog-footer {
+  position: sticky;
+  bottom: -25px;
+  padding-bottom: 16px;
+  background: var(--panel);
+  z-index: 1;
+}
+:root .entity-dialog .dialog-footer .btn,
+:root .task-dialog .dialog-footer .btn {
+  min-height: 44px;
+}
+:root .editor-delete {
+  gap: 6px;
+  flex-shrink: 0;
+}
+:root .task-dialog .task-title-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+:root .task-dialog .task-title-input input {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  line-height: 1.4;
+}
+:root .task-dialog .task-meta-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 0;
+}
+:root .task-dialog .task-essential-fields {
+  margin: 12px 0 24px;
+}
+:root .task-dialog .task-meta-grid > label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+:root .task-dialog .task-meta-grid > label > input,
+:root .task-dialog .task-meta-grid > label > select {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  min-height: 42px;
+  font-size: 14px;
+  border-radius: 7px;
+  padding: 9px 10px;
+}
+:root .task-dialog .dialog-tabs {
+  gap: 8px;
+  margin-bottom: 20px;
+}
+:root .task-dialog .dialog-tabs button {
+  min-height: 42px;
+}
+:root .task-dialog .task-planning {
+  margin-top: 24px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+:root .task-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+:root .task-section-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+:root .task-section-heading > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+:root .task-dialog .task-connections-empty {
+  margin: 0;
+  padding: 16px 3px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+:root .task-dialog .connection-options > label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+:root .task-dialog .connection-options > label > svg {
+  flex-shrink: 0;
+}
+:root .task-dialog .connection-options > label > .btn-icon {
+  flex-shrink: 0;
+}
+:root .task-dialog .task-discussion-label {
+  display: block;
+  margin: 20px 0 9px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+:root .task-dialog .task-discussion-label + textarea {
+  min-height: 110px;
+  margin-bottom: 12px;
+  resize: vertical;
+}
+:root .task-dialog .inline-add {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 10px;
+  margin-top: 12px;
+}
+:root .task-dialog .inline-add input {
+  min-height: 36px;
+}
+:root .task-dialog .inline-add .text-button {
+  min-height: 36px;
+  padding: 6px;
+}
+:root .task-dialog .subtasks > div > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 600px) {
+  :root .entity-dialog > .dialog-footer {
+    bottom: -22px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  :root .entity-dialog > .dialog-footer .btn {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  :root .task-dialog .task-meta-grid {
+    gap: 14px 12px;
+  }
+  :root .task-dialog .task-meta-grid > label > input,
+  :root .task-dialog .task-meta-grid > label > select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  :root .task-dialog .dialog-tabs {
+    gap: 4px;
+  }
+  :root .task-dialog .dialog-tabs button {
+    min-height: 44px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  :root .task-dialog .dialog-footer {
+    gap: 8px;
+  }
+  :root .task-dialog .dialog-footer > .small-text {
+    display: none;
+  }
+  :root .task-dialog .dialog-footer > .editor-delete {
+    margin-left: 0;
+    margin-right: auto;
+  }
+  :root .task-dialog .inline-add input,
+  :root .task-dialog .inline-add .text-button {
+    min-height: 44px;
+  }
+  :root .task-dialog .connection-options > label {
+    min-height: 48px;
+  }
   .entity-editor-close > div {
     flex-direction: column;
   }
   .entity-editor-close .btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  :root .task-dialog .task-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   BookOpen,
   Check,
@@ -32,6 +32,7 @@ import { Avatar, Empty, StatusIcon } from "./WorkspacePrimitives";
 import Markdown from "./Markdown";
 import SourceNoteCard from "./SourceNoteCard";
 import { useWorkspaceFetch } from "./WorkspaceScope";
+import "./entity-editors.css";
 type TaskForm = {
   task: Task;
   tagText: string;
@@ -490,6 +491,7 @@ export default function TaskDialog({
   const blocked = draft.blockedBy.filter(
     (id) => w.tasks.find((t) => t.id === id)?.status !== "done",
   );
+  const fieldId = useId();
   return (
     <div
       className="modal-shade task-shade"
@@ -503,6 +505,7 @@ export default function TaskDialog({
         role="dialog"
         aria-modal="true"
         aria-label={exists ? "Edit task" : "Create task"}
+        aria-busy={saving}
       >
         <div className="dialog-heading">
           <div className="task-dialog-breadcrumb">
@@ -525,7 +528,7 @@ export default function TaskDialog({
         </div>
         <div className="task-dialog-body">
           {recovered && (
-            <p className="draft-recovery-note">
+            <p className="draft-recovery-note" role="status">
               Recovered task draft from this device.
             </p>
           )}
@@ -541,6 +544,7 @@ export default function TaskDialog({
               </span>
               <button
                 className="btn"
+                disabled={!!draftError}
                 onClick={() => {
                   if (!draftError) onClose();
                 }}
@@ -557,16 +561,19 @@ export default function TaskDialog({
           )}
           <fieldset disabled={saving} className="dialog-fields">
             <div className="task-title-input">
+              <label htmlFor={`${fieldId}-title`} className="task-title-label">
+                Task title
+              </label>
               <input
+                id={`${fieldId}-title`}
                 autoFocus
                 placeholder="What needs to happen?"
-                aria-label="Task title"
                 maxLength={300}
                 value={draft.title}
                 onChange={(e) => set("title", e.target.value)}
               />
             </div>
-            <div className="task-meta-grid">
+            <div className="task-meta-grid task-essential-fields">
               <label>
                 Status
                 <select
@@ -589,7 +596,9 @@ export default function TaskDialog({
                   }
                 >
                   {priorities.map((p) => (
-                    <option key={p}>{p}</option>
+                    <option key={p} value={p}>
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -624,43 +633,6 @@ export default function TaskDialog({
                   ))}
                 </select>
               </label>
-              <label>
-                Due date
-                <input
-                  type="date"
-                  value={draft.dueDate}
-                  onChange={(e) => set("dueDate", e.target.value)}
-                />
-              </label>
-              <label>
-                Effort points
-                <input
-                  type="number"
-                  min="0"
-                  max="999"
-                  value={draft.estimate}
-                  onChange={(e) => set("estimate", Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Type
-                <select
-                  value={draft.type}
-                  onChange={(e) => set("type", e.target.value as Task["type"])}
-                >
-                  {["task", "story", "bug", "epic"].map((t) => (
-                    <option key={t}>{t}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Tags
-                <input
-                  placeholder="planning, research"
-                  value={tagText}
-                  onChange={(e) => change({ tagText: e.target.value })}
-                />
-              </label>
             </div>
             {blocked.length > 0 && (
               <div className="warning-box">
@@ -669,15 +641,21 @@ export default function TaskDialog({
                 {blocked.length === 1 ? "dependency" : "dependencies"}.
               </div>
             )}
-            <div className="view-tabs dialog-tabs">
+            <div
+              className="view-tabs dialog-tabs"
+              role="group"
+              aria-label="Task sections"
+            >
               <button
                 className={tab === "details" ? "selected" : ""}
+                aria-pressed={tab === "details"}
                 onClick={() => setTab("details")}
               >
                 Details
               </button>
               <button
                 className={tab === "connections" ? "selected" : ""}
+                aria-pressed={tab === "connections"}
                 onClick={() => setTab("connections")}
               >
                 <Link2 size={14} />
@@ -685,6 +663,7 @@ export default function TaskDialog({
               </button>
               <button
                 className={tab === "activity" ? "selected" : ""}
+                aria-pressed={tab === "activity"}
                 onClick={() => setTab("activity")}
               >
                 Discussion <span>{draft.comments.length}</span>
@@ -698,9 +677,14 @@ export default function TaskDialog({
                   onOpenNote={(id) => void openLinkedNote(id)}
                 />
                 <div className="field-heading">
-                  <label>Description</label>
+                  <label
+                    htmlFor={preview ? undefined : `${fieldId}-description`}
+                  >
+                    Description
+                  </label>
                   <button
                     className="text-button"
+                    aria-pressed={preview}
                     onClick={() => setPreview((p) => !p)}
                   >
                     {preview ? "Edit Markdown" : "Preview"}
@@ -719,6 +703,7 @@ export default function TaskDialog({
                   </div>
                 ) : (
                   <textarea
+                    id={`${fieldId}-description`}
                     className="description-editor"
                     maxLength={100000}
                     placeholder="Add context, acceptance criteria, or link an idea with [[Note title]]…"
@@ -726,8 +711,62 @@ export default function TaskDialog({
                     onChange={(e) => set("description", e.target.value)}
                   />
                 )}
+                <section
+                  className="task-planning"
+                  aria-labelledby={`${fieldId}-planning`}
+                >
+                  <div className="task-section-heading">
+                    <h3 id={`${fieldId}-planning`}>Planning</h3>
+                    <span>Optional details</span>
+                  </div>
+                  <div className="task-meta-grid">
+                    <label>
+                      Due date
+                      <input
+                        type="date"
+                        value={draft.dueDate}
+                        onChange={(e) => set("dueDate", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Effort points
+                      <input
+                        type="number"
+                        min="0"
+                        max="999"
+                        value={draft.estimate}
+                        onChange={(e) =>
+                          set("estimate", Number(e.target.value))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Type
+                      <select
+                        value={draft.type}
+                        onChange={(e) =>
+                          set("type", e.target.value as Task["type"])
+                        }
+                      >
+                        {["task", "story", "bug", "epic"].map((t) => (
+                          <option key={t} value={t}>
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Tags
+                      <input
+                        placeholder="planning, research"
+                        value={tagText}
+                        onChange={(e) => change({ tagText: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                </section>
                 <div className="field-heading">
-                  <label>
+                  <label htmlFor={`${fieldId}-subtask`}>
                     Subtasks{" "}
                     <span className="muted">
                       {draft.subtasks.filter((s) => s.done).length}/
@@ -741,6 +780,7 @@ export default function TaskDialog({
                       <button
                         className={"subtask-check " + (s.done ? "checked" : "")}
                         aria-label={"Toggle " + s.title}
+                        aria-pressed={s.done}
                         onClick={() =>
                           set(
                             "subtasks",
@@ -773,6 +813,7 @@ export default function TaskDialog({
                 <div className="inline-add">
                   <Plus size={15} />
                   <input
+                    id={`${fieldId}-subtask`}
                     value={subtask}
                     maxLength={300}
                     placeholder="Add a small next step…"
@@ -784,7 +825,11 @@ export default function TaskDialog({
                       }
                     }}
                   />
-                  <button className="text-button" onClick={addSubtask}>
+                  <button
+                    className="text-button"
+                    disabled={!subtask.trim()}
+                    onClick={addSubtask}
+                  >
                     Add
                   </button>
                 </div>
@@ -793,7 +838,7 @@ export default function TaskDialog({
             {tab === "connections" && (
               <>
                 <div className="field-heading">
-                  <label>Linked knowledge</label>
+                  <label>Linked notes</label>
                   <span className="muted small-text">
                     Keep the context close
                   </span>
@@ -832,6 +877,12 @@ export default function TaskDialog({
                       </button>
                     </label>
                   ))}
+                  {!w.notes.length && (
+                    <p className="task-connections-empty">
+                      No notes yet. Create a note in Notes, then link it here to
+                      keep the task&apos;s context close.
+                    </p>
+                  )}
                 </div>
                 <div className="field-heading">
                   <label>Blocked by</label>
@@ -862,6 +913,12 @@ export default function TaskDialog({
                         </span>
                       </label>
                     ))}
+                  {!w.tasks.some((t) => t.id !== draft.id) && (
+                    <p className="task-connections-empty">
+                      No other tasks yet. Add another task to choose work that
+                      needs to finish before this one.
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -896,7 +953,14 @@ export default function TaskDialog({
                     />
                   )}
                 </div>
+                <label
+                  className="task-discussion-label"
+                  htmlFor={`${fieldId}-comment`}
+                >
+                  Add an update
+                </label>
                 <textarea
+                  id={`${fieldId}-comment`}
                   className="field"
                   placeholder="Share an update or decision…"
                   value={comment}
@@ -939,13 +1003,14 @@ export default function TaskDialog({
         <footer className="dialog-footer">
           {task && (
             <button
-              className="btn-icon danger"
+              className="btn danger editor-delete"
               aria-label="Delete task"
               title="Delete task"
               disabled={saving}
               onClick={() => void deleteTask()}
             >
               <Trash2 size={16} />
+              <span>Delete</span>
             </button>
           )}
           <span className="small-text muted">

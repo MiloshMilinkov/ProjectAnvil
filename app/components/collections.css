@@ -1180,3 +1180,122 @@
     gap: 16px;
   }
 }
+
+/* Keep editing feedback and compact controls usable in every layout. */
+:root .bases-page .base-saving {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--font-size-meta, 12px);
+  color: var(--text-secondary, var(--muted));
+}
+:root .bases-page .base-saving.error {
+  color: var(--danger);
+}
+:root .bases-page .base-saving svg {
+  flex-shrink: 0;
+}
+:root .bases-page .base-scope-hint {
+  margin: -3px 0 16px;
+  color: var(--text-secondary, var(--muted));
+  font-size: var(--font-size-caption, 13px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+:root .bases-page .base-sort-direction,
+:root .bases-page .base-search > button {
+  min-width: var(--control-height, 40px);
+  min-height: var(--control-height, 40px);
+  align-items: center;
+  justify-content: center;
+  margin-left: 0;
+  margin-right: 0;
+}
+:root .bases-page .base-search {
+  padding-right: 2px;
+}
+:root .bases-page .base-clear-filters {
+  min-height: var(--control-height, 40px);
+  padding-inline: 8px;
+}
+:root .bases-page .base-board {
+  scroll-snap-type: x proximity;
+}
+:root .bases-page .base-board-column {
+  scroll-snap-align: start;
+}
+:root .bases-page .base-board-hint {
+  line-height: 1.5;
+}
+:root .bases-page .base-board-type {
+  flex-wrap: wrap;
+}
+:root .bases-page .base-board-title,
+:root .bases-page .base-gallery-title {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  :root .bases-page .heading-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-left: 0;
+    gap: 8px;
+  }
+  :root .bases-page .base-saving {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+  :root .bases-page .base-topline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+  :root .bases-page .base-view-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    gap: 4px;
+    overflow: visible;
+  }
+  :root .bases-page .base-view-tabs > button {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    gap: 5px;
+    padding-inline: 2px;
+    white-space: nowrap;
+  }
+  :root .bases-page .base-view-tabs > button,
+  :root .bases-page .base-tags button,
+  :root .bases-page .base-column-checks label {
+    min-height: 44px;
+  }
+  :root .bases-page .base-tags button {
+    padding-inline: 8px;
+  }
+  :root .bases-page .base-list-row {
+    flex-wrap: wrap;
+  }
+  :root .bases-page .base-list-main {
+    flex-basis: calc(100% - 52px);
+  }
+  :root .bases-page .base-list-main > span {
+    max-width: 100%;
+  }
+  :root .bases-page .base-list-props {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bases-page .base-spin {
+    animation: none;
+  }
+}

@@ -47,6 +47,7 @@ import { relationshipLabel } from "../lib/relationship-display";
 import type { EntityRef } from "../lib/types";
 import GraphRelationships from "./GraphRelationships";
 import { useCanvasPersistence } from "./useCanvasPersistence";
+import { useDialog } from "./useDialog";
 import "./visuals.css";
 
 type Point = { x: number; y: number };
@@ -511,15 +512,17 @@ export function GraphView(
         </div>
       </div>
       <div className="graph-toolbar">
-        <div className="visual-segment">
+        <div className="visual-segment" role="group" aria-label="Graph scope">
           <button
             className={scope === "global" ? "active" : ""}
+            aria-pressed={scope === "global"}
             onClick={() => setScope("global")}
           >
             <Globe2 size={14} /> Entire workspace
           </button>
           <button
             className={scope === "local" ? "active" : ""}
+            aria-pressed={scope === "local"}
             onClick={() => {
               setScope("local");
               if (!selected && focusId) setSelected(focusId);
@@ -528,11 +531,16 @@ export function GraphView(
             <Focus size={14} /> Local graph
           </button>
         </div>
-        <div className="graph-types">
+        <div
+          className="graph-types"
+          role="group"
+          aria-label="Visible graph items"
+        >
           {(["note", "task", "project"] as const).map((type) => (
             <button
               key={type}
               className={types[type] ? "active" : ""}
+              aria-pressed={types[type]}
               onClick={() =>
                 setTypes((old) => ({ ...old, [type]: !old[type] }))
               }
@@ -719,6 +727,7 @@ export function GraphView(
                     className="graph-node"
                     style={{ opacity: dim ? 0.22 : 1 }}
                     role="button"
+                    aria-pressed={active}
                     tabIndex={0}
                     aria-label={`${node.type}: ${node.title}${impacted ? ", source changed or needs review" : ""}`}
                     onKeyDown={(e) => {
@@ -1031,6 +1040,7 @@ const cardColors = [
   "#df8bb6",
   "#858da8",
 ];
+const cardColorNames = ["Purple", "Blue", "Green", "Gold", "Pink", "Slate"];
 const isHttp = (value: string) => {
   try {
     return ["http:", "https:"].includes(new URL(value).protocol);
@@ -1110,6 +1120,7 @@ export function CanvasView(props: CanvasViewProps) {
   const [connecting, setConnecting] = useState(false);
   const [connectFrom, setConnectFrom] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const addDialog = useRef<HTMLDivElement>(null);
   const [addType, setAddType] = useState<CanvasCard["type"]>("note");
   const [addSearch, setAddSearch] = useState("");
   const [newText, setNewText] = useState("");
@@ -1118,6 +1129,7 @@ export function CanvasView(props: CanvasViewProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [uploadMedia, setUploadMedia] = useState<Media[]>([]);
+  useDialog(addDialog, () => setShowAdd(false), false, showAdd);
   const drag = useRef<CanvasDrag | null>(null);
   const mediaInput = useRef<HTMLInputElement>(null);
   const restoredCameraFor = useRef<string | null>(null);
@@ -1466,7 +1478,7 @@ export function CanvasView(props: CanvasViewProps) {
         : [];
 
   return (
-    <div className="visual-feature">
+    <div className="visual-feature canvas-feature">
       <div className="visual-heading">
         <div>
           <div className="visual-eyebrow">ROOM TO THINK</div>
@@ -1519,6 +1531,9 @@ export function CanvasView(props: CanvasViewProps) {
         <span className="canvas-toolbar-divider" />
         <button
           className={`canvas-tool ${connecting ? "active" : ""}`}
+          aria-pressed={connecting}
+          aria-label={connecting ? "Cancel connecting cards" : "Connect cards"}
+          title={connecting ? "Cancel connecting cards" : "Connect cards"}
           onClick={() => {
             setConnecting(!connecting);
             setConnectFrom("");
@@ -1533,11 +1548,21 @@ export function CanvasView(props: CanvasViewProps) {
               : "Connect cards"}
           </span>
         </button>
-        <button className="canvas-tool" onClick={fit}>
+        <button
+          className="canvas-tool"
+          onClick={fit}
+          aria-label="Fit canvas"
+          title="Fit canvas"
+        >
           <Focus size={15} />
           <span>Fit canvas</span>
         </button>
-        <div className="canvas-save-state">
+        <div
+          className="canvas-save-state"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {saving ? (
             <>
               <Loader2 size={13} className="visual-spin" /> Saving…
@@ -1562,8 +1587,12 @@ export function CanvasView(props: CanvasViewProps) {
         </div>
         <button
           className={`btn-icon ${showInspector ? "canvas-button-active" : ""}`}
-          title="Toggle details"
-          aria-label="Toggle details"
+          title={showInspector ? "Hide canvas details" : "Show canvas details"}
+          aria-label={
+            showInspector ? "Hide canvas details" : "Show canvas details"
+          }
+          aria-expanded={showInspector}
+          aria-controls="canvas-details"
           onClick={() => setShowInspector(!showInspector)}
         >
           <Layers3 size={16} />
@@ -1599,7 +1628,9 @@ export function CanvasView(props: CanvasViewProps) {
           className={`canvas-surface ${connecting ? "connecting" : ""}`}
           ref={ref}
           tabIndex={0}
+          role="region"
           aria-label="Visual planning canvas. Select a card to edit its details."
+          aria-describedby="canvas-keyboard-help"
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
             if (e.key === "Delete" || e.key === "Backspace") {
@@ -1702,6 +1733,17 @@ export function CanvasView(props: CanvasViewProps) {
                   <g
                     key={connection.id}
                     className="canvas-edge-target"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Connection${connection.label ? `: ${connection.label}` : ""}. Enter to view details.`}
+                    aria-pressed={selectedEdge === connection.id}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setSelectedEdge(connection.id);
+                      setSelected("");
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedEdge(connection.id);
@@ -1790,6 +1832,7 @@ export function CanvasView(props: CanvasViewProps) {
                   className={`canvas-card canvas-card-${card.type} ${selected === card.id ? "selected" : ""} ${connectFrom === card.id ? "connection-source" : ""}`}
                   style={style}
                   tabIndex={0}
+                  role="group"
                   aria-label={`${card.type}: ${title}. Enter to select, arrow keys to move.`}
                   onFocus={() => {
                     setSelected(card.id);
@@ -2000,8 +2043,34 @@ export function CanvasView(props: CanvasViewProps) {
                   </div>
                   <button
                     className="canvas-resize"
-                    aria-label="Resize card"
-                    title="Drag to resize"
+                    aria-label={`Resize ${title}. Use arrow keys to adjust its size.`}
+                    title="Drag or use arrow keys to resize"
+                    onKeyDown={(event) => {
+                      if (!event.key.startsWith("Arrow")) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const amount = event.shiftKey ? 40 : 10;
+                      updateCard(card.id, {
+                        width: Math.max(
+                          200,
+                          card.width +
+                            (event.key === "ArrowRight"
+                              ? amount
+                              : event.key === "ArrowLeft"
+                                ? -amount
+                                : 0),
+                        ),
+                        height: Math.max(
+                          150,
+                          card.height +
+                            (event.key === "ArrowDown"
+                              ? amount
+                              : event.key === "ArrowUp"
+                                ? -amount
+                                : 0),
+                        ),
+                      });
+                    }}
                     onPointerDown={(e) => start(e, "resize", card)}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -2031,7 +2100,11 @@ export function CanvasView(props: CanvasViewProps) {
             </div>
           )}
           {connecting && (
-            <div className="canvas-connect-notice">
+            <div
+              className="canvas-connect-notice"
+              role="status"
+              aria-live="polite"
+            >
               <Link2 size={14} />
               {connectFrom
                 ? "Select the card you want to connect to"
@@ -2127,7 +2200,11 @@ export function CanvasView(props: CanvasViewProps) {
           </div>
         </div>
         {showInspector && (
-          <aside className="canvas-inspector">
+          <aside
+            className="canvas-inspector"
+            id="canvas-details"
+            aria-label="Canvas details"
+          >
             <div className="visual-inspector-label">
               {selectedCard
                 ? "CARD DETAILS"
@@ -2155,11 +2232,17 @@ export function CanvasView(props: CanvasViewProps) {
                   </button>
                 </div>
                 <label className="visual-field-label">Accent color</label>
-                <div className="canvas-colors">
-                  {cardColors.map((color) => (
+                <div
+                  className="canvas-colors"
+                  role="group"
+                  aria-label="Card accent color"
+                >
+                  {cardColors.map((color, index) => (
                     <button
                       key={color}
-                      aria-label={`Use ${color} accent`}
+                      aria-label={`${cardColorNames[index]} accent`}
+                      aria-pressed={selectedCard.color === color}
+                      title={`${cardColorNames[index]} accent`}
                       style={{ background: color }}
                       className={selectedCard.color === color ? "active" : ""}
                       onClick={() => updateCard(selectedCard.id, { color })}
@@ -2304,6 +2387,7 @@ export function CanvasView(props: CanvasViewProps) {
                 </div>
                 <button
                   className="btn canvas-connect-button"
+                  aria-pressed={connecting && connectFrom === selectedCard.id}
                   onClick={() => {
                     setConnecting(true);
                     setConnectFrom(selectedCard.id);
@@ -2312,8 +2396,8 @@ export function CanvasView(props: CanvasViewProps) {
                   <Link2 size={14} /> Connect this card
                 </button>
                 <p className="visual-muted canvas-detail-hint">
-                  Drag the card header to move it. Use its bottom corner to
-                  resize.
+                  Drag the header to move, or use arrow keys on the card. Adjust
+                  width, height, and position above for precise placement.
                 </p>
               </>
             ) : edge ? (
@@ -2425,9 +2509,9 @@ export function CanvasView(props: CanvasViewProps) {
         )}
       </div>
       <div className="visual-footer">
-        <span>
-          <MousePointer2 size={13} /> Drag background to pan · Scroll to zoom ·
-          Drag card headers to arrange
+        <span id="canvas-keyboard-help">
+          <MousePointer2 size={13} /> Drag to pan · Scroll or +/− to zoom ·
+          Arrow keys move a focused card
         </span>
         <span>
           {error
@@ -2453,6 +2537,7 @@ export function CanvasView(props: CanvasViewProps) {
           }}
         >
           <div
+            ref={addDialog}
             className="visual-add-modal"
             role="dialog"
             aria-modal="true"
@@ -2471,7 +2556,11 @@ export function CanvasView(props: CanvasViewProps) {
                 <X size={19} />
               </button>
             </div>
-            <div className="canvas-add-types">
+            <div
+              className="canvas-add-types"
+              role="group"
+              aria-label="Card type"
+            >
               {(
                 [
                   { type: "note", label: "Note", icon: FileText },
@@ -2483,6 +2572,7 @@ export function CanvasView(props: CanvasViewProps) {
               ).map((item) => (
                 <button
                   key={item.type}
+                  aria-pressed={addType === item.type}
                   className={addType === item.type ? "active" : ""}
                   onClick={() => {
                     setAddType(item.type);
@@ -2500,7 +2590,6 @@ export function CanvasView(props: CanvasViewProps) {
                 <label className="visual-search canvas-add-search">
                   <Search size={15} />
                   <input
-                    autoFocus
                     value={addSearch}
                     onChange={(e) => setAddSearch(e.target.value)}
                     placeholder={`Find a ${addType}…`}
@@ -2546,7 +2635,6 @@ export function CanvasView(props: CanvasViewProps) {
                   What are you thinking?
                 </label>
                 <textarea
-                  autoFocus
                   id="new-canvas-thought"
                   className="field"
                   rows={7}
@@ -2568,7 +2656,6 @@ export function CanvasView(props: CanvasViewProps) {
                   Reference website
                 </label>
                 <input
-                  autoFocus
                   id="new-canvas-url"
                   className="field"
                   placeholder="https://example.com"

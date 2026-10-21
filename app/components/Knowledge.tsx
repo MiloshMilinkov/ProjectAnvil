@@ -5,12 +5,14 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useDialog } from "./useDialog";
+import { useMediaQuery } from "./useMediaQuery";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -69,6 +71,7 @@ import LinkedNoteTasks from "./LinkedNoteTasks";
 import "./knowledge.css";
 import "./templates.css";
 import "./note-recovery.css";
+import "./knowledge-ux.css";
 
 type Props = FeatureProps & {
   selectedNote: string;
@@ -356,6 +359,11 @@ export default function Knowledge({
   notify,
 }: Props) {
   const scopedFetch = useWorkspaceFetch();
+  const controlId = useId();
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const browserButtonRef = useRef<HTMLButtonElement>(null);
+  const browserRef = useRef<HTMLElement>(null);
+  const mobileLayout = useMediaQuery("(max-width: 750px)");
   const draftScope = useDraftScope();
   const [recoveredNotes] = useState(() => recoveredNoteDrafts(draftScope));
   const [localNoteValues, setLocalNoteValues] = useState<Record<string, Note>>(
@@ -385,6 +393,8 @@ export default function Knowledge({
     ),
   );
   const [view, setView] = useState<"edit" | "preview" | "split">("split");
+  // Small screens show one pane while retaining Split when the window widens.
+  const effectiveView = mobileLayout && view === "split" ? "preview" : view;
   const [search, setSearch] = useState("");
   const [folder, setFolder] = useState("all");
   const [tag, setTag] = useState("all");
@@ -418,6 +428,13 @@ export default function Knowledge({
   const [recordError, setRecordError] = useState("");
   const [recordingRecovery, setRecordingRecovery] = useState(false);
   const [mobileBrowser, setMobileBrowser] = useState(false);
+  const browserDialogOpen = mobileLayout && mobileBrowser;
+  useDialog(
+    browserRef,
+    () => setMobileBrowser(false),
+    false,
+    browserDialogOpen,
+  );
   const [linkOpen, setLinkOpen] = useState(false);
   const [taskSource, setTaskSource] = useState<{
     note: Note;
@@ -821,6 +838,8 @@ export default function Knowledge({
         setNewOpen(false);
         setMoreOpen(false);
         setLinkOpen(false);
+        setMobileBrowser(false);
+        if (mobileBrowser) browserButtonRef.current?.focus();
       }
       if (slides && event.key === "ArrowRight")
         setSlideIndex((index) =>
@@ -834,7 +853,7 @@ export default function Knowledge({
     };
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
-  }, [slides, flush]);
+  }, [slides, flush, mobileBrowser]);
 
   const rememberNewNote = (patch: Partial<NewNoteDraft>) => {
     newNoteForm.current = {
@@ -1626,7 +1645,12 @@ export default function Knowledge({
   return (
     <div className={`knowledge ${mode === "daily" ? "daily-knowledge" : ""}`}>
       <aside
+        ref={browserRef}
+        id={`${controlId}-browser`}
         className={`note-browser ${mobileBrowser ? "mobile-visible" : ""}`}
+        role={browserDialogOpen ? "dialog" : undefined}
+        aria-modal={browserDialogOpen ? true : undefined}
+        aria-label="Browse notes"
       >
         <div className="note-browser-title">
           <span>
@@ -1635,10 +1659,25 @@ export default function Knowledge({
             ) : (
               <BookOpen size={18} />
             )}{" "}
-            {mode === "daily" ? "Daily journal" : "Knowledge base"}
+            {mode === "daily" ? "Daily journal" : "Notes"}
           </span>
-          <button className="btn-icon" title="New note" onClick={openNewNote}>
+          <button
+            className="btn-icon"
+            title="New note"
+            aria-label="New note"
+            onClick={openNewNote}
+          >
             <Plus size={17} />
+          </button>
+          <button
+            className="btn-icon note-browser-close"
+            aria-label="Close notes browser"
+            onClick={() => {
+              setMobileBrowser(false);
+              browserButtonRef.current?.focus();
+            }}
+          >
+            <X size={18} />
           </button>
         </div>
         <label className="note-search">
@@ -1654,6 +1693,7 @@ export default function Knowledge({
         <div className="note-scope">
           <button
             className={bookmarksOnly ? "active" : ""}
+            aria-pressed={bookmarksOnly}
             onClick={() => setBookmarksOnly((value) => !value)}
           >
             <Bookmark
@@ -1698,6 +1738,7 @@ export default function Knowledge({
               <button
                 key={note.id}
                 className={`note-list-item ${selectedNote === note.id ? "selected" : ""}`}
+                aria-current={selectedNote === note.id ? "page" : undefined}
                 onClick={() => onSelectNote(note.id)}
               >
                 <div className="note-list-item-top">
@@ -1734,7 +1775,11 @@ export default function Knowledge({
           ) : (
             <div className="note-list-empty">
               <Search size={25} />
-              <p>No notes here yet.</p>
+              <p>
+                {notes.length
+                  ? "No notes match these filters. Try another search, folder, tag, or bookmark filter."
+                  : "No notes here yet. Create your first note to get started."}
+              </p>
               <button className="btn" onClick={openNewNote}>
                 Create a note
               </button>
@@ -1743,7 +1788,7 @@ export default function Knowledge({
         </div>
         <div className="note-browser-footer">
           <div className="note-vault-dot" />
-          <span>Your workspace knowledge</span>
+          <span>Your notes</span>
           <button
             className="btn-icon"
             title="New note from template"
@@ -1797,8 +1842,12 @@ export default function Knowledge({
             <div className="note-toolbar">
               <div className="note-breadcrumb">
                 <button
+                  ref={browserButtonRef}
                   className="btn-icon mobile-note-toggle"
                   title="Browse notes"
+                  aria-label="Browse notes"
+                  aria-expanded={mobileBrowser}
+                  aria-controls={`${controlId}-browser`}
                   onClick={() => setMobileBrowser((value) => !value)}
                 >
                   <BookOpen size={17} />
@@ -1809,7 +1858,11 @@ export default function Knowledge({
                 <span className="note-breadcrumb-current">{draft.title}</span>
               </div>
               <div className="note-toolbar-actions">
-                <span className={`note-save-state ${saveState}`}>
+                <span
+                  className={`note-save-state ${saveState}`}
+                  role="status"
+                  aria-live="polite"
+                >
                   {saveState === "saving" ? (
                     <LoaderCircle size={12} className="spin" />
                   ) : saveState === "error" ? (
@@ -1834,6 +1887,8 @@ export default function Knowledge({
                   aria-label={
                     draft.bookmarked ? "Remove bookmark" : "Bookmark note"
                   }
+                  title={draft.bookmarked ? "Remove bookmark" : "Bookmark note"}
+                  aria-pressed={draft.bookmarked}
                   onClick={() => edit({ bookmarked: !draft.bookmarked })}
                 >
                   <Bookmark
@@ -1842,22 +1897,42 @@ export default function Knowledge({
                   />
                 </button>
                 <button
-                  className={`btn-icon ${details ? "is-active" : ""}`}
+                  className={`btn note-details-toggle ${details ? "is-active" : ""}`}
                   aria-label="Toggle note details"
+                  title="Note details"
+                  aria-expanded={details}
+                  aria-controls={`${controlId}-details`}
                   onClick={() => setDetails((value) => !value)}
                 >
                   <Settings2 size={16} />
+                  <span>Details</span>
                 </button>
                 <div className="note-more-wrap">
                   <button
+                    ref={moreButtonRef}
                     className="btn-icon"
                     aria-label="More note actions"
+                    title="More note actions"
+                    aria-expanded={moreOpen}
+                    aria-controls={`${controlId}-actions`}
                     onClick={() => setMoreOpen((value) => !value)}
                   >
                     <MoreHorizontal size={18} />
                   </button>
                   {moreOpen && (
-                    <div className="note-menu">
+                    <div
+                      id={`${controlId}-actions`}
+                      className="note-menu"
+                      role="group"
+                      aria-label="Note actions"
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.stopPropagation();
+                          setMoreOpen(false);
+                          moreButtonRef.current?.focus();
+                        }
+                      }}
+                    >
                       <button
                         onClick={() => {
                           openHistory();
@@ -1996,22 +2071,29 @@ export default function Knowledge({
                   </div>
                 </div>
                 <div className="note-editor-toolbar">
-                  <div className="note-view-switch">
+                  <div
+                    className="note-view-switch"
+                    role="group"
+                    aria-label="Note view"
+                  >
                     <button
-                      className={view === "edit" ? "active" : ""}
+                      className={effectiveView === "edit" ? "active" : ""}
+                      aria-pressed={effectiveView === "edit"}
                       onClick={() => setView("edit")}
                     >
                       Write
                     </button>
                     <button
-                      className={view === "split" ? "active" : ""}
+                      className={effectiveView === "split" ? "active" : ""}
+                      aria-pressed={effectiveView === "split"}
                       onClick={() => setView("split")}
                     >
                       <Columns2 size={13} />
                       Split
                     </button>
                     <button
-                      className={view === "preview" ? "active" : ""}
+                      className={effectiveView === "preview" ? "active" : ""}
+                      aria-pressed={effectiveView === "preview"}
                       onClick={() => setView("preview")}
                     >
                       Read
@@ -2040,30 +2122,36 @@ export default function Knowledge({
                   <div className="note-format-tools">
                     <button
                       title="Heading"
+                      aria-label="Insert heading"
                       onClick={() => insert("\n## Heading\n")}
                     >
                       H₂
                     </button>
                     <button
                       title="Bold text"
+                      aria-label="Insert bold text"
                       onClick={() => insert("**bold text**")}
                     >
                       <strong>B</strong>
                     </button>
                     <button
                       title="Checklist"
+                      aria-label="Insert checklist"
                       onClick={() => insert("\n- [ ] ")}
                     >
                       ☑
                     </button>
                     <button
                       title="Link a note"
+                      aria-label="Link a note"
+                      aria-expanded={linkOpen}
                       onClick={() => setLinkOpen((value) => !value)}
                     >
                       <Link2 size={15} />
                     </button>
                     <button
                       title="Attach an image, PDF, audio, or video"
+                      aria-label="Attach an image, PDF, audio, or video"
                       onClick={() => fileInput.current?.click()}
                       disabled={uploading}
                     >
@@ -2076,6 +2164,8 @@ export default function Knowledge({
                     <button
                       className={recording ? "is-recording" : ""}
                       title={recording ? "Stop recording" : "Record audio"}
+                      aria-label={recording ? "Stop recording" : "Record audio"}
+                      aria-pressed={recording}
                       onClick={() => void startRecording()}
                     >
                       {recording ? (
@@ -2160,7 +2250,7 @@ export default function Knowledge({
                   </div>
                 )}
                 <div
-                  className={`note-editing-area view-${view}`}
+                  className={`note-editing-area view-${effectiveView}`}
                   onDragOver={(event) => {
                     if (event.dataTransfer.types.includes("Files"))
                       event.preventDefault();
@@ -2172,7 +2262,7 @@ export default function Knowledge({
                     }
                   }}
                 >
-                  {view !== "preview" && (
+                  {effectiveView !== "preview" && (
                     <div className="note-source-pane">
                       <div className="note-pane-label">MARKDOWN</div>
                       <textarea
@@ -2187,9 +2277,9 @@ export default function Knowledge({
                       />
                     </div>
                   )}
-                  {view !== "edit" && (
+                  {effectiveView !== "edit" && (
                     <div className="note-preview-pane" ref={previewPane}>
-                      {view === "split" && (
+                      {effectiveView === "split" && (
                         <div className="note-pane-label">PREVIEW</div>
                       )}
                       <Markdown
@@ -2218,7 +2308,11 @@ export default function Knowledge({
               </div>
 
               {details && (
-                <aside className="note-details">
+                <aside
+                  id={`${controlId}-details`}
+                  className="note-details"
+                  aria-label="Note details"
+                >
                   <div className="note-details-title">
                     NOTE DETAILS
                     <button
@@ -2273,7 +2367,10 @@ export default function Knowledge({
                       </select>
                     </label>
                     {Object.entries(draft.properties).map(([key, value]) => (
-                      <label className="note-property" key={key}>
+                      <label
+                        className="note-property note-custom-property"
+                        key={key}
+                      >
                         <span title={key}>{key}</span>
                         <input
                           value={value}
@@ -2428,6 +2525,7 @@ export default function Knowledge({
                 : "Create your first note"}
             </button>
             <button
+              ref={browserButtonRef}
               className="btn mobile-note-toggle"
               onClick={() => setMobileBrowser(true)}
             >

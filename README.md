@@ -29,7 +29,7 @@
 | Area | What you can do |
 | --- | --- |
 | **Projects & tasks** | Set project goals and target dates; create tasks, stories, bugs, and epics with assignees, priorities, statuses, due dates, effort estimates, tags, subtasks, dependencies, and discussions. |
-| **Dashboards & planning views** | Follow progress from Overview and My work. Switch between task boards, lists, and timelines; filter by project, person, priority, or status and save useful views. |
+| **Dashboards & planning views** | See progress, upcoming work, and recent notes in Overview. Switch between boards, lists, and timelines; filter by project, person, priority, or status and save useful views. A visible project filter keeps your scope clear. Phones start with readable task cards in List. |
 | **Markdown notes** | Write with headings, checklists, tables, quotes, highlights, footnotes, and formatted code. Preview mathematical equations and Mermaid diagrams. |
 | **Connected knowledge** | Link notes, headings, and blocks with `[[links]]`; embed their content and follow backlinks. Organize with folders, tags, bookmarks, projects, and custom properties. |
 | **Relationship graph** | Explore global and local connections, search and filter nodes, adjust connection depth, and pan, zoom, or arrange the graph. Add meaningful relationships and review change impact. |
@@ -40,7 +40,7 @@
 | **Recovery & reliable saves** | Recover browser drafts after interruptions, retry failed saves, and review conflicts before replacing newer edits. Keep or discard unfinished forms; check workspace storage and missing attachments. |
 | **Personal & team workspaces** | Work as a guest, register an account, or join a team. Keep personal work private and share a team's projects, tasks, notes, canvases, and attachments with accepted members. |
 | **Workspace tools** | Search across tasks, notes, and projects. Write beside a preview, extract or combine notes, present basic slides, open notes in another window, and use focus mode. |
-| **Appearance & onboarding** | Choose Light, Dark, Warp, Focus, or Soft. Adjust spacing, save a startup view, customize the new-task shortcut, and replay the 27-step guided tour. Layouts adapt to desktop and mobile screens. |
+| **Appearance & onboarding** | Choose Light, Dark, Warp, Focus, or Soft. Readable typography, consistent controls, visible keyboard focus, and touch-friendly layouts support desktop and mobile work. Adjust spacing, save a startup view, customize the new-task shortcut, and replay the 27-step guided tour. |
 | **Portable records & backups** | Export and import workspace JSON. Create and verify complete local backups of accounts, attachments, archived history, personal work rooms, and review state; restore with a rollback copy. |
 
 ## Templates
@@ -84,6 +84,8 @@ For storage, backup, restore, and troubleshooting, see the [local setup guide](d
 ## Development
 
 Built with **React, TypeScript, Vinext/Vite, Better Auth, and local D1/R2 emulation**.
+
+Interface changes follow the [UI and UX standard](docs/UI_STANDARDS.md), including readability, navigation, accessibility, all five themes, and responsive review.
 
 ```sh
 npm run check

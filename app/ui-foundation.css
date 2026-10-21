@@ -1,0 +1,236 @@
+/* Shared UI rules. New components should use these roles instead of literal sizes/colors. */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: var(--font-sans);
+  --font-size-body: 15px;
+  --font-size-control: 14px;
+  --font-size-caption: 13px;
+  --font-size-meta: 12px;
+  --line-height-body: 1.6;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --control-height: 40px;
+  --control-height-touch: 44px;
+  --text-on-accent: #211a2d;
+  --shadow-popover: 0 12px 36px rgb(0 0 0 / 24%);
+}
+
+/* Focus has a light work area and dark navigation. Resolve color roles in both scopes. */
+:root,
+html[data-theme="focus"] :is(.sidebar, .topbar) {
+  --surface-page: var(--bg);
+  --surface-panel: var(--panel);
+  --surface-subtle: var(--panel-2);
+  --text-primary: var(--text);
+  --text-secondary: var(--muted);
+  --text-tertiary: var(--muted);
+  --border-strong: color-mix(in srgb, var(--muted) 78%, var(--panel));
+  --control-border: var(--border-strong);
+  --focus-ring: var(--accent);
+  --focus-ring-shadow: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+html:is([data-theme="light"], [data-theme="focus"], [data-theme="soft"]) {
+  --text-on-accent: #fff;
+  --shadow-popover: 0 12px 36px rgb(28 35 48 / 14%);
+}
+
+html[data-theme="dark"],
+html[data-theme="focus"] :is(.sidebar, .topbar) {
+  --text-on-accent: #142033;
+  --shadow-popover: 0 12px 36px rgb(0 0 0 / 24%);
+}
+
+:root body {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+:root :is(h1, h2, h3, .brand, .stat-card > strong) {
+  font-family: var(--font-heading);
+}
+
+:root :is(.btn, .btn-icon, .text-button, .icon-link) {
+  min-height: var(--control-height);
+  border-radius: var(--radius-md);
+}
+
+:root .btn {
+  font-size: var(--font-size-control);
+  padding: 8px 14px;
+}
+
+:root .btn-icon {
+  width: var(--control-height);
+  height: var(--control-height);
+  min-width: var(--control-height);
+}
+
+:root .text-button {
+  font-size: var(--font-size-caption);
+}
+
+:root .icon-link {
+  min-width: var(--control-height);
+}
+
+:root :is(.field, .form-label) {
+  font-size: var(--font-size-control);
+}
+
+:root .form-label {
+  color: var(--text-secondary);
+}
+
+:root .field {
+  min-height: var(--control-height);
+  border-color: var(--control-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+:root :is(input, textarea)::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+:root :is(.small-text, .eyebrow, .count-badge, .badge) {
+  font-size: var(--font-size-meta);
+}
+
+/* Secondary copy remains legible without competing with headings and actions. */
+:root
+  :is(
+    .page-heading p,
+    .breadcrumbs,
+    .dashboard-foot,
+    .sidebar-footer,
+    .settings-stats
+  ) {
+  color: var(--text-secondary);
+}
+
+:root .breadcrumbs > svg {
+  color: var(--text-secondary);
+}
+
+/* Task metadata and saved filters are working information, not decorative text. */
+:root :is(.task-key, .due-date:not(.overdue), .result-count),
+:root .saved-views > span:first-child,
+:root .saved-view-chip button {
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+}
+
+:root .saved-view-chip {
+  max-width: 100%;
+  min-width: 0;
+  background: var(--surface-panel);
+}
+
+:root .saved-view-chip button {
+  min-height: var(--control-height);
+  padding: 6px 12px;
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+:root .saved-view-chip button + button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--control-height);
+  padding: 0;
+}
+
+/* Navigation and collection hints use the same readable metadata role. */
+:root
+  body
+  :is(
+    .nav-caption,
+    .sidebar-search kbd,
+    .account-workspace-trigger small,
+    .base-preference-hint,
+    .base-arrange-bar > label,
+    .base-edit-hint,
+    .base-location small
+  ) {
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+}
+
+:root body :is(.project-summary-copy p, .progress-label, .task-table th) {
+  color: var(--text-secondary);
+}
+
+:root body :is(.project-summary-copy .badge, .count-badge) {
+  font-size: var(--font-size-meta);
+  color: var(--text-secondary);
+  background: var(--surface-panel);
+}
+
+:root body :is(.account-workspace-trigger small, .sidebar-search kbd) {
+  color: var(--text-primary);
+}
+
+/* The collection component's legacy date style marks both declarations important. */
+:root .base-date {
+  color: var(--text-secondary) !important;
+  font-size: var(--font-size-meta) !important;
+}
+
+:root :is(button, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+:root :is(input, textarea, select):focus {
+  border-color: var(--focus-ring) !important;
+}
+
+:root :is(input, textarea, select):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--focus-ring-shadow);
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  :root {
+    --control-height: var(--control-height-touch);
+  }
+
+  :root
+    :is(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+      textarea,
+      select
+    ) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

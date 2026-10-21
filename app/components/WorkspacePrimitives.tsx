@@ -15,8 +15,11 @@ export function Avatar({
       className={"avatar " + (small ? "small" : "")}
       style={{
         background: person ? person.color + "25" : "#8e94aa20",
-        color: person?.color || "#8e94aa",
+        color: "var(--text)",
+        fontSize: "var(--font-size-meta, 12px)",
       }}
+      role="img"
+      aria-label={person?.name || label || "Unassigned"}
       title={person?.name || label || "Unassigned"}
     >
       {person ? initials(person.name) : <Users size={12} />}

@@ -39,12 +39,12 @@ export const tourSteps: TourStep[] = [
     id: "welcome",
     page: "overview",
     title: "Your ideas and your work, together",
-    body: "Overview brings together project progress, open tasks, and recent notes. Start with a project, capture your ideas in Knowledge, then turn the next steps into tasks.",
-    tip: "Use the workspace switcher for personal work or a shared team. Guest work stays separate.",
+    body: "Overview puts project progress, upcoming tasks, and recent notes first. Create a task from the top of the page or resume your latest work room. Use Notes to capture information and turn next steps into tasks.",
+    tip: "The sidebar keeps Teams & people and Workspace settings at the bottom. The project filter strip shows your scope and lets you clear it.",
     anchors: [
       '[data-tour="overview"]',
       ".view-overview .page-heading",
-      ".view-overview .overview-hero",
+      ".view-overview .stat-grid",
     ],
   },
   {
@@ -63,7 +63,7 @@ export const tourSteps: TourStep[] = [
     id: "new-task",
     page: "tasks",
     title: "Turn the plan into a task",
-    body: "New task creates an actionable piece of work with a project, type, status, priority, due date, and optional assignee. Open a saved task to edit its Markdown description, checklist, linked notes, dependencies, and discussion.",
+    body: "Create task starts with a title, status, priority, assignee, and project. In Details, write a Markdown description and add a checklist; Planning holds the optional date, estimate, type, and tags. Connections holds linked notes and dependencies; Discussion holds comments.",
     tip: "Closing keeps a browser draft for this account and workspace. Save confirms the changes; conflicting teammate edits need review.",
     anchors: [
       '[data-tour="new-task"]',
@@ -76,7 +76,7 @@ export const tourSteps: TourStep[] = [
     page: "tasks",
     title: "Choose how to see the work",
     body: "Board organizes tasks into status columns; drag a card to move work forward. List makes many tasks easy to scan and edit. Timeline puts dated tasks on a calendar so you can spot upcoming work.",
-    tip: "Use the status field as an alternative to dragging.",
+    tip: "Phones start with a readable List. Board and Timeline remain available. Use the status field as an alternative to dragging.",
     anchors: ['[data-tour="task-layouts"]', ".task-view-toolbar .view-tabs"],
   },
   {
@@ -123,7 +123,7 @@ export const tourSteps: TourStep[] = [
     id: "knowledge",
     page: "notes",
     title: "Keep useful information connected",
-    body: "Knowledge holds notes, research, plans, and reference material. Choose templates for projects, routines, fitness, learning, travel, meetings, or creative worldbuilding.",
+    body: "Notes holds research, plans, and reference material. Choose templates for projects, routines, fitness, learning, travel, meetings, or creative worldbuilding. On a phone, Browse opens the note list; Close notes returns to your writing.",
     tip: "Templates are starting structures; every part stays editable.",
     anchors: [
       '[data-tour="new-note"]',
@@ -223,7 +223,7 @@ export const tourSteps: TourStep[] = [
     page: "graph",
     title: "Explore the relationships",
     body: "The graph connects notes, tasks, and projects. Select a node to inspect its neighbors; double-click to open it. Filter node types, search for an idea, or use Local graph to explore one or two connections away.",
-    tip: "Drag to pan, scroll to zoom, and use Fit graph to bring everything into view.",
+    tip: "Drag to pan, scroll to zoom, and use Fit graph to bring everything into view. On phones, a selected node’s details appear below the graph.",
     anchors: [
       '[data-tour="graph-controls"]',
       ".graph-toolbar",
@@ -254,7 +254,7 @@ export const tourSteps: TourStep[] = [
     page: "canvas",
     title: "Plan on an open canvas",
     body: "Arrange notes, tasks, loose thoughts, uploaded media, and web references as cards. Move and resize them, connect them with arrows, and label the relationships. Keep separate canvases for project plans, brainstorming, or connected reference material.",
-    tip: "Unsaved canvas changes recover in this browser. Use Save now or Retry save in the toolbar; Discard local changes loads the saved version after confirmation.",
+    tip: "Select a card to edit its Details; the resize handle also accepts arrow keys. Unsaved changes recover in this browser. Save now retries saving; Discard local changes loads the saved version after confirmation.",
     anchors: [
       '[data-tour="canvas-controls"]',
       ".canvas-toolbar",
@@ -266,7 +266,7 @@ export const tourSteps: TourStep[] = [
     page: "collections",
     title: "Give your notes a structured view",
     body: "Collections shows the same notes as a table, list, gallery, or Kanban board. Filter, sort, and group them by their properties. Edit table values directly; Properties adds columns and calculations such as sums and averages.",
-    tip: "A project index, reading list, habit log, or research tracker can all use your existing notes.",
+    tip: "Enter or Tab saves an edited property; Escape cancels. A project index, reading list, habit log, or research tracker can all use your existing notes.",
     anchors: [
       '[data-tour="collection-layouts"]',
       ".base-view-tabs",
@@ -277,7 +277,7 @@ export const tourSteps: TourStep[] = [
     id: "daily",
     page: "daily",
     title: "Make a small plan for today",
-    body: "Daily planner opens a dated journal for your focus, activity log, discoveries, and reflection. Your daily notes stay searchable and connected to the rest of your Knowledge.",
+    body: "Daily planner opens a dated journal for your focus, activity log, discoveries, and reflection. Your daily notes stay searchable and connected to the rest of your notes.",
     tip: "The guide previews this page without creating a journal entry.",
     anchors: [
       '[data-tour="daily-planner"]',
@@ -340,7 +340,7 @@ export const tourSteps: TourStep[] = [
     page: "overview",
     title: "A familiar place to return",
     body: "The appearance button offers Light, Dark, Warp, Focus, and Soft. Warp is the original violet look; Focus mixes light surfaces with dark framing; Soft uses gentle pink and mauve pastels. The guide button beside it restarts this tour whenever you need a reminder. You are ready to make the workspace your own.",
-    tip: "Next steps: create a project, write an idea, then make your first task.",
+    tip: "Use arrow keys and Home/End to choose an appearance; Escape closes the menu and returns focus. Next steps: create a project, write an idea, then make your first task.",
     anchors: [
       '[data-tour="tour-button"]',
       '[data-tour="appearance"]',

@@ -1821,3 +1821,108 @@
     width: 100%;
   }
 }
+
+/* Canvas tools retain their labels and save state on smaller screens. */
+:root .canvas-feature .canvas-toolbar {
+  flex-wrap: wrap;
+}
+:root .canvas-feature .canvas-save-state {
+  display: flex;
+  gap: 6px;
+  min-height: var(--control-height, 40px);
+  font-size: var(--font-size-meta, 12px);
+  color: var(--text-secondary, var(--muted));
+}
+:root .canvas-feature .canvas-save-state button {
+  min-height: var(--control-height, 40px);
+  font-size: inherit;
+  color: var(--accent);
+}
+:root .canvas-feature .canvas-tool > span {
+  display: inline;
+}
+:root .canvas-feature .canvas-colors {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+:root .canvas-feature .canvas-colors button {
+  width: var(--control-height, 40px);
+  height: var(--control-height, 40px);
+  padding: 8px;
+  background-clip: content-box;
+  flex-shrink: 0;
+}
+:root .canvas-feature .canvas-resize {
+  width: 32px;
+  height: 32px;
+}
+:root .canvas-feature .canvas-resize:focus-visible,
+:root .canvas-feature .canvas-colors button:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 3px;
+}
+:root .canvas-feature .canvas-edge-target:focus-visible {
+  outline: none;
+}
+:root .canvas-feature .canvas-edge-target:focus-visible > path:nth-of-type(2) {
+  stroke: var(--focus-ring, var(--accent));
+  stroke-width: 4px;
+}
+:root .canvas-feature .visual-footer {
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  line-height: 1.6;
+}
+@media (max-width: 850px) {
+  :root .graph-layout .graph-inspector {
+    display: block;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    max-height: 360px;
+    overflow: auto;
+  }
+  :root .canvas-feature .canvas-toolbar-divider {
+    display: none;
+  }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  :root .canvas-feature .canvas-tool,
+  :root .canvas-feature .canvas-toolbar .btn-icon,
+  :root .canvas-feature .canvas-quick-add button,
+  :root .canvas-feature .visual-zoom button,
+  :root .canvas-feature .canvas-card-header button,
+  :root .canvas-feature .canvas-resize {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root .canvas-feature .canvas-card-header {
+    min-height: 48px;
+  }
+  :root .canvas-feature .canvas-selector {
+    flex: 1 1 170px;
+    max-width: none;
+  }
+  :root .canvas-feature .canvas-selector select {
+    width: 100%;
+    max-width: 100%;
+    min-height: 44px;
+  }
+  :root .canvas-feature .canvas-connect-notice {
+    top: 70px;
+    left: 50%;
+    max-width: calc(100% - 24px);
+  }
+  :root .canvas-feature .canvas-connect-notice button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root .canvas-feature .visual-surface-caption {
+    bottom: 68px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .visual-feature .visual-spin,
+  .visual-feature .visual-modal-overlay {
+    animation: none;
+  }
+}

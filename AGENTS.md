@@ -11,3 +11,9 @@
 ## Local operation
 
 Follow `LOCAL_ONLY.md`. Editing documentation or preparing Git commits does not authorize hosting, deployment, cloud synchronization, or pushing to a remote repository.
+
+## Interface quality
+
+- Follow [the interface standards](docs/UI_STANDARDS.md) for all UI and UX changes, including future features.
+- Reuse the app's shared design tokens and controls. Preserve all five themes and readable, keyboard-accessible desktop and mobile layouts.
+- Complete the responsive, keyboard, theme, affected-workflow, and documentation checks in that standard before treating an interface change as finished.

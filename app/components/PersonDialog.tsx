@@ -80,10 +80,11 @@ export default function PersonDialog({
     >
       <form
         ref={dialog}
-        className="small-dialog"
+        className="small-dialog entity-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-busy={editor.busy}
         onSubmit={(event) => void submit(event)}
       >
         <div className="dialog-heading">
@@ -118,7 +119,9 @@ export default function PersonDialog({
             />
           </label>
           <label className="form-label">
-            Role
+            <span>
+              Role <small className="editor-optional">(optional)</small>
+            </span>
             <input
               className="field"
               maxLength={300}
@@ -142,12 +145,13 @@ export default function PersonDialog({
           {person && (
             <button
               type="button"
-              className="btn-icon danger"
+              className="btn danger editor-delete"
               aria-label="Remove assignment label"
               disabled={editor.busy}
               onClick={() => void remove()}
             >
               <Trash2 size={16} />
+              <span>Remove</span>
             </button>
           )}
           <button

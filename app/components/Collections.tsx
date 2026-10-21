@@ -154,6 +154,7 @@ function PropertyCell({
 }) {
   const [draft, setDraft] = useState(value);
   const focused = useRef(false);
+  const cancelled = useRef(false);
   useEffect(() => {
     if (!focused.current) setDraft(value);
   }, [value]);
@@ -161,20 +162,23 @@ function PropertyCell({
     <input
       className={`base-property-input ${asNumber ? "numeric" : ""}`}
       aria-label={name}
+      title="Edit this property. Enter or Tab saves; Escape cancels."
       value={draft}
       placeholder="—"
       inputMode={asNumber ? "decimal" : "text"}
       onFocus={() => {
         focused.current = true;
+        cancelled.current = false;
       }}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => {
         focused.current = false;
-        if (draft !== value) onCommit(draft);
+        if (!cancelled.current && draft !== value) onCommit(draft);
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter") event.currentTarget.blur();
         if (event.key === "Escape") {
+          cancelled.current = true;
           setDraft(value);
           event.currentTarget.blur();
         }
@@ -196,6 +200,7 @@ export default function Collections({
     storedPreferences(storageKey),
   );
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const propertiesButton = useRef<HTMLButtonElement>(null);
   const [propertyName, setPropertyName] = useState("");
   const [dragging, setDragging] = useState("");
   const [dragColumn, setDragColumn] = useState("");
@@ -313,8 +318,8 @@ export default function Collections({
     prefs.columnsConfigured ? prefs.columns : properties.slice(0, 4)
   ).filter((key) => properties.includes(key));
   const tags = [...new Set(allNotes.flatMap((note) => note.tags))].sort();
-  const activeProject =
-    projectFilter && projectFilter !== "all" ? projectFilter : prefs.project;
+  const scopedToProject = !!projectFilter && projectFilter !== "all";
+  const activeProject = scopedToProject ? projectFilter : prefs.project;
   const projectName = (id: string) =>
     workspace.projects.find((project) => project.id === id)?.name ||
     "No project";
@@ -416,7 +421,7 @@ export default function Collections({
         : sum;
   const hasFilters = !!(
     prefs.query ||
-    prefs.project ||
+    (!scopedToProject && prefs.project) ||
     prefs.kind ||
     prefs.tag
   );
@@ -452,7 +457,12 @@ export default function Collections({
   };
 
   const table = (notes: Note[]) => (
-    <div className="base-table-scroll">
+    <div
+      className="base-table-scroll"
+      role="region"
+      aria-label="Collection notes table"
+      tabIndex={0}
+    >
       <table className="base-table">
         <thead>
           <tr>
@@ -613,22 +623,27 @@ export default function Collections({
     <div className="page bases-page">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">YOUR KNOWLEDGE, ANOTHER ANGLE</div>
+          <div className="eyebrow">NOTES & PROPERTIES</div>
           <h1>Collections</h1>
           <p>
-            Turn your worlds, characters, and ideas into something you can
-            organize.
+            Organize notes and their properties in tables, lists, galleries, or
+            boards.
           </p>
         </div>
         <div className="heading-actions">
-          <span className={`base-saving ${saveError ? "error" : ""}`}>
+          <span
+            className={`base-saving ${saveError ? "error" : ""}`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {saving ? (
               <>
                 <LoaderCircle size={12} className="base-spin" />
                 Saving…
               </>
             ) : saveError ? (
-              "Some changes failed"
+              "Property not saved · edit it to retry"
             ) : (
               <>
                 <Check size={12} />
@@ -637,7 +652,10 @@ export default function Collections({
             )}
           </span>
           <button
+            ref={propertiesButton}
             className={`btn ${optionsOpen ? "base-options-active" : ""}`}
+            aria-expanded={optionsOpen}
+            aria-controls="collection-properties"
             onClick={() => setOptionsOpen((value) => !value)}
           >
             <SlidersHorizontal size={14} />
@@ -649,14 +667,13 @@ export default function Collections({
       <div className="base-topline">
         <div
           className="base-view-tabs"
-          role="tablist"
+          role="group"
           aria-label="Collection layout"
         >
           {layouts.map(({ id, label: labelText, icon: Icon }) => (
             <button
               key={id}
-              role="tab"
-              aria-selected={prefs.layout === id}
+              aria-pressed={prefs.layout === id}
               className={prefs.layout === id ? "selected" : ""}
               onClick={() => update({ layout: id })}
             >
@@ -688,7 +705,12 @@ export default function Collections({
         <select
           aria-label="Filter collection by project"
           value={activeProject}
-          disabled={!!projectFilter && projectFilter !== "all"}
+          disabled={scopedToProject}
+          title={
+            scopedToProject
+              ? "Project scope is selected in navigation"
+              : undefined
+          }
           onChange={(event) => update({ project: event.target.value })}
         >
           <option value="">All projects</option>
@@ -732,10 +754,15 @@ export default function Collections({
             Clear filters
           </button>
         )}
-        <span className="base-result-count">
+        <span className="base-result-count" role="status" aria-live="polite">
           {filtered.length} {filtered.length === 1 ? "note" : "notes"}
         </span>
       </div>
+      {scopedToProject && (
+        <p className="base-scope-hint">
+          Project scope: {projectName(activeProject)}
+        </p>
+      )}
 
       <div className="base-arrange-bar">
         <label>
@@ -761,7 +788,8 @@ export default function Collections({
         <button
           className="base-sort-direction"
           title={prefs.descending ? "Descending order" : "Ascending order"}
-          aria-label="Reverse sort direction"
+          aria-label={prefs.descending ? "Sort ascending" : "Sort descending"}
+          aria-pressed={prefs.descending}
           onClick={() => update({ descending: !prefs.descending })}
         >
           {prefs.descending ? (
@@ -783,23 +811,35 @@ export default function Collections({
             </select>
           </label>
         ) : (
-          <span className="base-board-hint">
+          <span className="base-board-hint" id="collection-board-help">
             <GripVertical size={12} />
-            Drag cards or use a card’s status menu
+            Scroll across columns · Change status from each card’s menu
           </span>
         )}
         <span className="base-edit-hint">
           {prefs.layout === "table"
-            ? "Click a property to edit · Enter to save"
+            ? "Edit a property · Enter or Tab saves · Escape cancels"
             : ""}
         </span>
       </div>
 
       {optionsOpen && (
-        <section className="base-options panel">
+        <section
+          className="base-options panel"
+          id="collection-properties"
+          aria-labelledby="collection-properties-title"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.stopPropagation();
+            setOptionsOpen(false);
+            propertiesButton.current?.focus();
+          }}
+        >
           <div className="base-options-heading">
             <div>
-              <h3>Properties & calculations</h3>
+              <h3 id="collection-properties-title">
+                Properties & calculations
+              </h3>
               <p>
                 Properties live on each note. Add a column, then enter values in
                 the table.
@@ -808,7 +848,10 @@ export default function Collections({
             <button
               className="btn-icon"
               aria-label="Close collection properties"
-              onClick={() => setOptionsOpen(false)}
+              onClick={() => {
+                setOptionsOpen(false);
+                propertiesButton.current?.focus();
+              }}
             >
               <X size={15} />
             </button>
@@ -916,7 +959,13 @@ export default function Collections({
       <div className="base-content">
         {filtered.length ? (
           prefs.layout === "kanban" ? (
-            <div className="base-board">
+            <div
+              className="base-board"
+              role="region"
+              aria-label="Notes grouped by status"
+              aria-describedby="collection-board-help"
+              tabIndex={0}
+            >
               {statuses.map((column, index) => {
                 const notes = filtered.filter(
                   (note) => status(note) === column,
@@ -1000,7 +1049,9 @@ export default function Collections({
                         </article>
                       ))}
                       {!notes.length && (
-                        <div className="base-board-empty">Drop a note here</div>
+                        <div className="base-board-empty">
+                          No notes with this status
+                        </div>
                       )}
                     </div>
                   </section>
@@ -1041,8 +1092,18 @@ export default function Collections({
             <div>
               <Database size={29} />
             </div>
-            <h2>No notes in this collection</h2>
-            <p>Try changing your filters, or create a note in Knowledge.</p>
+            <h2>
+              {hasFilters
+                ? "No notes match your filters"
+                : "No notes in this collection"}
+            </h2>
+            <p>
+              {hasFilters
+                ? "Clear or change your filters to see more notes."
+                : scopedToProject
+                  ? "Create a note in Notes and assign it to this project."
+                  : "Create a note in Notes to start your collection."}
+            </p>
             {hasFilters && (
               <button
                 className="btn"
@@ -1081,6 +1142,8 @@ export default function Collections({
         </div>
         <button
           className="base-summary-calculation"
+          aria-expanded={optionsOpen}
+          aria-controls="collection-properties"
           onClick={() => setOptionsOpen(true)}
         >
           <Hash size={16} />
