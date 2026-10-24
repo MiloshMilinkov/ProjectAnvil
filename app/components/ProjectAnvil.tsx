@@ -46,6 +46,7 @@ import {
   Anvil,
   Trash2,
   RotateCcw,
+  ListChecks,
 } from "lucide-react";
 import {
   Workspace,
@@ -108,6 +109,11 @@ import {
 import "./task-scheduling.css";
 import SavedTaskViews from "./SavedTaskViews";
 import TrashDialog from "./TrashDialog";
+import ProjectHome from "./ProjectHome";
+import RemindersCenter from "./RemindersCenter";
+import TaskBulkDialog from "./TaskBulkDialog";
+import { projectProgress } from "../lib/planning-progress";
+import { instantiateTaskTemplate } from "../lib/personal-templates";
 
 type Page = TourPage;
 const nav = [
@@ -218,6 +224,7 @@ export default function ProjectAnvil() {
     [newTaskStatus, setNewTaskStatus] = useState<Status>("todo"),
     [newProject, setNewProject] = useState(false),
     [editingProject, setEditingProject] = useState<Project | null>(null),
+    [projectHomeId, setProjectHomeId] = useState(""),
     [personModal, setPersonModal] = useState<Person | "new" | null>(null),
     [palette, setPalette] = useState(false),
     [search, setSearch] = useState(""),
@@ -232,6 +239,9 @@ export default function ProjectAnvil() {
   const [undoPending, setUndoPending] = useState(false);
   const undoGuard = useRef(false);
   const toastSequence = useRef(0);
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [page, projectHomeId]);
   const [tourPending, setTourPending] = useState(
     () => !readBrowserPreference("projectanvil-tour-v1"),
   );
@@ -355,11 +365,25 @@ export default function ProjectAnvil() {
       [beforeNavigation],
     );
   const captureRoomContext = rooms.captureRoomContext;
+  const openProjectHome = useCallback(
+    (id: string) => {
+      void (async () => {
+        if (!(await beforeNavigation())) return;
+        setProjectHomeId(id);
+        setProjectFilter(id);
+        setPage("projects");
+        setMobile(false);
+        setSearch("");
+      })();
+    },
+    [beforeNavigation],
+  );
   const go = useCallback(
     (nextPage: Page) => {
       void (async () => {
         if (nextPage !== page && !(await beforeNavigation())) return;
         if (nextPage === "rooms") captureRoomContext();
+        if (nextPage === "projects") setProjectHomeId("");
         setPage(nextPage);
         setMobile(false);
         setSearch("");
@@ -678,6 +702,11 @@ export default function ProjectAnvil() {
             </strong>
           </div>
           <div className="topbar-actions">
+            <RemindersCenter
+              workspace={w}
+              currentPerson={currentPerson}
+              openTask={openTask}
+            />
             <div data-tour="appearance">
               <AppearanceMenu />
             </div>
@@ -799,8 +828,8 @@ export default function ProjectAnvil() {
         {recoveryCount > 0 && (
           <div className="error-banner" role="status">
             {recoveryCount}{" "}
-            {recoveryCount === 1 ? "draft copy was" : "draft copies were"} kept
-            from another window.
+            {recoveryCount === 1 ? "recovery copy is" : "recovery copies are"}{" "}
+            available for review.
             <button onClick={() => setReviewPending(true)}>
               Review recovery copies
             </button>
@@ -818,10 +847,7 @@ export default function ProjectAnvil() {
                 setNewTask(true);
                 setSelectedTask(null);
               }}
-              onProject={(p) => {
-                setProjectFilter(p);
-                go("tasks");
-              }}
+              onProject={openProjectHome}
               onResumeRoom={rooms.resumeRoom}
             />
           )}
@@ -846,54 +872,92 @@ export default function ProjectAnvil() {
               setProjectFilter={setProjectFilter}
             />
           )}
-          {page === "projects" && (
-            <div className="page">
-              <PageHeader
-                eyebrow="THE BIG PICTURE"
-                title="Projects"
-                description="Organize goals, tasks, and notes around a shared outcome."
-                action={
+          {page === "projects" &&
+          projectHomeId &&
+          w.projects.some((project) => project.id === projectHomeId) ? (
+            <ProjectHome
+              key={projectHomeId}
+              {...featureProps}
+              projectId={projectHomeId}
+              onBack={() => {
+                setProjectHomeId("");
+                setProjectFilter("");
+              }}
+              onEdit={() => {
+                setEditingProject(
+                  w.projects.find((project) => project.id === projectHomeId) ||
+                    null,
+                );
+                setNewProject(true);
+              }}
+              onCreateTask={(projectId, milestoneId) => {
+                const seed = instantiateTaskTemplate(
+                  {
+                    title: "",
+                    description: "",
+                    type: "task",
+                    priority: "medium",
+                    estimate: 0,
+                    tags: [],
+                    subtasks: [],
+                  },
+                  { projectId, assigneeId: currentPerson },
+                );
+                seed.milestoneId = milestoneId || "";
+                setTaskSeed(seed);
+                setSelectedTask(null);
+                setNewTaskStatus("todo");
+                setNewTask(true);
+              }}
+              onOpenCanvas={(id) => void rooms.openRoomCanvas(id)}
+            />
+          ) : (
+            page === "projects" && (
+              <div className="page">
+                <PageHeader
+                  eyebrow="THE BIG PICTURE"
+                  title="Projects"
+                  description="Organize goals, tasks, and notes around a shared outcome."
+                  action={
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setEditingProject(null);
+                        setNewProject(true);
+                      }}
+                    >
+                      <Plus size={16} />
+                      New project
+                    </button>
+                  }
+                />
+                <div className="projects-grid">
+                  {w.projects.map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={p}
+                      workspace={w}
+                      onOpen={() => openProjectHome(p.id)}
+                      onEdit={() => {
+                        setEditingProject(p);
+                        setNewProject(true);
+                      }}
+                    />
+                  ))}
                   <button
-                    className="btn btn-primary"
+                    className="project-add"
                     onClick={() => {
                       setEditingProject(null);
                       setNewProject(true);
                     }}
                   >
-                    <Plus size={16} />
-                    New project
+                    <Plus size={25} />
+                    <strong>Start something new</strong>
+                    <span>Create a project for your next idea</span>
                   </button>
-                }
-              />
-              <div className="projects-grid">
-                {w.projects.map((p) => (
-                  <ProjectCard
-                    key={p.id}
-                    project={p}
-                    workspace={w}
-                    onOpen={() => {
-                      setProjectFilter(p.id);
-                      go("tasks");
-                    }}
-                    onEdit={() => {
-                      setEditingProject(p);
-                      setNewProject(true);
-                    }}
-                  />
-                ))}
-                <button
-                  className="project-add"
-                  onClick={() => {
-                    setEditingProject(null);
-                    setNewProject(true);
-                  }}
-                >
-                  <Plus size={25} />
-                  <strong>Start something new</strong>
-                  <span>Create a project for your next idea</span>
-                </button>
+                </div>
               </div>
-            </div>
+            )
           )}
           {(page === "notes" || page === "daily") && (
             <Knowledge
@@ -960,6 +1024,7 @@ export default function ProjectAnvil() {
             setTaskSeed(undefined);
           }}
           openNote={openNote}
+          openTask={openTask}
           notify={notify}
         />
       )}
@@ -1262,8 +1327,11 @@ function Overview(
       onCreate,
       onProject,
     } = props,
+    parentIds = new Set(w.tasks.map((task) => task.parentId).filter(Boolean)),
     tasks = w.tasks.filter(
-      (t) => !props.projectFilter || t.projectId === props.projectFilter,
+      (t) =>
+        (!props.projectFilter || t.projectId === props.projectFilter) &&
+        !parentIds.has(t.id),
     ),
     active = tasks.filter((t) => t.status !== "done"),
     mine = active.filter((t) => t.assigneeId === currentPerson),
@@ -1372,9 +1440,9 @@ function Overview(
           </div>
           <div className="project-summaries">
             {projects.map((p) => {
-              const pt = tasks.filter((t) => t.projectId === p.id),
-                pd = pt.filter((t) => t.status === "done").length,
-                percent = pt.length ? Math.round((pd / pt.length) * 100) : 0;
+              const progress = projectProgress(w, p.id),
+                pd = progress.completed,
+                percent = progress.percent;
               return (
                 <button
                   className="project-summary"
@@ -1395,7 +1463,7 @@ function Overview(
                     <p>{p.goal || p.description}</p>
                     <div className="progress-label">
                       <span>
-                        {pd} of {pt.length} tasks complete
+                        {pd} of {progress.total} tasks complete
                       </span>
                       <strong>{percent}%</strong>
                     </div>
@@ -1609,6 +1677,7 @@ function TaskView(
   const referenceDate = useCalendarToday();
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sort, setSort] = useState<TaskSort>("priority");
+  const [bulkTasks, setBulkTasks] = useState<Task[] | null>(null);
   const [chosenView, setView] = useState<TaskLayout | null>(null),
     [query, setQuery] = useState(""),
     [assignee, setAssignee] = useState(""),
@@ -1685,6 +1754,15 @@ function TaskView(
         }
       />
       <div className="task-view-toolbar">
+        <button
+          className="btn btn-secondary"
+          data-tour="bulk-edit"
+          disabled={!tasks.length}
+          onClick={() => setBulkTasks(structuredClone(tasks))}
+        >
+          <ListChecks size={16} />
+          Bulk edit
+        </button>
         <div
           className="view-tabs"
           role="group"
@@ -2031,6 +2109,16 @@ function TaskView(
           openTask={openTask}
         />
       )}
+      {bulkTasks && (
+        <TaskBulkDialog
+          tasks={bulkTasks}
+          workspace={w}
+          mutate={mutate}
+          notify={notify}
+          onClose={() => setBulkTasks(null)}
+          openTask={openTask}
+        />
+      )}
     </div>
   );
 }
@@ -2046,8 +2134,9 @@ function ProjectCard({
   onEdit: () => void;
 }) {
   const tasks = w.tasks.filter((t) => t.projectId === p.id),
-    done = tasks.filter((t) => t.status === "done").length,
-    percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+    progress = projectProgress(w, p.id),
+    done = progress.completed,
+    percent = progress.percent;
   return (
     <article className="panel project-card">
       <div className="project-card-top">
@@ -2073,7 +2162,7 @@ function ProjectCard({
       </div>
       <div className="progress-label">
         <span>
-          {done}/{tasks.length} tasks complete
+          {done}/{progress.total} tasks complete
         </span>
         <strong>{percent}%</strong>
       </div>

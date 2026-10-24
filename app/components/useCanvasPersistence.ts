@@ -39,6 +39,7 @@ function sameCanvas(left: Canvas, right: Canvas): boolean {
   return (
     left.id === right.id &&
     left.title === right.title &&
+    (left.projectId || "") === (right.projectId || "") &&
     left.cards.length === right.cards.length &&
     left.edges.length === right.edges.length &&
     left.cards.every((card, index) =>
@@ -56,6 +57,7 @@ function isCanvas(value: unknown): value is Canvas {
   return (
     typeof canvas.id === "string" &&
     typeof canvas.title === "string" &&
+    (canvas.projectId === undefined || typeof canvas.projectId === "string") &&
     Array.isArray(canvas.cards) &&
     canvas.cards.length <= 500 &&
     canvas.cards.every(

@@ -17,7 +17,7 @@ interface Props {
 function isProject(value: unknown): value is Project {
   if (!value || typeof value !== "object") return false;
   const project = value as Partial<Project>;
-  return [
+  const fieldsValid = [
     "id",
     "name",
     "key",
@@ -27,6 +27,21 @@ function isProject(value: unknown): value is Project {
     "status",
     "targetDate",
   ].every((key) => typeof project[key as keyof Project] === "string");
+  return (
+    fieldsValid &&
+    (project.milestones === undefined ||
+      (Array.isArray(project.milestones) &&
+        project.milestones.length <= 100 &&
+        project.milestones.every(
+          (item) =>
+            item &&
+            typeof item.id === "string" &&
+            typeof item.title === "string" &&
+            typeof item.description === "string" &&
+            typeof item.targetDate === "string" &&
+            typeof item.archived === "boolean",
+        )))
+  );
 }
 
 export default function ProjectDialog({
@@ -50,6 +65,7 @@ export default function ProjectDialog({
       color: "#a192fc",
       status: "Planning",
       targetDate: "",
+      milestones: [],
     }),
   });
   const dialog = useRef<HTMLFormElement>(null);
@@ -82,7 +98,7 @@ export default function ProjectDialog({
   async function remove() {
     if (
       !window.confirm(
-        "Move this project to Trash? Move its notes and tasks first.",
+        "Move this project to Trash? Move its notes, tasks, and canvases first.",
       )
     )
       return;

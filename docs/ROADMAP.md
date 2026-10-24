@@ -2,7 +2,7 @@
 
 All phases follow the [interface standard](UI_STANDARDS.md): readable and accessible on desktop and mobile, all five themes, recoverable changes, clear errors, and current README/tour documentation. Later phases are plans, not implemented promises. The app remains [local only](../LOCAL_ONLY.md).
 
-**Current milestone: Phase 1 implemented.** The remaining phases are future work.
+**Current milestone: Phases 1 and 2 implemented.** Phases 3–5 are future work.
 
 | Phase | Scope | Short test plan |
 | --- | --- | --- |

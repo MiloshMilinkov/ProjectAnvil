@@ -47,6 +47,12 @@ import {
   taskTemplateContent,
 } from "../lib/personal-templates";
 import { moveToTrash } from "../lib/trash-actions";
+import {
+  TaskHierarchyFields,
+  TaskScheduleOptions,
+  taskScheduleError,
+} from "./TaskPlanningFields";
+import { taskChildrenProgress } from "../lib/planning-progress";
 export default function TaskDialog({
   workspace: w,
   task,
@@ -58,6 +64,7 @@ export default function TaskDialog({
   mutate,
   onClose,
   openNote,
+  openTask,
   notify,
 }: {
   workspace: Workspace;
@@ -70,6 +77,7 @@ export default function TaskDialog({
   mutate: FeatureProps["mutate"];
   onClose: () => void;
   openNote: (id: string) => void;
+  openTask?: (id: string) => void;
   notify: FeatureProps["notify"];
 }) {
   const scope = useDraftScope();
@@ -103,6 +111,10 @@ export default function TaskDialog({
           assigneeId: w.people.some((p) => p.id === personId) ? personId : "",
           startDate: "",
           dueDate: "",
+          parentId: "",
+          milestoneId: "",
+          recurrence: null,
+          reminder: null,
           estimate: 0,
           tags: [],
           noteIds: [],
@@ -132,6 +144,7 @@ export default function TaskDialog({
   const [copyPending, setCopyPending] = useState(
     !!initialTask && !!initialRecovery,
   );
+  const seedIsCopy = !!initialTask?.title.trim();
   const busy = useRef(false),
     dirty = useRef(!!initialRecovery || !!initialTask),
     dialogRef = useRef<HTMLElement>(null);
@@ -298,6 +311,20 @@ export default function TaskDialog({
       return false;
     }
     const { startDate, dueDate } = latestForm.current.task;
+    const planningError = taskScheduleError(latestForm.current.task);
+    const children = taskChildrenProgress(w, latestForm.current.task.id);
+    if (
+      planningError ||
+      (latestForm.current.task.status === "done" &&
+        children.completed < children.total)
+    ) {
+      setTab("details");
+      setError(
+        planningError ||
+          "Finish the child tasks before completing this parent.",
+      );
+      return false;
+    }
     if (startDate && dueDate && startDate > dueDate) {
       setTab("details");
       setError("Planned start date must be on or before the due date.");
@@ -331,13 +358,28 @@ export default function TaskDialog({
             ...Object.fromEntries(
               Object.entries(cleaned).filter(
                 ([key, value]) =>
-                  !["id", "key", "createdAt", "updatedAt"].includes(key) &&
+                  ![
+                    "id",
+                    "key",
+                    "createdAt",
+                    "updatedAt",
+                    "recurrenceNextId",
+                    "recurringFromId",
+                  ].includes(key) &&
                   JSON.stringify(value) !==
                     JSON.stringify(original[key as keyof Task]),
               ),
             ),
           }
-        : { ...cleaned, key: "" };
+        : {
+            ...Object.fromEntries(
+              Object.entries(cleaned).filter(
+                ([key]) =>
+                  !["recurrenceNextId", "recurringFromId"].includes(key),
+              ),
+            ),
+            key: "",
+          };
       const saved = await mutate({
         action: "upsert",
         entity: "tasks",
@@ -479,6 +521,11 @@ export default function TaskDialog({
       openNote(id);
     }
   }
+  async function openRelatedTask(id: string) {
+    if (!openTask || (dirty.current && !(await save(false)))) return;
+    onClose();
+    openTask(id);
+  }
   const blocked = draft.blockedBy.filter(
     (id) => w.tasks.find((t) => t.id === id)?.status !== "done",
   );
@@ -553,22 +600,23 @@ export default function TaskDialog({
               role="status"
             >
               <span>
-                An unfinished new task was recovered. Your requested copy is
-                ready if you prefer to start with it.
+                An unfinished new task was recovered. Your requested{" "}
+                {seedIsCopy ? "copy" : "new task"} is ready if you prefer to
+                start with it.
               </span>
               <button
                 className="btn"
                 onClick={() => {
                   if (
                     !window.confirm(
-                      "Replace the recovered new-task draft with this copy?",
+                      `Replace the recovered new-task draft with this ${seedIsCopy ? "copy" : "new task"}?`,
                     )
                   )
                     return;
                   replaceUnfinishedTask(freshForm);
                 }}
               >
-                Use copy instead
+                {seedIsCopy ? "Use copy instead" : "Use new task instead"}
               </button>
               <button className="btn" onClick={() => setCopyPending(false)}>
                 Keep recovered task
@@ -671,7 +719,16 @@ export default function TaskDialog({
                 Project
                 <select
                   value={draft.projectId}
-                  onChange={(e) => set("projectId", e.target.value)}
+                  onChange={(e) =>
+                    change({
+                      task: {
+                        ...latestForm.current.task,
+                        projectId: e.target.value,
+                        parentId: "",
+                        milestoneId: "",
+                      },
+                    })
+                  }
                 >
                   <option value="">No project</option>
                   {w.projects.map((p) => (
@@ -682,6 +739,16 @@ export default function TaskDialog({
                 </select>
               </label>
             </div>
+            <TaskHierarchyFields
+              task={draft}
+              workspace={w}
+              onChange={(patch) =>
+                change({ task: { ...latestForm.current.task, ...patch } })
+              }
+              onOpenTask={
+                openTask ? (id) => void openRelatedTask(id) : undefined
+              }
+            />
             {blocked.length > 0 && (
               <div className="warning-box">
                 <Link2 size={15} />
@@ -844,6 +911,16 @@ export default function TaskDialog({
                       />
                     </label>
                   </div>
+                  <TaskScheduleOptions
+                    task={draft}
+                    workspace={w}
+                    onChange={(patch) =>
+                      change({ task: { ...latestForm.current.task, ...patch } })
+                    }
+                    onOpenTask={
+                      openTask ? (id) => void openRelatedTask(id) : undefined
+                    }
+                  />
                 </section>
                 <div className="field-heading">
                   <label htmlFor={`${fieldId}-subtask`}>

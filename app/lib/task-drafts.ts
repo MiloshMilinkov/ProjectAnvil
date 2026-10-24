@@ -62,6 +62,25 @@ function isTask(value: unknown): value is Task {
     stringArray(task.tags, 40) &&
     stringArray(task.noteIds, 500) &&
     stringArray(task.blockedBy, 500) &&
+    (task.parentId === undefined || typeof task.parentId === "string") &&
+    (task.milestoneId === undefined || typeof task.milestoneId === "string") &&
+    (task.recurrenceNextId === undefined ||
+      typeof task.recurrenceNextId === "string") &&
+    (task.recurringFromId === undefined ||
+      typeof task.recurringFromId === "string") &&
+    (task.recurrence == null ||
+      (typeof task.recurrence === "object" &&
+        ["daily", "weekly", "monthly"].includes(task.recurrence.frequency) &&
+        Number.isFinite(task.recurrence.interval) &&
+        typeof task.recurrence.anchorDate === "string" &&
+        typeof task.recurrence.timeZone === "string" &&
+        (task.recurrence.untilDate === undefined ||
+          typeof task.recurrence.untilDate === "string"))) &&
+    (task.reminder == null ||
+      (typeof task.reminder === "object" &&
+        typeof task.reminder.date === "string" &&
+        typeof task.reminder.time === "string" &&
+        typeof task.reminder.timeZone === "string")) &&
     Array.isArray(task.subtasks) &&
     task.subtasks.length <= 200 &&
     task.subtasks.every(
@@ -91,11 +110,15 @@ function isTask(value: unknown): value is Task {
 /** Preserve old recovery copies while supplying their newly introduced field. */
 export function parseRecoverableTask(value: unknown): Task | null {
   const normalized =
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    !("startDate" in value)
-      ? { ...value, startDate: "" }
+    value && typeof value === "object" && !Array.isArray(value)
+      ? {
+          startDate: "",
+          parentId: "",
+          milestoneId: "",
+          recurrence: null,
+          reminder: null,
+          ...value,
+        }
       : value;
   return isTask(normalized) ? normalized : null;
 }

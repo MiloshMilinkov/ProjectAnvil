@@ -97,9 +97,27 @@ Restore checks current workspace access, preserves note history, and reconnects 
 
 Projects must have their tasks and notes moved elsewhere before they can be moved to Trash. Existing deletes from before this feature have no Trash copy. Repeated deletion/restore requests are safe to retry; an older Undo cannot replace a later deletion. Trash belongs to the workspace and its current accepted members. Personal templates recover separately in their **Deleted** tab.
 
+## Project planning, recurring tasks, and reminders
+
+Open a project's title to see its home, with tasks, notes, milestones, and attached canvases. A canvas belongs to at most one project; attaching it elsewhere changes that association while preserving its cards and connections. Moving notes/tasks between projects is still done through their editors.
+
+Project and milestone progress count tasks without child tasks. Parents summarize their descendants instead of being counted again. A child inherits its nearest parent's milestone unless given its own. Parents and children must share a project, and parent/dependency links are checked together for cycles. Complete children before their parent; reopen a completed parent before reopening a child.
+
+Milestones can be edited, archived, and restored from **Archived** in the project home. Archived milestones keep existing assignments and recurring-series context; they are hidden from new manual assignments. Archiving does not stop a recurring schedule. Milestone forms keep browser drafts and guarded saves; discarding one form cancels only that form's queued writes.
+
+**Bulk edit** starts from the current task view. Select up to 100 tasks and choose the fields to change. Moving projects detaches the moved task's parent and milestone. Selected children finish/move before parents; reopening processes parents first. Each task is checked and saved independently. Successful tasks stay saved if another fails. Network or access errors stop the batch; use **Retry remaining** or open a failed task for review. **Stop after current task** waits for its current request to finish. Closing preserves choices and pending saves. Applying new choices explicitly replaces this batch's abandoned failed intents while keeping their recovery copies.
+
+**Recurring tasks** use daily, weekly, or monthly calendar rules, an interval of 1–365, an anchor date, an IANA time zone, and an optional end date. Completing an occurrence creates its successor in the same guarded transaction, with fresh IDs, reset checklist/progress/discussion, preserved valid context, and shifted dates. Missed dates are skipped to the first occurrence strictly after both today in the selected zone and the completed occurrence's date. Monthly rules retain the original day, clamping shorter months (January 31 → February 28 → March 31). Planned start/due offsets are preserved.
+
+Tasks with children cannot repeat. A completed occurrence keeps its successor link, so reopening/completing it again does not create another successor. Stop or change a routine on its current open occurrence. If the successor was moved to Trash, restore it there. Account removal clears an unavailable assignee on the next occurrence. Capacity or invalid-date failures leave both the original completion and the successor unchanged, with an error to review.
+
+**Reminders** store a date, local clock time, and IANA time zone on the task. The bell includes tasks assigned to the current person and unassigned work in the active workspace. Completed tasks are excluded. It checks about every 30 seconds and on return to the app; missed reminders are shown on the next open. Due reminders can be snoozed for an hour or dismissed; use **Dismissed** to restore them. These choices are specific to this browser, account, and workspace, and are excluded from complete data backups. Task reminder schedules are included in workspace exports and complete backups.
+
+A local time skipped by a daylight-saving change is rejected so you can choose a valid time; a repeated clock time uses its earlier occurrence once. If a recurring successor's reminder would land in a skipped clock period, completion is rolled back with a message to adjust the reminder before retrying. Calendar recurrence and hour-long snoozes use their respective calendar and elapsed-time rules across clock changes. Browser/server time-zone data and the computer's clock determine timing. Email, operating-system alarms, and background delivery while the app is closed are not configured.
+
 ## Drafts, conflicts, and save recovery
 
-- Notes and canvases keep recovery drafts as you edit. Task, project, assignment-label, linked-task, and room forms keep their own unfinished drafts. Recovery is scoped to the account and workspace in this browser.
+- Notes and canvases keep recovery drafts as you edit. Task, project, milestone, bulk-edit, assignment-label, linked-task, and room forms keep their own unfinished drafts. Recovery is scoped to the account and workspace in this browser.
 - Close an unfinished form with **Keep draft** to return later, or explicitly discard it. A browser-storage failure is shown and blocks unsafe in-app navigation; keep the page open until saved or copy/download your text.
 - **Saved**, **Saving**, and **Unsaved changes** describe the actual save state. A successful refresh does not dismiss a failed save. Use **Retry saves** for interrupted requests, or **Review unsaved changes** to download recovery data and discard individual pending saves.
 - When another window replaces a browser draft, its displaced copy is kept separately. Use **Review recovery copies** to inspect, download, and manually merge useful text before discarding the copy.
@@ -119,6 +137,8 @@ Drafts are device/browser recovery copies, not confirmed database saves. Save or
 | Note history | Archived separately from active records; normal edits capture versions at least 30 seconds apart, with explicit restores and deletions also preserving replaced content |
 | Linked task source quote | 8,000 characters |
 | Work rooms | 30 per account/workspace; up to 20 pinned notes per room |
+| Project milestones | 100 per project, including archived milestones |
+| Bulk editing | Up to 100 tasks per batch; failures are reported per task |
 | Personal templates | 200 entries including deleted templates, 2 MB per account library, 120 KB per template |
 | Workspace Trash | Stored separately from the active workspace allowance; retained without automatic expiry |
 

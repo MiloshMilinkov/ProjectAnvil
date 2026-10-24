@@ -1,6 +1,7 @@
 import { database } from "./access-store";
 import { validateWorkspace, WorkspaceError } from "./workspace-model";
 import { normalizeSourceExcerpt } from "./source-excerpts";
+import { canRestoreTaskLinks } from "./planning-model";
 import type {
   Canvas,
   Entity,
@@ -376,6 +377,35 @@ export async function prepareTrashRestore(
       task.startDate ??= "";
       reference(item, "projectId", "projects");
       reference(item, "assigneeId", "people", true);
+      task.parentId ??= "";
+      task.milestoneId ??= "";
+      task.recurrence ??= null;
+      task.reminder ??= null;
+      if (task.parentId) {
+        const parent = next.tasks.find((value) => value.id === task.parentId);
+        if (
+          !parent ||
+          parent.projectId !== task.projectId ||
+          parent.recurrence ||
+          (parent.status === "done" && task.status !== "done")
+        ) {
+          task.parentId = "";
+          warn(
+            "The original parent link could not be restored because the parent is unavailable or its plan changed.",
+          );
+        }
+      }
+      if (
+        task.milestoneId &&
+        !next.projects
+          .find((project) => project.id === task.projectId)
+          ?.milestones?.some((milestone) => milestone.id === task.milestoneId)
+      ) {
+        task.milestoneId = "";
+        warn(
+          "The original milestone is unavailable; the task was restored without that assignment.",
+        );
+      }
       task.noteIds = task.noteIds.filter((value) => {
         const valid = exists("notes", value);
         if (!valid) {
@@ -446,6 +476,7 @@ export async function prepareTrashRestore(
       item.updatedAt = new Date().toISOString();
     }
     if (result.entity === "projects") {
+      item.milestones ??= [];
       const key = String(item.key);
       let number = 1;
       while (
@@ -470,6 +501,7 @@ export async function prepareTrashRestore(
       item.layout ??= "board";
     }
     if (result.entity === "canvases") {
+      reference(item, "projectId", "projects");
       cleanCanvas(item as unknown as Canvas);
     }
     return result;
@@ -709,7 +741,12 @@ export async function prepareTrashRestore(
                   ?.blockedBy.some(reachesTask) || false
               );
             };
-            if (reachesTask(value)) {
+            if (
+              reachesTask(value) ||
+              !canRestoreTaskLinks(next, item as unknown as Task, {
+                blockedBy: [...(item.blockedBy as string[]), value],
+              })
+            ) {
               warn(
                 "Some blocking links could not be restored because newer dependencies would create a cycle.",
               );
@@ -753,6 +790,24 @@ export async function prepareTrashRestore(
         ) {
           warn(
             "The original note source could not be restored because it is missing or already has a linked task.",
+          );
+        } else {
+          attempt(field, before);
+        }
+      } else if (change.entity === "tasks" && field === "parentId" && before) {
+        const parent = next.tasks.find((task) => task.id === before);
+        if (!same(item[field], after)) {
+          warn(
+            "Some parent links were left unchanged because they changed after deletion.",
+          );
+        } else if (
+          !parent ||
+          !canRestoreTaskLinks(next, item as unknown as Task, {
+            parentId: String(before),
+          })
+        ) {
+          warn(
+            "Some parent links could not be restored because newer planning changes would make them invalid.",
           );
         } else {
           attempt(field, before);

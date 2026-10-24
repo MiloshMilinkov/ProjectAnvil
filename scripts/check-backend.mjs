@@ -15,6 +15,14 @@ const files = [
   "app/lib/types.ts",
   "app/lib/task-scheduling.ts",
   "app/lib/task-drafts.ts",
+  "app/lib/planning-model.ts",
+  "app/lib/planning-progress.ts",
+  "app/lib/recurrence.ts",
+  "app/lib/reminder-time.ts",
+  "app/lib/reminder-state.ts",
+  "app/lib/bulk-tasks.ts",
+  "app/lib/bulk-drafts.ts",
+  "app/lib/milestone-drafts.ts",
   "app/lib/task-copy.ts",
   "app/lib/trash-actions.ts",
   "app/lib/saved-view-config.ts",
@@ -97,10 +105,14 @@ try {
   );
   for (const name of [
     "phase1-trash.cjs",
+    "phase2-planning.cjs",
     "personal-templates.cjs",
     "task-copy.cjs",
     "saved-views.cjs",
     "note-templates.cjs",
+    "recurrence.cjs",
+    "milestone-drafts.cjs",
+    "planning-actions.cjs",
   ]) {
     fs.copyFileSync(path.join(root, "tests", name), path.join(output, name));
   }
@@ -122,6 +134,10 @@ try {
     { file: "task-copy.cjs" },
     { file: "saved-views.cjs" },
     { file: "note-templates.cjs" },
+    { file: "recurrence.cjs", timezone: "Europe/Belgrade" },
+    { file: "recurrence.cjs", timezone: "America/New_York" },
+    { file: "milestone-drafts.cjs" },
+    { file: "planning-actions.cjs" },
     { file: "task-scheduling.cjs", timezone: "Europe/Belgrade" },
     { file: "task-scheduling.cjs", timezone: "America/New_York" },
   ]) {

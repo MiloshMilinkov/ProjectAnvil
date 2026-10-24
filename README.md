@@ -28,7 +28,9 @@
 
 | Area | What you can do |
 | --- | --- |
-| **Projects & tasks** | Set project goals and target dates; create tasks, stories, bugs, and epics with assignees, priorities, statuses, optional planned start and due dates, effort estimates, tags, subtasks, dependencies, and discussions. Duplicate a task into an editable copy with a fresh key and checklist; completion, assignments, dates, and discussion reset. Date ranges are checked before saving. |
+| **Projects & tasks** | Open a project home combining its goal, progress, tasks, notes, and canvases. Plan multiple milestones, archive or restore them, and group tasks under parents. Progress counts tasks without children once. Tasks, stories, bugs, and epics include assignees, priority, dates, effort, tags, checklists, dependencies, and discussions. Duplicate tasks into fresh editable copies with reset progress and schedules. |
+| **Bulk editing** | Select up to 100 tasks from the current view and update status, priority, assignee, project, milestone, or dates. Keep untouched fields, see individual saved/failed results, stop after the current save, and retry remaining work. Interrupted choices and pending writes stay recoverable. |
+| **Recurring tasks & reminders** | Repeat tasks daily, weekly, or monthly with intervals, time zones, and optional end dates. Completing an occurrence creates the next one once, skipping missed dates and preserving month-end anchors. Set dated, zoned in-app reminders; review due/upcoming items, snooze, dismiss, or restore them. Reminders are checked while the app is open and on return. |
 | **Dashboards & planning views** | See progress, upcoming work, and recent notes in Overview. Switch between boards, lists, and timelines; filter by project, person, priority, status, or dates, and sort by priority, due date, planned start, or recent changes. Save filters, sorting, and layout together; rename or update saved views when plans change. Timeline shows real date ranges or single-date markers with a movable 28-day window. Phones start with readable task cards in List. |
 | **Markdown notes** | Write with headings, checklists, tables, quotes, highlights, footnotes, and formatted code. Preview mathematical equations and Mermaid diagrams. |
 | **Connected knowledge** | Link notes, headings, and blocks with `[[links]]`; embed their content and follow backlinks. Organize with folders, tags, bookmarks, projects, and custom properties. |
@@ -40,7 +42,7 @@
 | **Recovery & reliable saves** | Move deleted records to workspace Trash, use Undo, or restore later with available links. Newer edits are preserved and skipped connections are reported. Recover browser drafts, retry failed saves, and review conflicts; check workspace storage and missing attachments. |
 | **Personal & team workspaces** | Work as a guest, register an account, or join a team. Keep personal work private and share a team's projects, tasks, notes, canvases, and attachments with accepted members. |
 | **Workspace tools** | Search across tasks, notes, and projects. Write beside a preview, extract or combine notes, present basic slides, open notes in another window, and use focus mode. |
-| **Appearance & onboarding** | Choose Light, Dark, Warp, Focus, or Soft. Readable typography, consistent controls, visible keyboard focus, and touch-friendly layouts support desktop and mobile work. Adjust spacing, save a startup view, customize the new-task shortcut, and replay the 31-step guided tour. |
+| **Appearance & onboarding** | Choose Light, Dark, Warp, Focus, or Soft. Readable typography, consistent controls, visible keyboard focus, and touch-friendly layouts support desktop and mobile work. Adjust spacing, save a startup view, customize the new-task shortcut, and replay the 37-step guided tour. |
 | **Portable records & backups** | Export and import workspace JSON. Create and verify complete local backups of accounts, attachments, archived history, personal work rooms, and review state; restore with a rollback copy. |
 
 ## Templates
@@ -81,6 +83,7 @@ For storage, backup, restore, and troubleshooting, see the [local setup guide](d
 - Sharing is managed per workspace; separate project permissions and transfers between workspaces are not available yet.
 - Open tabs refresh about every ten seconds. Interrupted edits have browser recovery copies and manual save retries; simultaneous text coediting, background cloud sync, and automatic Markdown-folder sync are not implemented.
 - Google sign-in, verification emails, password-reset emails, and invitation emails are not configured.
+- Reminders are in-app. Delivery needs the app open; snoozes and dismissals are browser preferences. Recurrence advances on completion rather than creating a backlog while the app is closed. See [planning behavior](docs/LOCAL_SETUP.md#project-planning-recurring-tasks-and-reminders) for time-zone and recovery details.
 - Workspace JSON excludes Trash, personal templates, archived note history, personal rooms, uploaded files, and accounts. Complete backups preserve confirmed local data; unsaved browser drafts must be saved or downloaded separately. Importing resets relationship review markers and invalidates older Trash restores. Trash has no automatic expiry. See [backup options and storage limits](docs/LOCAL_SETUP.md#data-and-backups).
 
 ## Development

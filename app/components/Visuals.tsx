@@ -49,6 +49,7 @@ import GraphRelationships from "./GraphRelationships";
 import { useCanvasPersistence } from "./useCanvasPersistence";
 import { useDialog } from "./useDialog";
 import "./visuals.css";
+import "./project-planning.css";
 
 type Point = { x: number; y: number };
 type Camera = Point & { scale: number };
@@ -1048,9 +1049,10 @@ const isHttp = (value: string) => {
     return false;
   }
 };
-const blankCanvas = (): Canvas => ({
+const blankCanvas = (projectId = ""): Canvas => ({
   id: uid(),
   title: "Untitled canvas",
+  projectId,
   cards: [],
   edges: [],
 });
@@ -1257,7 +1259,11 @@ export function CanvasView(props: CanvasViewProps) {
     return () => cancelAnimationFrame(frame);
   }, [resumeContext, workspace.canvases, switchCanvas]);
   const createCanvas = () => {
-    const next = blankCanvas();
+    const next = blankCanvas(
+      workspace.projects.some((project) => project.id === props.projectFilter)
+        ? props.projectFilter
+        : "",
+    );
     next.title = `Canvas ${workspace.canvases.length + 1}`;
     setSelected("");
     setSelectedEdge("");
@@ -1286,7 +1292,12 @@ export function CanvasView(props: CanvasViewProps) {
   };
   const addCard = (type: CanvasCard["type"], entityId = "", text = "") => {
     let current = canvasRef.current;
-    if (!current) current = blankCanvas();
+    if (!current)
+      current = blankCanvas(
+        workspace.projects.some((project) => project.id === props.projectFilter)
+          ? props.projectFilter
+          : "",
+      );
     const offset = (current.cards.length % 4) * 22;
     const card: CanvasCard = {
       id: uid(),
@@ -1529,6 +1540,35 @@ export function CanvasView(props: CanvasViewProps) {
           <Plus size={16} />
         </button>
         <span className="canvas-toolbar-divider" />
+        {canvas && (
+          <label className="canvas-project-control" data-tour="canvas-project">
+            <span>Project</span>
+            <select
+              aria-label="Canvas project"
+              value={canvas.projectId || ""}
+              onChange={(event) => {
+                const current = canvasRef.current;
+                if (current)
+                  void save({ ...current, projectId: event.target.value });
+              }}
+            >
+              <option value="">No project</option>
+              {canvas.projectId &&
+                !workspace.projects.some(
+                  (project) => project.id === canvas.projectId,
+                ) && (
+                  <option value={canvas.projectId}>
+                    Unavailable project · choose another
+                  </option>
+                )}
+              {workspace.projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           className={`canvas-tool ${connecting ? "active" : ""}`}
           aria-pressed={connecting}

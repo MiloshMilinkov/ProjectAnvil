@@ -37,7 +37,28 @@ export interface Project {
   status: string;
   goal: string;
   targetDate: string;
+  milestones?: Milestone[];
 }
+export interface Milestone {
+  id: string;
+  title: string;
+  description: string;
+  targetDate: string;
+  archived: boolean;
+}
+export interface RecurrenceRule {
+  frequency: "daily" | "weekly" | "monthly";
+  interval: number;
+  anchorDate: string;
+  timeZone: string;
+  untilDate?: string;
+}
+export interface ReminderRule {
+  date: string;
+  time: string;
+  timeZone: string;
+}
+export type TaskReminder = ReminderRule;
 export interface TaskSource {
   noteId: string;
   excerpt: string;
@@ -63,6 +84,13 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   source?: TaskSource;
+  parentId?: string;
+  milestoneId?: string;
+  recurrence?: RecurrenceRule | null;
+  reminder?: ReminderRule | null;
+  /** Server-owned successor ledger prevents a reopened task spawning twice. */
+  recurrenceNextId?: string;
+  recurringFromId?: string;
 }
 export interface Note {
   id: string;
@@ -108,6 +136,7 @@ export interface Canvas {
   title: string;
   cards: CanvasCard[];
   edges: CanvasEdge[];
+  projectId?: string;
 }
 export interface SavedView {
   id: string;

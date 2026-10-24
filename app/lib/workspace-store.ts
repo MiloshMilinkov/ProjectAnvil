@@ -63,7 +63,19 @@ async function rawWorkspace(access: ResolvedWorkspace): Promise<Workspace> {
   workspace.relationships ??= [];
   // Normalize optional scheduling fields from workspaces saved before scheduling
   // was introduced. Reading a workspace never rewrites its stored records.
-  for (const task of workspace.tasks) task.startDate ??= "";
+  for (const task of workspace.tasks) {
+    task.startDate ??= "";
+    task.parentId ??= "";
+    task.milestoneId ??= "";
+    task.recurrence ??= null;
+    task.reminder ??= null;
+    if (task.recurrence) task.recurrence.untilDate ??= "";
+  }
+  for (const project of workspace.projects) {
+    project.milestones ??= [];
+    for (const milestone of project.milestones) milestone.archived ??= false;
+  }
+  for (const canvas of workspace.canvases) canvas.projectId ??= "";
   for (const view of workspace.savedViews) {
     view.dateFilter ??= "all";
     view.sort ??= "priority";

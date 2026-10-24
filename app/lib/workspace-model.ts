@@ -9,6 +9,17 @@ import {
 } from "./types";
 import { createSignatureReader, entityKey } from "./relationships";
 import { normalizeSourceExcerpt } from "./source-excerpts";
+import { planningError } from "./planning-model";
+import {
+  isCalendarDate,
+  validTimeZone,
+  wallTimeToInstant,
+} from "./reminder-time";
+import {
+  addCalendarDays,
+  calendarDayDifference,
+  nextRecurrenceDate,
+} from "./recurrence";
 
 export class WorkspaceError extends Error {
   constructor(
@@ -63,6 +74,59 @@ const references = z
   );
 const uniqueIds = <T extends { id: string }>(values: T[]) =>
   new Set(values.map((value) => value.id)).size === values.length;
+const timeZone = z
+  .string()
+  .max(100)
+  .refine(validTimeZone, "Choose a valid time zone.");
+const recurrence = z
+  .object({
+    frequency: z.enum(["daily", "weekly", "monthly"]),
+    interval: z.number().int().min(1).max(365),
+    anchorDate: date.refine(
+      isCalendarDate,
+      "Choose the first occurrence date.",
+    ),
+    timeZone,
+    untilDate: date
+      .refine(
+        (value) => !value || isCalendarDate(value),
+        "Choose a valid recurrence end date.",
+      )
+      .default(""),
+  })
+  .strict()
+  .refine(
+    (rule) => !rule.untilDate || rule.untilDate >= rule.anchorDate,
+    "The recurrence end must be on or after its first occurrence.",
+  );
+const reminder = z
+  .object({
+    date: date.refine(Boolean, "Choose a reminder date."),
+    time: z
+      .string()
+      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Choose a valid reminder time."),
+    timeZone,
+  })
+  .strict()
+  .refine(
+    (value) =>
+      validTimeZone(value.timeZone) && wallTimeToInstant(value) !== null,
+    "This reminder time does not exist because the clocks change. Choose another time.",
+  );
+const milestones = z
+  .array(
+    z
+      .object({
+        id,
+        title,
+        description: z.string().max(10_000).default(""),
+        targetDate: date.default(""),
+        archived: z.boolean().default(false),
+      })
+      .strict(),
+  )
+  .max(100)
+  .refine(uniqueIds, "Milestone IDs must be unique.");
 const people = z
   .object({
     id,
@@ -87,6 +151,7 @@ const projects = z
     status: short,
     goal: z.string().max(10_000),
     targetDate: date,
+    milestones: milestones.default([]),
   })
   .strict();
 const tasks = z
@@ -102,6 +167,12 @@ const tasks = z
     assigneeId: reference,
     startDate: date.default(""),
     dueDate: date,
+    parentId: reference.default(""),
+    milestoneId: reference.default(""),
+    recurrence: recurrence.nullable().default(null),
+    reminder: reminder.nullable().default(null),
+    recurrenceNextId: id.optional(),
+    recurringFromId: id.optional(),
     estimate: z.number().finite().min(0).max(100_000),
     tags,
     noteIds: references,
@@ -198,6 +269,7 @@ const canvases = z
   .object({
     id,
     title,
+    projectId: reference.default(""),
     cards: z
       .array(canvasCard)
       .max(500)
@@ -436,6 +508,8 @@ export function validateWorkspace(value: unknown): Workspace {
     visited.add(taskId);
   }
   workspace.tasks.forEach((task) => visit(task.id));
+  const invalidPlan = planningError(workspace);
+  if (invalidPlan) throw new WorkspaceError(invalidPlan);
   const titles = new Set<string>();
   for (const note of workspace.notes) {
     const normalized = note.title.trim().toLowerCase();
@@ -457,6 +531,7 @@ export function validateWorkspace(value: unknown): Workspace {
       throw new WorkspaceError("Attachment URLs must match their file IDs.");
   }
   for (const canvas of workspace.canvases) {
+    check(canvas.projectId || "", "projects", canvas.title);
     const cards = new Set(canvas.cards.map((card) => card.id));
     for (const card of canvas.cards) {
       if (
@@ -556,6 +631,8 @@ function serverOwnedField(entity: Entity, key: string): boolean {
     key === "createdAt" ||
     key === "updatedAt" ||
     (entity === "notes" && key === "snapshots") ||
+    (entity === "tasks" &&
+      ["recurrenceNextId", "recurringFromId"].includes(key)) ||
     (entity === "relationships" &&
       ["reviewedAt", "fromSignature", "toSignature"].includes(key))
   );
@@ -565,6 +642,12 @@ function serverOwnedField(entity: Entity, key: string): boolean {
 function comparableField(entity: Entity, key: string, value: unknown): string {
   if (value === undefined) {
     if (entity === "tasks" && key === "startDate") value = "";
+    if (entity === "tasks" && ["parentId", "milestoneId"].includes(key))
+      value = "";
+    if (entity === "tasks" && ["recurrence", "reminder"].includes(key))
+      value = null;
+    if (entity === "projects" && key === "milestones") value = [];
+    if (entity === "canvases" && key === "projectId") value = "";
     if (entity === "savedViews" && key === "dateFilter") value = "all";
     if (entity === "savedViews" && key === "sort") value = "priority";
     if (entity === "savedViews" && key === "layout") value = "board";
@@ -676,6 +759,7 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         status: "Planning",
         goal: "",
         targetDate: "",
+        milestones: [],
       };
     case "tasks":
       return {
@@ -688,6 +772,10 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         assigneeId: "",
         startDate: "",
         dueDate: "",
+        parentId: "",
+        milestoneId: "",
+        recurrence: null,
+        reminder: null,
         estimate: 0,
         tags: [],
         noteIds: [],
@@ -712,7 +800,7 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         updatedAt: now,
       };
     case "canvases":
-      return { ...base, cards: [], edges: [] };
+      return { ...base, projectId: "", cards: [], edges: [] };
     case "savedViews":
       return {
         ...base,
@@ -810,6 +898,15 @@ export function applyMutation(
     const item = mutation.item as Record<string, unknown>;
     const values = next[entity] as { id: string }[];
     const existing = values.find((value) => value.id === item.id);
+    if (entity === "tasks") {
+      const previous = existing as Workspace["tasks"][number] | undefined;
+      for (const field of ["recurrenceNextId", "recurringFromId"] as const) {
+        if (Object.hasOwn(item, field) && item[field] !== previous?.[field])
+          throw new WorkspaceError(
+            "Recurring task links are managed automatically.",
+          );
+      }
+    }
     const merged: Record<string, unknown> = {
       ...defaults(entity, now),
       ...existing,
@@ -915,11 +1012,107 @@ export function applyMutation(
       entitySchemas[entity] as z.ZodType<{ id: string }>,
       merged,
     );
+    if (entity === "projects" && existing) {
+      const previous = existing as Workspace["projects"][number];
+      const project = parsed as Workspace["projects"][number];
+      if (
+        previous.milestones?.some(
+          (milestone) =>
+            !project.milestones?.some(
+              (candidate) => candidate.id === milestone.id,
+            ),
+        )
+      )
+        throw new WorkspaceError(
+          "Archive a milestone instead of removing it so its plan remains recoverable.",
+        );
+    }
     if (existing) values[values.indexOf(existing)] = parsed;
     else values.push(parsed);
     if (entity === "tasks") {
       const task = parsed as Workspace["tasks"][number];
       const previous = existing as Workspace["tasks"][number] | undefined;
+      if (
+        task.milestoneId &&
+        (task.milestoneId !== previous?.milestoneId ||
+          task.projectId !== previous?.projectId) &&
+        next.projects
+          .find((project) => project.id === task.projectId)
+          ?.milestones?.find((milestone) => milestone.id === task.milestoneId)
+          ?.archived
+      )
+        throw new WorkspaceError(
+          "Choose an active milestone. Archived milestones keep their existing tasks.",
+        );
+      if (
+        previous?.status !== "done" &&
+        task.status === "done" &&
+        task.recurrence &&
+        !task.recurrenceNextId
+      ) {
+        const occurrence =
+          task.dueDate || task.startDate || task.recurrence.anchorDate;
+        const following = nextRecurrenceDate(
+          task.recurrence,
+          occurrence,
+          new Date(now),
+        );
+        if (following) {
+          const offset = calendarDayDifference(following, occurrence);
+          const nextTask = {
+            ...structuredClone(task),
+            id: crypto.randomUUID(),
+            key: "",
+            status: "todo" as const,
+            startDate: task.startDate
+              ? addCalendarDays(task.startDate, offset)
+              : "",
+            dueDate: task.dueDate
+              ? addCalendarDays(task.dueDate, offset)
+              : task.startDate
+                ? ""
+                : following,
+            assigneeId: next.people.some(
+              (person) => person.id === task.assigneeId && !person.inactive,
+            )
+              ? task.assigneeId
+              : "",
+            blockedBy: [],
+            comments: [],
+            subtasks: task.subtasks.map((subtask) => ({
+              id: crypto.randomUUID(),
+              title: subtask.title,
+              done: false,
+            })),
+            reminder: task.reminder
+              ? {
+                  ...task.reminder,
+                  date: addCalendarDays(task.reminder.date, offset),
+                }
+              : null,
+            recurringFromId: task.id,
+            createdAt: now,
+            updatedAt: now,
+          };
+          delete nextTask.source;
+          delete nextTask.recurrenceNextId;
+          const prefix =
+            next.projects.find((project) => project.id === task.projectId)
+              ?.key || "TASK";
+          const numbers = next.tasks
+            .filter((value) => value.key.startsWith(`${prefix}-`))
+            .map((value) => Number(value.key.slice(prefix.length + 1)))
+            .filter(Number.isFinite);
+          let number = Math.max(0, ...numbers) + 1;
+          while (
+            next.tasks.some((value) => value.key === `${prefix}-${number}`)
+          )
+            number++;
+          nextTask.key = `${prefix}-${number}`;
+          task.recurrenceNextId = nextTask.id;
+          next.tasks.push(nextTask);
+        }
+      }
       if (task.source && task.source.noteId !== previous?.source?.noteId) {
         const from = { type: "task" as const, id: task.id };
         const to = { type: "note" as const, id: task.source.noteId };
@@ -959,10 +1152,11 @@ export function applyMutation(
     if (
       entity === "projects" &&
       (next.tasks.some((item) => item.projectId === deletedId) ||
-        next.notes.some((item) => item.projectId === deletedId))
+        next.notes.some((item) => item.projectId === deletedId) ||
+        next.canvases.some((item) => item.projectId === deletedId))
     ) {
       throw new WorkspaceError(
-        "Move or delete this project’s tasks and notes before deleting the project.",
+        "Move or delete this project’s tasks, notes, and canvases before deleting the project.",
       );
     }
     values.splice(
@@ -992,6 +1186,7 @@ export function applyMutation(
     if (entity === "tasks")
       next.tasks.forEach((task) => {
         task.blockedBy = task.blockedBy.filter((value) => value !== deletedId);
+        if (task.parentId === deletedId) task.parentId = "";
       });
     const cardType =
       entity === "notes"
