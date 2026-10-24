@@ -61,6 +61,7 @@ import {
   isRecoverableNoteRecord,
   parseNewNoteDraft,
   parseNoteCopyDraft,
+  stagePersonalNoteTemplate,
   type NewNoteDraft,
   type NoteTemplateId,
 } from "../lib/note-drafts";
@@ -68,6 +69,9 @@ import { useDraftScope } from "./useRecoverableDraft";
 import Markdown from "./Markdown";
 import NoteTaskComposer from "./NoteTaskComposer";
 import LinkedNoteTasks from "./LinkedNoteTasks";
+import PersonalTemplates from "./PersonalTemplates";
+import { noteTemplateContent } from "../lib/personal-templates";
+import { moveToTrash } from "../lib/trash-actions";
 import "./knowledge.css";
 import "./templates.css";
 import "./note-recovery.css";
@@ -361,6 +365,7 @@ export default function Knowledge({
   const scopedFetch = useWorkspaceFetch();
   const controlId = useId();
   const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const emptyCreateRef = useRef<HTMLButtonElement>(null);
   const browserButtonRef = useRef<HTMLButtonElement>(null);
   const browserRef = useRef<HTMLElement>(null);
   const mobileLayout = useMediaQuery("(max-width: 750px)");
@@ -392,6 +397,9 @@ export default function Knowledge({
       readDraft<unknown>(draftScope, "note-forms", "new-note")?.value,
     ),
   );
+  const [personalCreation, setPersonalCreation] = useState(
+    !!newNoteDraft?.personalTemplateId,
+  );
   const [view, setView] = useState<"edit" | "preview" | "split">("split");
   // Small screens show one pane while retaining Split when the window widens.
   const effectiveView = mobileLayout && view === "split" ? "preview" : view;
@@ -416,6 +424,9 @@ export default function Knowledge({
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
+  const [personalTemplatesOpen, setPersonalTemplatesOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeId, setMergeId] = useState("");
   const [slides, setSlides] = useState(false);
@@ -538,7 +549,7 @@ export default function Knowledge({
       }
       return result.record.token;
     },
-    [draftScope],
+    [draftScope, setDraftStorageError],
   );
 
   const flush = useCallback(() => {
@@ -855,13 +866,26 @@ export default function Knowledge({
     return () => window.removeEventListener("keydown", handle);
   }, [slides, flush, mobileBrowser]);
 
-  const rememberNewNote = (patch: Partial<NewNoteDraft>) => {
+  const rememberNewNote = (
+    patch: Partial<NewNoteDraft>,
+    preservePersonal = false,
+  ) => {
+    const previous = newNoteForm.current;
+    const personal =
+      preservePersonal && previous.personalTemplateId && previous.candidate;
     newNoteForm.current = {
-      ...newNoteForm.current,
+      ...previous,
       ...patch,
-      candidate: undefined,
-      operationId: undefined,
+      candidate: personal
+        ? {
+            ...previous.candidate!,
+            title: patch.title?.trim() || previous.candidate!.title,
+          }
+        : undefined,
+      operationId: personal ? uid() : undefined,
+      personalTemplateId: personal ? previous.personalTemplateId : undefined,
     };
+    setPersonalCreation(!!personal);
     const result = writeDraft(
       draftScope,
       "note-forms",
@@ -891,8 +915,11 @@ export default function Knowledge({
         .includes(templateSearch.trim().toLowerCase()),
   );
 
-  const create = async (templateId: TemplateId, title: string) => {
-    if (creatingRef.current) return;
+  const create = async (
+    templateId: TemplateId,
+    title: string,
+  ): Promise<boolean> => {
+    if (creatingRef.current) return false;
     creatingRef.current = true;
     setCreating(true);
     try {
@@ -917,7 +944,16 @@ export default function Knowledge({
           projectFilter === "all" ? "" : projectFilter,
         );
       const operationId = (sameForm && previous.operationId) || uid();
-      newNoteForm.current = { title, templateId, candidate: note, operationId };
+      newNoteForm.current = {
+        title,
+        templateId,
+        candidate: note,
+        operationId,
+        ...(sameForm && previous.personalTemplateId
+          ? { personalTemplateId: previous.personalTemplateId }
+          : {}),
+      };
+      setPersonalCreation(!!newNoteForm.current.personalTemplateId);
       const savedForm = writeDraft(
         draftScope,
         "note-forms",
@@ -942,13 +978,16 @@ export default function Knowledge({
       setNewTitle("");
       removeDraft(draftScope, "note-forms", "new-note", savedForm.record.token);
       newNoteForm.current = { title: "", templateId: "blank" };
+      setPersonalCreation(false);
       notify(`${template.kind === "daily" ? "Daily journal" : "Note"} created`);
+      return true;
     } catch (cause) {
       notify(
         cause instanceof Error
           ? cause.message
           : "Could not create the note. Please try again.",
       );
+      return false;
     } finally {
       creatingRef.current = false;
       setCreating(false);
@@ -1391,7 +1430,9 @@ export default function Knowledge({
     }
   };
   const remove = async () => {
-    if (!draft) return;
+    if (!draft || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
     if (timer.current) clearTimeout(timer.current);
     pending.current = null;
     try {
@@ -1399,21 +1440,31 @@ export default function Knowledge({
       const saved = workspaceRef.current.notes.find(
         (note) => note.id === draft.id,
       );
-      await mutate({
-        action: "delete",
-        entity: "notes",
-        id: draft.id,
-        base: saved ? { ...saved } : null,
-      });
+      await moveToTrash(
+        mutate,
+        notify,
+        {
+          entity: "notes",
+          id: draft.id,
+          base: saved ? { ...saved } : null,
+        },
+        "Note",
+        draftScope,
+      );
       localEdits.current.delete(draft.id);
       sentVersions.current.delete(draft.id);
       draftCache.current.delete(draft.id);
       removeDraft(draftScope, "notes", draft.id);
       onSelectNote(notes.find((note) => note.id !== draft.id)?.id || "");
       setDeleteOpen(false);
-      notify("Note deleted");
+      requestAnimationFrame(() =>
+        (moreButtonRef.current || emptyCreateRef.current)?.focus(),
+      );
     } catch {
       notify("Could not delete the note.");
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
     }
   };
 
@@ -1934,6 +1985,16 @@ export default function Knowledge({
                       }}
                     >
                       <button
+                        data-tour="note-templates"
+                        onClick={() => {
+                          setPersonalTemplatesOpen(true);
+                          setMoreOpen(false);
+                        }}
+                      >
+                        <Copy size={15} />
+                        My note templates
+                      </button>
+                      <button
                         onClick={() => {
                           openHistory();
                           setMoreOpen(false);
@@ -2007,7 +2068,7 @@ export default function Knowledge({
                         }}
                       >
                         <Trash2 size={15} />
-                        Delete note
+                        Move to Trash
                       </button>
                     </div>
                   )}
@@ -2518,7 +2579,11 @@ export default function Knowledge({
               creative idea. Connect notes to each other and to the tasks that
               move them forward.
             </p>
-            <button className="btn btn-primary" onClick={openNewNote}>
+            <button
+              ref={emptyCreateRef}
+              className="btn btn-primary"
+              onClick={openNewNote}
+            >
               <Plus size={16} />
               {workspace.notes.length
                 ? "Create a note"
@@ -2589,14 +2654,18 @@ export default function Knowledge({
               <input
                 className="field"
                 autoFocus
+                maxLength={300}
                 value={newTitle}
                 disabled={creating}
                 onChange={(event) => {
                   setNewTitle(event.target.value);
-                  rememberNewNote({
-                    title: event.target.value,
-                    templateId: newTemplateId,
-                  });
+                  rememberNewNote(
+                    {
+                      title: event.target.value,
+                      templateId: newTemplateId,
+                    },
+                    true,
+                  );
                 }}
                 placeholder={
                   selectedTemplate.kind === "daily"
@@ -2612,8 +2681,24 @@ export default function Knowledge({
               />
             </label>
             <div className="note-template-label">
-              CHOOSE A STARTING POINT <span>{templates.length} templates</span>
+              CHOOSE A STARTING POINT{" "}
+              <span>{templates.length} built-in templates</span>
             </div>
+            {personalCreation && (
+              <p className="draft-recovery-note" role="status">
+                Your personal template is ready. Review the title, then choose
+                Create note. Its content stays with this form if you close it.
+              </p>
+            )}
+            <button
+              className="btn"
+              data-tour="personal-note-templates"
+              disabled={creating}
+              onClick={() => setPersonalTemplatesOpen(true)}
+            >
+              <Copy size={16} />
+              My note templates
+            </button>
             <div className="note-template-filters">
               <label className="note-template-search">
                 <Search size={17} />
@@ -2645,9 +2730,15 @@ export default function Knowledge({
               <div className="note-template-grid">
                 {visibleTemplates.map((item) => (
                   <button
-                    className={newTemplateId === item.id ? "selected" : ""}
+                    className={
+                      !personalCreation && newTemplateId === item.id
+                        ? "selected"
+                        : ""
+                    }
                     key={item.id}
-                    aria-pressed={newTemplateId === item.id}
+                    aria-pressed={
+                      !personalCreation && newTemplateId === item.id
+                    }
                     disabled={creating}
                     onClick={() => {
                       setNewTemplateId(item.id);
@@ -2664,7 +2755,7 @@ export default function Knowledge({
                     </span>
                     <strong>{item.label}</strong>
                     <p>{item.description}</p>
-                    {newTemplateId === item.id && (
+                    {!personalCreation && newTemplateId === item.id && (
                       <Check size={17} className="template-check" />
                     )}
                   </button>
@@ -2678,7 +2769,12 @@ export default function Knowledge({
             </div>
             <div className="knowledge-modal-footer">
               <span className="note-template-selection">
-                Selected: <strong>{selectedTemplate.label}</strong>
+                Selected:{" "}
+                <strong>
+                  {personalCreation
+                    ? "Personal template"
+                    : selectedTemplate.label}
+                </strong>
               </span>
               <button
                 className="btn"
@@ -2839,41 +2935,132 @@ export default function Knowledge({
       {deleteOpen && draft && (
         <div
           className="knowledge-modal-backdrop"
-          onClick={() => setDeleteOpen(false)}
+          onClick={() => !deleting && setDeleteOpen(false)}
         >
           <NoteDialog
             className="knowledge-modal compact-modal"
-            label="Delete note"
+            label="Move note to Trash"
             onClose={() => setDeleteOpen(false)}
+            busy={deleting}
           >
             <div className="knowledge-modal-heading">
-              <h2>Delete this note?</h2>
+              <h2>Move this note to Trash?</h2>
               <button
                 className="btn-icon"
                 aria-label="Close"
+                disabled={deleting}
                 onClick={() => setDeleteOpen(false)}
               >
                 <X size={18} />
               </button>
             </div>
             <p className="knowledge-modal-description">
-              “{draft.title}” and its saved versions will be removed from your
-              workspace.
+              “{draft.title}” will leave the active workspace. Its content,
+              saved versions, and valid links can be restored from Trash.
             </p>
             <div className="knowledge-modal-footer">
-              <button className="btn" onClick={() => setDeleteOpen(false)}>
+              <button
+                className="btn"
+                disabled={deleting}
+                onClick={() => setDeleteOpen(false)}
+              >
                 Keep note
               </button>
               <button
                 className="btn note-delete-button"
+                disabled={deleting}
                 onClick={() => void remove()}
               >
                 <Trash2 size={15} />
-                Delete note
+                {deleting ? "Moving…" : "Move to Trash"}
               </button>
             </div>
           </NoteDialog>
         </div>
+      )}
+
+      {personalTemplatesOpen && (
+        <PersonalTemplates
+          kind="note"
+          source={draft ? noteTemplateContent(draft) : undefined}
+          sourceTitle={draft?.title}
+          onClose={() => setPersonalTemplatesOpen(false)}
+          onUse={async (template) => {
+            if (template.kind !== "note") return;
+            const previous = newNoteForm.current;
+            const unfinished = !!(
+              previous.candidate ||
+              previous.title.trim() ||
+              previous.templateId !== "blank"
+            );
+            if (
+              unfinished &&
+              !window.confirm(
+                "Use this template instead of the previously unfinished note creation?",
+              )
+            )
+              throw new Error("The previous note form is kept.");
+            const previousRecord = readDraft<NewNoteDraft>(
+              draftScope,
+              "note-forms",
+              "new-note",
+            );
+            if (unfinished && previousRecord) {
+              const copy = writeDraft(
+                draftScope,
+                "recovery-copies",
+                `note-forms:new-note:${previousRecord.owner || previousRecord.token}`,
+                {
+                  entity: "note-forms",
+                  id: "new-note",
+                  record: previousRecord,
+                },
+                null,
+              );
+              if (copy.error) {
+                setDraftStorageError(copy.error);
+                throw new Error(
+                  "Your previous form could not be kept in recovery. Free some browser storage and try again.",
+                );
+              }
+            }
+            const projectId = workspaceRef.current.projects.some(
+              (project) => project.id === projectFilter,
+            )
+              ? projectFilter
+              : "";
+            const staged = stagePersonalNoteTemplate(
+              template,
+              workspaceRef.current.notes,
+              projectId,
+            );
+            const result = writeDraft(
+              draftScope,
+              "note-forms",
+              "new-note",
+              staged,
+              null,
+            );
+            setDraftStorageError(result.error || "");
+            if (result.error) {
+              // A failed browser write also updates its in-memory copy. Restore
+              // the previous form there before leaving the library open.
+              writeDraft(draftScope, "note-forms", "new-note", previous, null);
+              throw new Error(
+                "The template could not be kept in browser recovery. Free some browser storage and try again; your previous form is kept.",
+              );
+            }
+            if (previous.candidate)
+              discardDraftMutations(draftScope, "notes", previous.candidate.id);
+            newNoteForm.current = staged;
+            setNewTitle(staged.title);
+            setNewTemplateId("blank");
+            setPersonalCreation(true);
+            setTemplateSearch("");
+            setTemplateCategory("all");
+            setNewOpen(true);
+          }}
+        />
       )}
 
       {slides && draft && (

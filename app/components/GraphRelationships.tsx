@@ -29,6 +29,8 @@ import {
   type RelationshipKind,
 } from "../lib/types";
 import "./relationships.css";
+import { moveToTrash } from "../lib/trash-actions";
+import { useDraftScope } from "./useRecoverableDraft";
 
 type Props = Pick<FeatureProps, "workspace" | "mutate" | "notify"> & {
   impact: ReturnType<typeof relationshipImpact>;
@@ -169,13 +171,26 @@ export default function GraphRelationships({
     }
   }
 
+  const draftScope = useDraftScope();
   async function removeRelationship(id: string) {
     setBusy(id);
     setError("");
     try {
-      await mutate({ action: "delete", entity: "relationships", id });
+      const relationship = workspace.relationships.find(
+        (item) => item.id === id,
+      );
+      await moveToTrash(
+        mutate,
+        notify,
+        {
+          entity: "relationships",
+          id,
+          base: relationship ? { ...relationship } : null,
+        },
+        "Relationship",
+        draftScope,
+      );
       setRemovingId("");
-      notify("Relationship removed. Both connected items were kept.");
     } catch (error) {
       setError(
         error instanceof Error

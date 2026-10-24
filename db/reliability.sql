@@ -12,6 +12,31 @@ CREATE TABLE IF NOT EXISTS workspace_receipts (
   PRIMARY KEY (workspace_id, actor_key, operation_id)
 );
 CREATE INDEX IF NOT EXISTS workspace_receipts_created_idx ON workspace_receipts(created_at);
+CREATE TABLE IF NOT EXISTS workspace_trash (
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  trash_id text NOT NULL,
+  entity text NOT NULL,
+  entity_id text NOT NULL,
+  title text NOT NULL,
+  payload text NOT NULL,
+  deleted_at text NOT NULL,
+  restored_at text,
+  invalidated_at text,
+  restore_warnings text NOT NULL DEFAULT '[]',
+  PRIMARY KEY (workspace_id, trash_id)
+);
+CREATE INDEX IF NOT EXISTS workspace_trash_page_idx ON workspace_trash(workspace_id, deleted_at DESC, trash_id DESC);
+CREATE TABLE IF NOT EXISTS personal_templates (
+  owner_key text NOT NULL,
+  id text NOT NULL,
+  data text NOT NULL,
+  revision integer NOT NULL DEFAULT 1,
+  deleted_at text,
+  last_action text NOT NULL DEFAULT 'save',
+  updated_at text NOT NULL,
+  PRIMARY KEY (owner_key, id)
+);
+CREATE INDEX IF NOT EXISTS personal_templates_owner_updated ON personal_templates(owner_key, deleted_at, updated_at DESC);
 CREATE TABLE IF NOT EXISTS entity_tombstones (
   workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   entity text NOT NULL,

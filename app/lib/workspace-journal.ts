@@ -1,6 +1,7 @@
 import { database, type ResolvedWorkspace } from "./access-store";
 import { WorkspaceError } from "./workspace-model";
 import type { Entity, Note, Workspace } from "./types";
+import type { TrashCommit } from "./trash-types";
 
 const entities: Entity[] = [
   "people",
@@ -107,6 +108,7 @@ export async function commitWorkspace(
   operationId: string | undefined,
   hash: string,
   preserveReplacedContent = false,
+  trash: TrashCommit = {},
 ): Promise<boolean> {
   const db = database();
   const token = crypto.randomUUID();
@@ -154,13 +156,19 @@ export async function commitWorkspace(
     ? " AND EXISTS (SELECT 1 FROM appmembers WHERE workspace_id = ? AND user_id = ?)"
     : "";
   const authorizationValues = access.user ? [access.id, access.user.id] : [];
+  const restoreCondition = trash.restore
+    ? " AND EXISTS (SELECT 1 FROM workspace_trash WHERE workspace_id = ? AND trash_id = ? AND deleted_at = ? AND restored_at IS NULL AND invalidated_at IS NULL)"
+    : "";
+  const restoreValues = trash.restore
+    ? [access.id, trash.restore.id, trash.restore.deletedAt]
+    : [];
   const committed =
     "EXISTS (SELECT 1 FROM workspace_write_guards g JOIN workspaces w ON w.id = g.workspace_id WHERE g.workspace_id = ? AND g.token = ? AND w.revision = ?)";
   const guardValues = [access.id, token, updated.revision];
   const statements = [
     db
       .prepare(
-        `INSERT OR IGNORE INTO workspace_write_guards (workspace_id, token) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = ? AND revision = ?${authorization})`,
+        `INSERT OR IGNORE INTO workspace_write_guards (workspace_id, token) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = ? AND revision = ?${authorization})${restoreCondition}`,
       )
       .bind(
         access.id,
@@ -168,6 +176,7 @@ export async function commitWorkspace(
         access.id,
         current.revision,
         ...authorizationValues,
+        ...restoreValues,
       ),
     db
       .prepare(
@@ -224,6 +233,80 @@ export async function commitWorkspace(
         ...guardValues,
       ),
   ];
+  if (preserveReplacedContent)
+    statements.push(
+      db
+        .prepare(
+          `UPDATE workspace_trash SET invalidated_at = ?
+        WHERE workspace_id = ? AND restored_at IS NULL AND invalidated_at IS NULL AND ${committed}`,
+        )
+        .bind(now, access.id, ...guardValues),
+    );
+  if (trash.deleted) {
+    // Each lifecycle has its own archive. Old Undo actions cannot resurrect a
+    // later deletion, even after their short-lived mutation receipt expires.
+    statements.push(
+      db
+        .prepare(
+          `UPDATE workspace_trash SET invalidated_at = ?
+        WHERE workspace_id = ? AND entity = ? AND entity_id = ?
+        AND restored_at IS NULL AND invalidated_at IS NULL AND ${committed}`,
+        )
+        .bind(
+          now,
+          access.id,
+          trash.deleted.entity,
+          trash.deleted.entityId,
+          ...guardValues,
+        ),
+      db
+        .prepare(
+          `INSERT INTO workspace_trash
+        (workspace_id, trash_id, entity, entity_id, title, payload, deleted_at)
+        SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${committed}`,
+        )
+        .bind(
+          access.id,
+          trash.deleted.id,
+          trash.deleted.entity,
+          trash.deleted.entityId,
+          trash.deleted.title,
+          JSON.stringify(trash.deleted.snapshot),
+          now,
+          ...guardValues,
+        ),
+    );
+  }
+  if (trash.restore) {
+    statements.push(
+      db
+        .prepare(
+          `DELETE FROM entity_tombstones WHERE workspace_id = ? AND deleted_at = ?
+        AND EXISTS (SELECT 1 FROM json_each(?)
+          WHERE json_extract(value, '$.entity') = entity_tombstones.entity
+          AND json_extract(value, '$.id') = entity_tombstones.entity_id) AND ${committed}`,
+        )
+        .bind(
+          access.id,
+          trash.restore.deletedAt,
+          JSON.stringify(trash.restore.restored),
+          ...guardValues,
+        ),
+      db
+        .prepare(
+          `UPDATE workspace_trash SET restored_at = ?, restore_warnings = ?
+        WHERE workspace_id = ? AND trash_id = ? AND restored_at IS NULL
+        AND invalidated_at IS NULL AND ${committed}`,
+        )
+        .bind(
+          now,
+          JSON.stringify(trash.restore.warnings),
+          access.id,
+          trash.restore.id,
+          ...guardValues,
+        ),
+    );
+  }
   if (operationId)
     statements.push(
       db

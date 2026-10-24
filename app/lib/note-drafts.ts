@@ -1,5 +1,9 @@
 import type { DraftRecord } from "./draft-store";
 import type { Note, Priority } from "./types";
+import {
+  instantiateNoteTemplate,
+  type PersonalTemplate,
+} from "./personal-templates";
 
 export const noteTemplateIds = [
   "blank",
@@ -24,6 +28,33 @@ export interface NewNoteDraft {
   templateId: NoteTemplateId;
   candidate?: Note;
   operationId?: string;
+  personalTemplateId?: string;
+}
+
+/** Stage reusable content for review; the caller still owns explicit creation. */
+export function stagePersonalNoteTemplate(
+  template: PersonalTemplate & { kind: "note" },
+  notes: Pick<Note, "title">[],
+  projectId = "",
+): NewNoteDraft {
+  const titles = new Set(notes.map((note) => note.title.trim().toLowerCase()));
+  const original =
+    template.content.title.trim() || template.name.trim() || "Untitled note";
+  let title = original.slice(0, 300);
+  let number = 1;
+  while (titles.has(title.toLowerCase())) {
+    const suffix = number === 1 ? " (copy)" : ` (copy ${number})`;
+    title = `${original.slice(0, 300 - suffix.length)}${suffix}`;
+    number++;
+  }
+  const candidate = instantiateNoteTemplate(template.content, { projectId });
+  return {
+    title,
+    templateId: "blank",
+    candidate: { ...candidate, title },
+    operationId: crypto.randomUUID(),
+    personalTemplateId: template.id,
+  };
 }
 
 export interface LinkedTaskDraft {
@@ -122,7 +153,14 @@ export function parseNewNoteDraft(value: unknown): NewNoteDraft | null {
     return null;
   if (value.operationId !== undefined && !identifier(value.operationId))
     return null;
+  if (
+    value.personalTemplateId !== undefined &&
+    !identifier(value.personalTemplateId)
+  )
+    return null;
   if ((value.candidate === undefined) !== (value.operationId === undefined))
+    return null;
+  if (value.personalTemplateId !== undefined && value.candidate === undefined)
     return null;
   return value as unknown as NewNoteDraft;
 }

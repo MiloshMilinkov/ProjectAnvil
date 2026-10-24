@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   taskDateFilters,
   taskSorts,
+  taskLayouts,
   type Entity,
   type Mutation,
   type Workspace,
@@ -226,6 +227,7 @@ const savedViews = z
     ]),
     dateFilter: z.enum(taskDateFilters).default("all"),
     sort: z.enum(taskSorts).default("priority"),
+    layout: z.enum(taskLayouts).default("board"),
   })
   .strict();
 const entityReference = z
@@ -294,6 +296,9 @@ const workspaceSchema = z
   })
   .strict();
 const mutationSchema = z.discriminatedUnion("action", [
+  z
+    .object({ action: z.literal("restore"), id, operationId: id.optional() })
+    .strict(),
   z
     .object({
       action: z.literal("upsert"),
@@ -562,6 +567,7 @@ function comparableField(entity: Entity, key: string, value: unknown): string {
     if (entity === "tasks" && key === "startDate") value = "";
     if (entity === "savedViews" && key === "dateFilter") value = "all";
     if (entity === "savedViews" && key === "sort") value = "priority";
+    if (entity === "savedViews" && key === "layout") value = "board";
   }
   return comparable(value);
 }
@@ -717,6 +723,7 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         status: "",
         dateFilter: "all",
         sort: "priority",
+        layout: "board",
       };
     case "media":
       return base;
@@ -732,12 +739,18 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
   }
 }
 
+export function validateMutation(input: unknown): Mutation {
+  return parse(mutationSchema, input) as Mutation;
+}
+
 export function applyMutation(
   current: Workspace,
   input: unknown,
   now = new Date().toISOString(),
 ): Workspace {
-  const mutation = parse(mutationSchema, input) as Mutation;
+  const mutation = validateMutation(input);
+  if (mutation.action === "restore")
+    throw new WorkspaceError("Restore this item from its workspace Trash.");
   assertMutationBase(current, mutation);
   const next = structuredClone({
     ...current,

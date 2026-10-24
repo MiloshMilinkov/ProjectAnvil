@@ -38,14 +38,16 @@ Every account has a private personal workspace. Create or select a team workspac
 
 Work rooms belong to the account and workspace where they were created, including team workspaces. Guest rooms belong to the local guest workspace. Relationships and their review state belong to the workspace and are shared with its accepted members.
 
+Personal note/task templates belong to the account across its workspaces, including team workspaces, and are never shared with teammates. Guest templates use a separate local library. Reusing a template creates editable content with fresh IDs and reset completion; assignments, schedules, project links, history, and private attachment references are omitted. Manage them in **My task templates** or **My note templates**. The library's **Deleted** tab restores removed templates.
+
 ## Data and backups
 
 ProjectAnvil stores its database and uploaded files under **`.wrangler/state`**. The private **`.dev.vars`** file contains the account session signing secret. Preserve both together. They and local backups are excluded from Git.
 
 | Backup option | Includes | Excludes |
 | --- | --- | --- |
-| **Workspace settings → Export workspace** | Active workspace notes, tasks, discussions, labels, projects, saved views, relationships, and canvas layouts | Archived note history, attachment files, accounts, sessions, membership, invitations, and personal rooms/checkpoints |
-| **Complete local backup** | Database, archived note history, uploads, accounts, membership, sessions, room checkpoints, and relationship review state | Unsaved browser drafts, browser preferences, and source code; preserve the matching source version too |
+| **Workspace settings → Export workspace** | Active workspace notes, tasks, discussions, labels, projects, saved views, relationships, and canvas layouts | Trash, personal templates, archived note history, attachment files, accounts, sessions, membership, invitations, and personal rooms/checkpoints |
+| **Complete local backup** | Database including Trash and personal templates, archived note history, uploads, accounts, membership, sessions, room checkpoints, and relationship review state | Unsaved browser drafts, browser preferences, and source code; preserve the matching source version too |
 
 ### Make a complete backup
 
@@ -85,6 +87,16 @@ Do not combine individual database files from different backups or reinitialize 
 
 Export the current workspace first. Import replaces records only in the active workspace after confirmation and rejects an outdated workspace revision. Imported relationships start reviewed against the imported content, clearing previous review markers. Personal work rooms are stored separately and are not restored from JSON; pins to removed records are pruned. Existing archived note history and unreferenced attachment bytes are retained. Attachment references in JSON need their corresponding files in storage.
 
+Import also makes earlier workspace Trash entries unavailable to restore, avoiding stale recovery copies overwriting the imported workspace. Their archive is retained in complete backups. Import does not replace your personal template library.
+
+## Trash, restore, and Undo
+
+Deleted workspace records are retained in **Trash** in the sidebar. The latest deletion notification offers **Undo** until dismissed or replaced by another notification; older items can be restored from Trash. Trash lists deletion times and loads additional pages on demand. There is no permanent-delete control or automatic expiry in this version.
+
+Restore checks current workspace access, preserves note history, and reconnects available note/task links, task dependencies, canvas cards/connections, and meaningful relationships. It preserves newer changes and reports connections needing review. Missing related items do not prevent recovery of the main content. Restoring a task whose key has been reused allocates another key. Work-room pins pruned during deletion are not restored automatically; re-pin them if needed.
+
+Projects must have their tasks and notes moved elsewhere before they can be moved to Trash. Existing deletes from before this feature have no Trash copy. Repeated deletion/restore requests are safe to retry; an older Undo cannot replace a later deletion. Trash belongs to the workspace and its current accepted members. Personal templates recover separately in their **Deleted** tab.
+
 ## Drafts, conflicts, and save recovery
 
 - Notes and canvases keep recovery drafts as you edit. Task, project, assignment-label, linked-task, and room forms keep their own unfinished drafts. Recovery is scoped to the account and workspace in this browser.
@@ -107,8 +119,10 @@ Drafts are device/browser recovery copies, not confirmed database saves. Save or
 | Note history | Archived separately from active records; normal edits capture versions at least 30 seconds apart, with explicit restores and deletions also preserving replaced content |
 | Linked task source quote | 8,000 characters |
 | Work rooms | 30 per account/workspace; up to 20 pinned notes per room |
+| Personal templates | 200 entries including deleted templates, 2 MB per account library, 120 KB per template |
+| Workspace Trash | Stored separately from the active workspace allowance; retained without automatic expiry |
 
-Archived history and uploaded file bytes do not count toward the active workspace allowance. History and unreferenced attachment files are retained without automatic deletion; complete backups preserve them. **Settings → Storage & recovery** checks usage, retained files, and missing attachments without deleting files. History is loaded in pages of 20 versions. Change-impact markers indicate possible consequences; review the connected content before acknowledging them.
+Archived history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. History, Trash, and unreferenced attachment files are retained without automatic deletion; complete backups preserve them. **Settings → Storage & recovery** checks active usage, retained files, and missing attachments without deleting files. History is loaded in pages of 20 versions. Change-impact markers indicate possible consequences; review the connected content before acknowledging them.
 
 ## Troubleshooting
 

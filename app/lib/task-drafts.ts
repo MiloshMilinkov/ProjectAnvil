@@ -1,11 +1,36 @@
 import { priorities, statuses, type Task } from "./types";
-import type { DraftRecord } from "./draft-store";
+import {
+  discardDraftMutations,
+  writeDraft,
+  type DraftRecord,
+  type DraftScope,
+} from "./draft-store";
 
 export interface TaskForm {
   task: Task;
   tagText: string;
   comment: string;
   subtask: string;
+}
+
+/** Call only after the user explicitly discards the previous unfinished task. */
+export function replaceTaskDraft(
+  scope: DraftScope,
+  draftId: string,
+  previousTaskId: string,
+  replacement: TaskForm,
+) {
+  const result = writeDraft<TaskForm, Task>(
+    scope,
+    "tasks",
+    draftId,
+    replacement,
+    null,
+  );
+  // Retrying an abandoned failed save must not recreate the discarded task.
+  // Recovery copies from other windows remain separate and are left untouched.
+  discardDraftMutations(scope, "tasks", previousTaskId);
+  return result;
 }
 
 function isTask(value: unknown): value is Task {

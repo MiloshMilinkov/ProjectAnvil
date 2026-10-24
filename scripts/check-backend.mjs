@@ -15,6 +15,13 @@ const files = [
   "app/lib/types.ts",
   "app/lib/task-scheduling.ts",
   "app/lib/task-drafts.ts",
+  "app/lib/task-copy.ts",
+  "app/lib/trash-actions.ts",
+  "app/lib/saved-view-config.ts",
+  "app/lib/trash-types.ts",
+  "app/lib/workspace-trash.ts",
+  "app/lib/personal-templates.ts",
+  "app/lib/personal-template-store.ts",
   "app/lib/seed.ts",
   "app/lib/workspace-model.ts",
   "app/lib/access-store.ts",
@@ -39,6 +46,8 @@ const files = [
   "app/api/rooms/route.ts",
   "app/api/history/route.ts",
   "app/api/storage/route.ts",
+  "app/api/trash/route.ts",
+  "app/api/templates/route.ts",
 ];
 try {
   fs.writeFileSync(
@@ -86,6 +95,15 @@ try {
     path.join(root, "tests", "task-scheduling.cjs"),
     path.join(output, "task-scheduling.cjs"),
   );
+  for (const name of [
+    "phase1-trash.cjs",
+    "personal-templates.cjs",
+    "task-copy.cjs",
+    "saved-views.cjs",
+    "note-templates.cjs",
+  ]) {
+    fs.copyFileSync(path.join(root, "tests", name), path.join(output, name));
+  }
   const result = spawnSync(process.execPath, [path.join(output, "check.cjs")], {
     cwd: root,
     stdio: "inherit",
@@ -101,6 +119,9 @@ try {
   process.exitCode = result.status ?? 1;
   for (const check of [
     { file: "drafts.cjs" },
+    { file: "task-copy.cjs" },
+    { file: "saved-views.cjs" },
+    { file: "note-templates.cjs" },
     { file: "task-scheduling.cjs", timezone: "Europe/Belgrade" },
     { file: "task-scheduling.cjs", timezone: "America/New_York" },
   ]) {
@@ -111,9 +132,13 @@ try {
       {
         cwd: root,
         stdio: "inherit",
-        env: check.timezone
-          ? { ...process.env, TZ: check.timezone }
-          : process.env,
+        env: {
+          ...process.env,
+          ...(check.timezone ? { TZ: check.timezone } : {}),
+          NODE_PATH: [path.join(root, "node_modules"), process.env.NODE_PATH]
+            .filter(Boolean)
+            .join(path.delimiter),
+        },
       },
     );
     if (draftResult.error) throw draftResult.error;

@@ -1,5 +1,9 @@
 import { createSeedWorkspace } from "./seed";
-import { applyMutation, WorkspaceError } from "./workspace-model";
+import {
+  applyMutation,
+  validateMutation,
+  WorkspaceError,
+} from "./workspace-model";
 import {
   accountPersonId,
   assertSameOrigin,
@@ -18,6 +22,13 @@ import {
   savedSnapshot,
 } from "./workspace-journal";
 import { readBoundedBody } from "./request-body";
+import {
+  assertTrashIdAvailable,
+  captureDeletion,
+  prepareTrashRestore,
+  restoreWarnings,
+} from "./workspace-trash";
+import type { TrashCommit, WorkspaceMutationResult } from "./trash-types";
 
 interface WorkspaceRow {
   data: string;
@@ -56,6 +67,7 @@ async function rawWorkspace(access: ResolvedWorkspace): Promise<Workspace> {
   for (const view of workspace.savedViews) {
     view.dateFilter ??= "all";
     view.sort ??= "priority";
+    view.layout ??= "board";
   }
   workspace.revision = row.revision;
   return workspace;
@@ -384,6 +396,13 @@ export async function mutateWorkspace(
   request: Request,
   mutation: unknown,
 ): Promise<Workspace> {
+  return (await mutateWorkspaceResult(request, mutation)).workspace;
+}
+
+export async function mutateWorkspaceResult(
+  request: Request,
+  mutation: unknown,
+): Promise<WorkspaceMutationResult> {
   assertSameOrigin(request);
   const input =
     mutation && typeof mutation === "object" && !Array.isArray(mutation)
@@ -396,6 +415,7 @@ export async function mutateWorkspace(
   const operationId =
     typeof input.operationId === "string" ? input.operationId : undefined;
   const hash = await payloadHash(mutation);
+  const trashId = operationId || crypto.randomUUID();
   // Merge again against the latest committed data whenever another writer wins.
   for (let attempt = 0; attempt < 12; attempt++) {
     // Recheck membership on retries, including a removal during an edit.
@@ -405,8 +425,16 @@ export async function mutateWorkspace(
       access,
       await verifiedMembers(access),
     );
-    if (await hasReceipt(access, operationId, hash))
-      return activeWorkspace(current);
+    if (await hasReceipt(access, operationId, hash)) {
+      await resolveWorkspace(request);
+      return {
+        workspace: activeWorkspace(current),
+        warnings:
+          input.action === "restore" && typeof input.id === "string"
+            ? await restoreWarnings(access.id, input.id)
+            : [],
+      };
+    }
     if (
       input.action === "upsert" &&
       input.base === null &&
@@ -438,10 +466,33 @@ export async function mutateWorkspace(
           );
       }
     }
-    const updated = applyMutation(
-      current,
-      prepareMutation(mutation, current, access),
-    );
+    const trash: TrashCommit = {};
+    let updated: Workspace;
+    if (input.action === "restore") {
+      const restoreMutation = validateMutation(mutation);
+      const result = await prepareTrashRestore(
+        access.id,
+        current,
+        restoreMutation.id!,
+      );
+      updated = result.workspace;
+      trash.restore = result.restore;
+    } else {
+      if (input.action === "delete")
+        await assertTrashIdAvailable(access.id, trashId);
+      updated = applyMutation(
+        current,
+        prepareMutation(mutation, current, access),
+      );
+      if (input.action === "delete")
+        trash.deleted = captureDeletion(
+          current,
+          updated,
+          input.entity as Entity,
+          input.id as string,
+          trashId,
+        );
+    }
     for (const task of updated.tasks) {
       const assignee = updated.people.find(
         (person) => person.id === task.assigneeId,
@@ -464,9 +515,13 @@ export async function mutateWorkspace(
         operationId,
         hash,
         input.action === "import",
+        trash,
       )
     )
-      return activeWorkspace(updated);
+      return {
+        workspace: activeWorkspace(updated),
+        warnings: trash.restore?.warnings || [],
+      };
     await new Promise((resolve) =>
       setTimeout(resolve, 15 + Math.floor(Math.random() * 35) * (attempt + 1)),
     );

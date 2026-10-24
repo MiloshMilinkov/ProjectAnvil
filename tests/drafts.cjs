@@ -268,6 +268,319 @@ function checkTaskDraftValues() {
   assert.equal(parseTaskDraft(null), null);
 }
 
+async function checkEverydayRetryRecovery(drafts) {
+  const { moveToTrash } = require("./compiled/app/lib/trash-actions");
+  const {
+    recoverPendingOperation,
+  } = require("./compiled/app/lib/editor-mutations");
+  const { applyMutation } = require("./compiled/app/lib/workspace-model");
+  const { createSeedWorkspace } = require("./compiled/app/lib/seed");
+  const scope = { accountId: "retry-account", workspaceId: "retry-workspace" };
+  let workspace = applyMutation(createSeedWorkspace(), {
+    action: "upsert",
+    entity: "tasks",
+    item: { id: "retry-task", title: "Keep this recovery copy" },
+    base: null,
+  });
+  const input = {
+    entity: "tasks",
+    id: "retry-task",
+    base: structuredClone(workspace.tasks[0]),
+  };
+  // A matching intent belonging to another account must not supply Undo's token.
+  drafts.writeDraft(
+    { ...scope, accountId: "other-account" },
+    "mutations",
+    "foreign-delete",
+    {
+      ...input,
+      action: "delete",
+      operationId: "foreign-delete",
+    },
+    null,
+  );
+  const archives = new Map();
+  const receipts = new Map();
+  const calls = [];
+  const notices = [];
+  let loseDeleteReply = true;
+  const mutateDelete = async (mutation) => {
+    calls.push(structuredClone(mutation));
+    const recovery = drafts.writeDraft(
+      scope,
+      "mutations",
+      mutation.operationId,
+      mutation,
+      null,
+    );
+    if (!receipts.has(mutation.operationId)) {
+      const deleted = workspace.tasks.find((task) => task.id === mutation.id);
+      workspace = applyMutation(workspace, mutation);
+      archives.set(mutation.operationId, structuredClone(deleted));
+      receipts.set(mutation.operationId, JSON.stringify(mutation));
+    } else {
+      assert.equal(
+        JSON.stringify(mutation),
+        receipts.get(mutation.operationId),
+        "A receipt retry keeps the original payload",
+      );
+    }
+    if (loseDeleteReply) {
+      loseDeleteReply = false;
+      throw new Error("Delete committed but its reply was lost");
+    }
+    drafts.removeDraft(
+      scope,
+      "mutations",
+      mutation.operationId,
+      recovery.record.token,
+    );
+    return structuredClone(workspace);
+  };
+  const notify = (message, options) => notices.push({ message, ...options });
+  await assert.rejects(
+    () => moveToTrash(mutateDelete, notify, input, "Task", scope),
+    /reply was lost/,
+  );
+  assert.equal(
+    workspace.tasks.length,
+    0,
+    "The first request really committed before the connection failed",
+  );
+  assert.equal(
+    notices.length,
+    0,
+    "Undo is offered only after an acknowledged deletion",
+  );
+  const pending = drafts.listDrafts(scope, "mutations");
+  assert.equal(pending.length, 1);
+  const deletionId = pending[0].id;
+  assert.notEqual(deletionId, "foreign-delete");
+  await moveToTrash(mutateDelete, notify, input, "Task", scope);
+  assert.equal(calls.length, 2);
+  assert.equal(
+    calls[1].operationId,
+    deletionId,
+    "The helper recovers the original delete ID instead of creating another action",
+  );
+  assert.equal(
+    archives.size,
+    1,
+    "Retrying does not create another Trash archive",
+  );
+  assert.equal(receipts.size, 1);
+  assert.equal(archives.get(deletionId).id, input.id);
+  assert.deepEqual(notices, [
+    { message: "Task moved to Trash", undoId: deletionId },
+  ]);
+  assert.equal(
+    drafts.listDrafts(scope, "mutations").length,
+    0,
+    "Acknowledgement clears the recovered pending delete",
+  );
+
+  // SavedTaskViews holds its creation ID until acknowledgement. Exercise that
+  // composition with the real operation recovery and workspace model so a lost
+  // create reply cannot produce a second saved view or discard its layout.
+  const createId = "saved-view-stable-create";
+  const creation = {
+    action: "upsert",
+    entity: "savedViews",
+    base: null,
+    item: {
+      id: createId,
+      name: "Upcoming priorities",
+      query: "planning",
+      assignee: "",
+      priority: "high",
+      project: "",
+      status: "todo",
+      dateFilter: "due-next-7-days",
+      sort: "due-date",
+      layout: "timeline",
+    },
+  };
+  let loseCreateReply = true;
+  const createReceipts = new Map();
+  const createCalls = [];
+  const saveView = async (intent) => {
+    const mutation = recoverPendingOperation(scope, structuredClone(intent));
+    mutation.operationId ||= crypto.randomUUID();
+    createCalls.push(structuredClone(mutation));
+    const recovery = drafts.writeDraft(
+      scope,
+      "mutations",
+      mutation.operationId,
+      mutation,
+      null,
+    );
+    if (!createReceipts.has(mutation.operationId)) {
+      workspace = applyMutation(workspace, mutation);
+      createReceipts.set(mutation.operationId, JSON.stringify(mutation));
+    } else
+      assert.equal(
+        JSON.stringify(mutation),
+        createReceipts.get(mutation.operationId),
+      );
+    if (loseCreateReply) {
+      loseCreateReply = false;
+      throw new Error("View committed but its reply was lost");
+    }
+    drafts.removeDraft(
+      scope,
+      "mutations",
+      mutation.operationId,
+      recovery.record.token,
+    );
+    return workspace;
+  };
+  await assert.rejects(() => saveView(creation), /reply was lost/);
+  const pendingView = drafts.listDrafts(scope, "mutations")[0];
+  assert.equal(pendingView.record.value.item.id, createId);
+  assert.equal(
+    recoverPendingOperation(scope, {
+      ...creation,
+      item: { ...creation.item, layout: "list" },
+    }).operationId,
+    undefined,
+    "Changed layout is a distinct intent and cannot reuse the previous receipt",
+  );
+  await saveView(creation);
+  assert.equal(createCalls[1].operationId, createCalls[0].operationId);
+  assert.equal(createReceipts.size, 1);
+  assert.equal(workspace.savedViews.length, 1);
+  assert.equal(workspace.savedViews[0].id, createId);
+  assert.equal(workspace.savedViews[0].layout, "timeline");
+  assert.equal(drafts.listDrafts(scope, "mutations").length, 0);
+}
+
+function checkConfirmedTaskReplacement(drafts) {
+  const { replaceTaskDraft } = require("./compiled/app/lib/task-drafts");
+  const { applyMutation } = require("./compiled/app/lib/workspace-model");
+  const { createSeedWorkspace } = require("./compiled/app/lib/seed");
+  for (const sameId of [false, true]) {
+    const scope = {
+      accountId: "replacement-account",
+      workspaceId: `replacement-${sameId}`,
+    };
+    const foreign = { ...scope, accountId: "other-replacement-account" };
+    const oldMutation = {
+      action: "upsert",
+      entity: "tasks",
+      item: { id: "abandoned-task", title: "Abandoned task" },
+      base: null,
+      operationId: "failed-task-save",
+    };
+    const oldTask = applyMutation(createSeedWorkspace(), oldMutation).tasks[0];
+    const oldForm = { task: oldTask, tagText: "", comment: "", subtask: "" };
+    const oldDraft = drafts.writeDraft(
+      scope,
+      "tasks",
+      "new-task",
+      oldForm,
+      null,
+    );
+    drafts.writeDraft(
+      scope,
+      "mutations",
+      oldMutation.operationId,
+      oldMutation,
+      null,
+    );
+    const otherTask = {
+      action: "upsert",
+      entity: "tasks",
+      item: { id: "other-task", title: "Another unfinished task" },
+      base: null,
+      operationId: "other-save",
+    };
+    drafts.writeDraft(
+      scope,
+      "mutations",
+      otherTask.operationId,
+      otherTask,
+      null,
+    );
+    drafts.writeDraft(
+      scope,
+      "mutations",
+      "note-save",
+      {
+        action: "upsert",
+        entity: "notes",
+        item: { id: oldTask.id, title: "Unrelated note" },
+        base: null,
+      },
+      null,
+    );
+    drafts.writeDraft(
+      foreign,
+      "mutations",
+      oldMutation.operationId,
+      oldMutation,
+      null,
+    );
+    const displaced = drafts.writeDraft(
+      scope,
+      "recovery-copies",
+      "another-window",
+      { entity: "tasks", id: "new-task", record: oldDraft.record },
+      null,
+    );
+    const replacementTask = {
+      ...oldTask,
+      id: sameId ? oldTask.id : "copied-task",
+      title: sameId ? "Template content" : "Task copy",
+      key: "",
+    };
+    const replacement = { ...oldForm, task: replacementTask };
+
+    // This is the persistence action shared by both confirmed replacement paths.
+    const result = replaceTaskDraft(scope, "new-task", oldTask.id, replacement);
+    assert.equal(result.persisted, true);
+    assert.deepEqual(
+      drafts.readDraft(scope, "tasks", "new-task").value,
+      replacement,
+    );
+    const pending = drafts
+      .listDrafts(scope, "mutations")
+      .map(({ record }) => record.value);
+    assert.deepEqual(
+      pending.map((mutation) => mutation.operationId).filter(Boolean),
+      ["other-save"],
+    );
+    assert.equal(
+      pending.some((mutation) => mutation.entity === "notes"),
+      true,
+      "Other entity writes remain queued",
+    );
+    assert.equal(
+      drafts.listDrafts(foreign, "mutations").length,
+      1,
+      "Other account writes remain queued",
+    );
+    assert.deepEqual(
+      drafts.readDraft(scope, "recovery-copies", "another-window"),
+      displaced.record,
+      "Another window's displaced recovery copy remains intact",
+    );
+    let workspace = createSeedWorkspace();
+    for (const mutation of pending)
+      workspace = applyMutation(workspace, mutation);
+    workspace = applyMutation(workspace, {
+      action: "upsert",
+      entity: "tasks",
+      item: replacementTask,
+      base: null,
+    });
+    assert.deepEqual(
+      workspace.tasks.map((task) => task.title).sort(),
+      ["Another unfinished task", replacementTask.title].sort(),
+      "Retrying saves cannot resurrect the abandoned task content",
+    );
+  }
+}
+
 async function checkDrafts() {
   checkNoteDraftValues();
   checkTaskDraftValues();
@@ -731,6 +1044,9 @@ async function checkDrafts() {
       undefined,
       "Changed review expectations get a new operation",
     );
+
+    await checkEverydayRetryRecovery(drafts);
+    checkConfirmedTaskReplacement(drafts);
 
     let dirty = true;
     const release = drafts.registerDraftGuard(scope, "recording", {

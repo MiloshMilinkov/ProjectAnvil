@@ -18,6 +18,8 @@ export const taskSorts = [
   "updated",
 ] as const;
 export type TaskSort = (typeof taskSorts)[number];
+export const taskLayouts = ["board", "list", "timeline"] as const;
+export type TaskLayout = (typeof taskLayouts)[number];
 export interface Person {
   id: string;
   name: string;
@@ -117,6 +119,7 @@ export interface SavedView {
   status: string;
   dateFilter?: DateFilter;
   sort?: TaskSort;
+  layout?: TaskLayout;
 }
 export interface EntityRef {
   type: "note" | "task" | "project";
@@ -170,7 +173,13 @@ export type MutationItem =
   | Relationship
   | Record<string, unknown>;
 export interface Mutation {
-  action: "upsert" | "delete" | "rename" | "import" | "review-relationship";
+  action:
+    | "upsert"
+    | "delete"
+    | "restore"
+    | "rename"
+    | "import"
+    | "review-relationship";
   entity?: Entity;
   item?: MutationItem;
   id?: string;
@@ -183,6 +192,7 @@ export interface Mutation {
   expectedToSignature?: string;
 }
 export type Mutate = (mutation: Mutation) => Promise<Workspace>;
+export type Notify = (message: string, options?: { undoId: string }) => void;
 export interface FeatureProps {
   workspace: Workspace;
   mutate: Mutate;
@@ -190,7 +200,7 @@ export interface FeatureProps {
   openNote: (id: string) => void;
   currentPerson: string;
   projectFilter: string;
-  notify: (message: string) => void;
+  notify: Notify;
 }
 export const statuses: { id: Status; label: string; color: string }[] = [
   { id: "backlog", label: "Backlog", color: "#8c91a5" },

@@ -1,6 +1,6 @@
 import { resolveWorkspace } from "../../lib/access-store";
 import {
-  mutateWorkspace,
+  mutateWorkspaceResult,
   readMutationRequest,
   readWorkspace,
   routeError,
@@ -41,12 +41,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const access = await resolveWorkspace(request);
-    const workspace = await mutateWorkspace(
+    const result = await mutateWorkspaceResult(
       request,
       await readMutationRequest(request),
     );
     return Response.json(
-      { workspace: workspaceForClient(workspace, access.id) },
+      {
+        workspace: workspaceForClient(result.workspace, access.id),
+        warnings: result.warnings,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

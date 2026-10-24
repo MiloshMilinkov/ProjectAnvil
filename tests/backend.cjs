@@ -655,6 +655,8 @@ async function main() {
     "entity_tombstones",
     "note_history",
     "media_objects",
+    "workspace_trash",
+    "personal_templates",
   ];
   const migratedTables = new Set(
     sql
@@ -664,7 +666,7 @@ async function main() {
   );
   assert.equal(
     requiredTables.filter((name) => migratedTables.has(name)).length,
-    15,
+    17,
     "Runtime bootstrap must create every auth, access, work room and recovery table",
   );
   const userColumns = sql
@@ -1033,6 +1035,13 @@ async function main() {
     store: rawStore,
     request,
     objects,
+  });
+  await require("./phase1-trash.cjs")({ sql, store: rawStore, request });
+  await require("./personal-templates.cjs")({
+    sql,
+    store: rawStore,
+    request,
+    users,
   });
   Module._load = originalLoad;
   sql.close();

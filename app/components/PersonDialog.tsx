@@ -11,7 +11,7 @@ interface Props {
   person: Person | null;
   mutate: FeatureProps["mutate"];
   onClose: () => void;
-  notify: (message: string) => void;
+  notify: FeatureProps["notify"];
 }
 
 function isPerson(value: unknown): value is Person {
@@ -61,12 +61,13 @@ export default function PersonDialog({
   async function remove() {
     if (
       !window.confirm(
-        "Remove this assignment label? Its tasks will become unassigned.",
+        "Move this assignment label to Trash? Its tasks will become unassigned.",
       )
     )
       return;
-    if (await editor.remove()) {
-      notify("Assignment label removed");
+    const undoId = await editor.remove();
+    if (undoId) {
+      notify("Assignment label moved to Trash", { undoId });
       onClose();
     }
   }

@@ -43,6 +43,7 @@ export function useWorkspaceData() {
   const [loadError, setLoadError] = useState("");
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(0);
+  const [restoreWarnings, setRestoreWarnings] = useState<string[]>([]);
   const latest = useRef<Workspace | null>(null);
   const alive = useRef(true);
   const reads = useRef(new AbortController());
@@ -192,6 +193,7 @@ export function useWorkspaceData() {
                 const data = (await response.json()) as {
                   workspace?: Workspace;
                   error?: string;
+                  warnings?: string[];
                 };
                 if (!response.ok || !data.workspace)
                   throw new SaveError(
@@ -199,6 +201,14 @@ export function useWorkspaceData() {
                     response.status,
                   );
                 saved = data.workspace;
+                if (
+                  alive.current &&
+                  mutation.action === "restore" &&
+                  data.warnings?.length
+                )
+                  setRestoreWarnings((previous) => [
+                    ...new Set([...previous, ...data.warnings!]),
+                  ]);
                 break;
               } catch (error) {
                 if (
@@ -324,6 +334,8 @@ export function useWorkspaceData() {
     loadError,
     mutate,
     pending,
+    restoreWarnings,
+    clearRestoreWarnings: () => setRestoreWarnings([]),
     outboxSize,
     retrySaves,
     syncError:

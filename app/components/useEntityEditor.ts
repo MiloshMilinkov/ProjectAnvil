@@ -11,6 +11,8 @@ import {
 } from "../lib/draft-store";
 import { useDraftScope } from "./useRecoverableDraft";
 import { useWorkspaceFetch } from "./WorkspaceScope";
+import { recoverPendingOperation } from "../lib/editor-mutations";
+import { uid } from "../lib/types";
 
 type Editable = Project | Person;
 
@@ -147,23 +149,25 @@ export function useEntityEditor<T extends Editable>({
     }
   }
 
-  async function remove(): Promise<boolean> {
+  async function remove(): Promise<string | false> {
     if (!original || busyRef.current) return false;
     busyRef.current = true;
     setBusy(true);
     setError("");
+    const token = readDraft(scope, recoveryEntity, recoveryId)?.token;
     try {
       const base = baseline.current;
-      await mutate({
+      const deletion = recoverPendingOperation(scope, {
         action: "delete",
         entity,
         id: original.id,
         base: base ? { ...base } : null,
       });
-      const token = readDraft(scope, recoveryEntity, recoveryId)?.token;
+      deletion.operationId ||= uid();
+      await mutate(deletion);
       clearRecovery(token);
       discardDraftMutations(scope, entity, original.id);
-      return true;
+      return deletion.operationId;
     } catch (cause) {
       setError(
         cause instanceof Error

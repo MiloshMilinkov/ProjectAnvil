@@ -44,6 +44,8 @@ import {
   Zap,
   CircleHelp,
   Anvil,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import {
   Workspace,
@@ -53,9 +55,10 @@ import {
   FeatureProps,
   Status,
   Priority,
+  type TaskLayout,
+  type Notify,
   statuses,
   priorities,
-  uid,
   today,
 } from "../lib/types";
 import Knowledge from "./Knowledge";
@@ -103,6 +106,8 @@ import {
   type TaskSort,
 } from "../lib/task-scheduling";
 import "./task-scheduling.css";
+import SavedTaskViews from "./SavedTaskViews";
+import TrashDialog from "./TrashDialog";
 
 type Page = TourPage;
 const nav = [
@@ -157,6 +162,7 @@ function PriorityMark({ value }: { value: Priority }) {
 }
 export default function ProjectAnvil() {
   const phoneLayout = useMediaQuery("(max-width: 760px)");
+  const navigationButton = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const paletteRef = useRef<HTMLElement>(null);
   const shortcutsRef = useRef<HTMLDivElement>(null);
@@ -171,6 +177,8 @@ export default function ProjectAnvil() {
     syncError,
     outboxSize,
     retrySaves,
+    restoreWarnings,
+    clearRestoreWarnings,
   } = useWorkspaceData();
   const draftScope = useDraftScope();
   const recoveryCount = useSyncExternalStore(
@@ -206,17 +214,24 @@ export default function ProjectAnvil() {
     [selectedNote, setSelectedNote] = useState(startup.note),
     [selectedTask, setSelectedTask] = useState<string | null>(null),
     [newTask, setNewTask] = useState(false),
+    [taskSeed, setTaskSeed] = useState<Task | undefined>(),
     [newTaskStatus, setNewTaskStatus] = useState<Status>("todo"),
     [newProject, setNewProject] = useState(false),
     [editingProject, setEditingProject] = useState<Project | null>(null),
     [personModal, setPersonModal] = useState<Person | "new" | null>(null),
     [palette, setPalette] = useState(false),
     [search, setSearch] = useState(""),
-    [toast, setToast] = useState(""),
+    [toast, setToast] = useState<{ message: string; undoId?: string } | null>(
+      null,
+    ),
     [focus, setFocus] = useState(startup.focus),
     [shortcuts, setShortcuts] = useState(false),
     [tourOpen, setTourOpen] = useState(false);
   const [reviewPending, setReviewPending] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [undoPending, setUndoPending] = useState(false);
+  const undoGuard = useRef(false);
+  const toastSequence = useRef(0);
   const [tourPending, setTourPending] = useState(
     () => !readBrowserPreference("projectanvil-tour-v1"),
   );
@@ -241,11 +256,36 @@ export default function ProjectAnvil() {
     tourReturnPage = useRef<Page>("overview"),
     tourReturnFocus = useRef(false);
   const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notify = useCallback((message: string) => {
-    setToast(message);
+  const notify: Notify = useCallback((message, options) => {
+    toastSequence.current += 1;
+    setToast({ message, ...options });
     if (toastRef.current) clearTimeout(toastRef.current);
-    toastRef.current = setTimeout(() => setToast(""), 4200);
+    // Keep Undo available until the next notification or explicit dismissal.
+    if (!options?.undoId)
+      toastRef.current = setTimeout(() => setToast(null), 4200);
   }, []);
+  async function undoDelete() {
+    if (!toast?.undoId || undoGuard.current) return;
+    const { undoId } = toast;
+    const sequence = toastSequence.current;
+    undoGuard.current = true;
+    setUndoPending(true);
+    try {
+      await mutate({ action: "restore", id: undoId });
+      if (sequence === toastSequence.current) notify("Item restored");
+    } catch (cause) {
+      if (sequence === toastSequence.current)
+        notify(
+          cause instanceof Error
+            ? cause.message
+            : "Restore failed. You can retry in Trash.",
+          { undoId },
+        );
+    } finally {
+      undoGuard.current = false;
+      setUndoPending(false);
+    }
+  }
   useEffect(
     () => () => {
       if (toastRef.current) clearTimeout(toastRef.current);
@@ -280,6 +320,7 @@ export default function ProjectAnvil() {
     setMobile(false);
     setPalette(false);
     setNewTask(false);
+    setTaskSeed(undefined);
     setNewProject(false);
     setPersonModal(null);
     setShortcuts(false);
@@ -300,6 +341,7 @@ export default function ProjectAnvil() {
   const openTask = useCallback((id: string) => {
       setSelectedTask(id);
       setNewTask(false);
+      setTaskSeed(undefined);
     }, []),
     openNote = useCallback(
       (id: string) => {
@@ -563,6 +605,17 @@ export default function ProjectAnvil() {
             </div>
             <div className="sidebar-bottom">
               <button
+                data-tour="trash"
+                className="nav-item"
+                onClick={() => {
+                  setTrashOpen(true);
+                  setMobile(false);
+                }}
+              >
+                <Trash2 size={17} />
+                Trash
+              </button>
+              <button
                 data-tour="nav-team"
                 className={"nav-item " + (page === "team" ? "active" : "")}
                 aria-current={page === "team" ? "page" : undefined}
@@ -611,6 +664,7 @@ export default function ProjectAnvil() {
           <div className="breadcrumbs">
             <button
               className="btn-icon mobile-menu"
+              ref={navigationButton}
               aria-label="Open navigation"
               onClick={() => setMobile(true)}
             >
@@ -702,6 +756,25 @@ export default function ProjectAnvil() {
             onManage={() => go("rooms")}
             onDismiss={rooms.dismissRoom}
           />
+        )}
+        {!trashOpen && restoreWarnings.length > 0 && (
+          <aside className="restore-notice" role="status">
+            <div>
+              <strong>Restored with connections to review</strong>
+              <button
+                className="btn-icon"
+                aria-label="Dismiss restore details"
+                onClick={clearRestoreWarnings}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <ul>
+              {restoreWarnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
+              ))}
+            </ul>
+          </aside>
         )}
         {loadError && (
           <div className="error-banner" role="status">
@@ -868,9 +941,15 @@ export default function ProjectAnvil() {
       </div>
       {(newTask || selectedTask) && (
         <TaskDialog
-          key={selectedTask || "new-task"}
+          key={selectedTask || taskSeed?.id || "new-task"}
           workspace={w}
           task={w.tasks.find((t) => t.id === selectedTask)}
+          initialTask={taskSeed}
+          onDuplicate={(copy) => {
+            setSelectedTask(null);
+            setTaskSeed(copy);
+            setNewTask(true);
+          }}
           projectId={projectFilter}
           personId={currentPerson}
           initialStatus={newTaskStatus}
@@ -878,6 +957,7 @@ export default function ProjectAnvil() {
           onClose={() => {
             setSelectedTask(null);
             setNewTask(false);
+            setTaskSeed(undefined);
           }}
           openNote={openNote}
           notify={notify}
@@ -1105,14 +1185,36 @@ export default function ProjectAnvil() {
           onClose={() => setReviewPending(false)}
         />
       )}
+      {trashOpen && (
+        <TrashDialog
+          mutate={mutate}
+          notify={notify}
+          warnings={restoreWarnings}
+          onClose={() => {
+            setTrashOpen(false);
+            if (phoneLayout)
+              requestAnimationFrame(() => navigationButton.current?.focus());
+          }}
+        />
+      )}
       {tourOpen && <GuidedTour onNavigate={go} onClose={closeTour} />}
       {toast && (
         <div className="toast" role="status">
           <Check size={16} />
-          {toast}
+          <span className="toast-message">{toast.message}</span>
+          {toast.undoId && (
+            <button
+              className="toast-undo"
+              disabled={undoPending}
+              onClick={() => void undoDelete()}
+            >
+              <RotateCcw size={14} />
+              {undoPending ? "Restoring…" : "Undo"}
+            </button>
+          )}
           <button
             aria-label="Dismiss notification"
-            onClick={() => setToast("")}
+            onClick={() => setToast(null)}
           >
             <X size={14} />
           </button>
@@ -1507,18 +1609,14 @@ function TaskView(
   const referenceDate = useCalendarToday();
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sort, setSort] = useState<TaskSort>("priority");
-  const [chosenView, setView] = useState<string | null>(null),
+  const [chosenView, setView] = useState<TaskLayout | null>(null),
     [query, setQuery] = useState(""),
     [assignee, setAssignee] = useState(""),
     [priority, setPriority] = useState(""),
     [status, setStatus] = useState(""),
-    [viewName, setViewName] = useState(""),
-    [savingView, setSavingView] = useState(false),
-    [viewPending, setViewPending] = useState(false),
     [dragging, setDragging] = useState(""),
     [dragOver, setDragOver] = useState("");
   const view = chosenView ?? (phoneLayout ? "list" : "board");
-  const viewSaveGuard = useRef(false);
   const filtered = !!(
     query ||
     (!mine && assignee) ||
@@ -1566,34 +1664,6 @@ function TaskView(
     setStatus("");
     setProjectFilter("");
     setDateFilter("all");
-  }
-  async function saveView() {
-    if (!viewName.trim() || viewSaveGuard.current) return;
-    viewSaveGuard.current = true;
-    setViewPending(true);
-    try {
-      await mutate({
-        action: "upsert",
-        entity: "savedViews",
-        item: {
-          id: uid(),
-          name: viewName.trim(),
-          query,
-          assignee: mine ? "" : assignee,
-          priority,
-          project: projectFilter,
-          status,
-          dateFilter,
-          sort,
-        },
-      });
-      setSavingView(false);
-      setViewName("");
-      notify("View saved");
-    } finally {
-      viewSaveGuard.current = false;
-      setViewPending(false);
-    }
   }
   return (
     <div className="page tasks-page">
@@ -1663,16 +1733,6 @@ function TaskView(
             ))}
           </select>
         </label>
-        <button
-          className="btn btn-subtle"
-          disabled={viewPending}
-          aria-expanded={savingView}
-          aria-controls="save-task-view"
-          onClick={() => setSavingView((p) => !p)}
-        >
-          <Bookmark size={14} />
-          Save view
-        </button>
       </div>
       <div
         className="filters"
@@ -1764,72 +1824,32 @@ function TaskView(
           </button>
         )}
       </div>
-      {savingView && (
-        <div className="save-view-bar" id="save-task-view">
-          <label htmlFor="saved-view-name">View name</label>
-          <input
-            id="saved-view-name"
-            autoFocus
-            className="field"
-            placeholder="Name this filtered view"
-            value={viewName}
-            disabled={viewPending}
-            onChange={(e) => setViewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void saveView().catch(() => {});
-            }}
-          />
-          <button
-            className="btn btn-primary"
-            disabled={!viewName.trim() || viewPending}
-            onClick={() => saveView().catch(() => {})}
-          >
-            {viewPending ? "Saving…" : "Save view"}
-          </button>
-          <button
-            className="btn-icon"
-            aria-label="Cancel saving view"
-            disabled={viewPending}
-            onClick={() => setSavingView(false)}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-      {w.savedViews.length > 0 && (
-        <div className="saved-views">
-          <span>Saved views</span>
-          {w.savedViews.map((v) => (
-            <span key={v.id} className="saved-view-chip">
-              <button
-                onClick={() => {
-                  setQuery(v.query);
-                  setAssignee(v.assignee);
-                  setPriority(v.priority);
-                  setStatus(v.status);
-                  setProjectFilter(v.project);
-                  setDateFilter(v.dateFilter || "all");
-                  setSort(v.sort || "priority");
-                }}
-              >
-                {v.name}
-              </button>
-              <button
-                title={"Delete view " + v.name}
-                onClick={() =>
-                  mutate({
-                    action: "delete",
-                    entity: "savedViews",
-                    id: v.id,
-                  }).catch(() => {})
-                }
-              >
-                <X size={11} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      <SavedTaskViews
+        workspace={w}
+        mutate={mutate}
+        notify={notify}
+        mine={mine}
+        config={{
+          query,
+          assignee,
+          priority,
+          project: projectFilter,
+          status,
+          dateFilter,
+          sort,
+          layout: view,
+        }}
+        onApply={(config) => {
+          setQuery(config.query);
+          setAssignee(config.assignee);
+          setPriority(config.priority);
+          setStatus(config.status);
+          setProjectFilter(config.project);
+          setDateFilter(config.dateFilter || "all");
+          setSort(config.sort || "priority");
+          setView(config.layout);
+        }}
+      />
       {view === "board" && filtered && !tasks.length && (
         <div className="task-filter-empty" role="status">
           <span>No tasks match these filters.</span>

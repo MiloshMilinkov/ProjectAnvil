@@ -5,6 +5,7 @@ import {
   Check,
   CheckSquare,
   ChevronRight,
+  Copy,
   ExternalLink,
   Link2,
   Plus,
@@ -35,12 +36,22 @@ import { useWorkspaceFetch } from "./WorkspaceScope";
 import {
   parseRecoverableTask,
   parseTaskDraft,
+  replaceTaskDraft,
   type TaskForm,
 } from "../lib/task-drafts";
 import "./entity-editors.css";
+import PersonalTemplates from "./PersonalTemplates";
+import { duplicateTask } from "../lib/task-copy";
+import {
+  instantiateTaskTemplate,
+  taskTemplateContent,
+} from "../lib/personal-templates";
+import { moveToTrash } from "../lib/trash-actions";
 export default function TaskDialog({
   workspace: w,
   task,
+  initialTask,
+  onDuplicate,
   projectId,
   personId,
   initialStatus,
@@ -51,13 +62,15 @@ export default function TaskDialog({
 }: {
   workspace: Workspace;
   task?: Task;
+  initialTask?: Task;
+  onDuplicate?: (task: Task) => void;
   projectId: string;
   personId: string;
   initialStatus: Status;
   mutate: FeatureProps["mutate"];
   onClose: () => void;
   openNote: (id: string) => void;
-  notify: (s: string) => void;
+  notify: FeatureProps["notify"];
 }) {
   const scope = useDraftScope();
   const scopedFetch = useWorkspaceFetch();
@@ -75,29 +88,32 @@ export default function TaskDialog({
   );
   const [freshForm] = useState<TaskForm>(() => ({
     task: structuredClone(
-      task || {
-        id: uid(),
-        key: "",
-        title: "",
-        description: "",
-        status: initialStatus,
-        priority: "medium",
-        type: "task",
-        projectId: w.projects.some((p) => p.id === projectId) ? projectId : "",
-        assigneeId: w.people.some((p) => p.id === personId) ? personId : "",
-        startDate: "",
-        dueDate: "",
-        estimate: 0,
-        tags: [],
-        noteIds: [],
-        blockedBy: [],
-        subtasks: [],
-        comments: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
+      task ||
+        initialTask || {
+          id: uid(),
+          key: "",
+          title: "",
+          description: "",
+          status: initialStatus,
+          priority: "medium",
+          type: "task",
+          projectId: w.projects.some((p) => p.id === projectId)
+            ? projectId
+            : "",
+          assigneeId: w.people.some((p) => p.id === personId) ? personId : "",
+          startDate: "",
+          dueDate: "",
+          estimate: 0,
+          tags: [],
+          noteIds: [],
+          blockedBy: [],
+          subtasks: [],
+          comments: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
     ),
-    tagText: task?.tags.join(", ") || "",
+    tagText: (task || initialTask)?.tags.join(", ") || "",
     comment: "",
     subtask: "",
   }));
@@ -112,11 +128,27 @@ export default function TaskDialog({
     [closePrompt, setClosePrompt] = useState(false),
     [preview, setPreview] = useState(false),
     [tab, setTab] = useState("details");
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [copyPending, setCopyPending] = useState(
+    !!initialTask && !!initialRecovery,
+  );
   const busy = useRef(false),
-    dirty = useRef(!!initialRecovery),
+    dirty = useRef(!!initialRecovery || !!initialTask),
     dialogRef = useRef<HTMLElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const token = useRef(initialRecovery?.token);
+  useEffect(() => {
+    if (!initialTask || initialRecovery) return;
+    const result = writeDraft(scope, "tasks", draftId, freshForm, null);
+    token.current = result.record.token;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setDraftError(result.error || "");
+    });
+    return () => {
+      active = false;
+    };
+  }, [initialTask, initialRecovery, scope, draftId, freshForm]);
   function change(patch: Partial<TaskForm>) {
     if (busy.current) return;
     const next = { ...latestForm.current, ...patch };
@@ -138,7 +170,9 @@ export default function TaskDialog({
             updatedAt: next.task.updatedAt,
           },
         };
-    dirty.current = JSON.stringify(next) !== JSON.stringify(baselineForm);
+    dirty.current =
+      (!originalTask.current && !!initialTask) ||
+      JSON.stringify(next) !== JSON.stringify(baselineForm);
     if (!dirty.current) {
       if (token.current) removeDraft(scope, "tasks", draftId, token.current);
       token.current = undefined;
@@ -154,6 +188,26 @@ export default function TaskDialog({
     );
     token.current = result.record.token;
     setDraftError(result.error || "");
+  }
+  function replaceUnfinishedTask(next: TaskForm) {
+    const result = replaceTaskDraft(
+      scope,
+      draftId,
+      latestForm.current.task.id,
+      next,
+    );
+    originalTask.current = null;
+    latestForm.current = next;
+    setForm(next);
+    setExists(false);
+    setRecovered(false);
+    setCopyPending(false);
+    dirty.current = true;
+    token.current = result.record.token;
+    setDraftError(result.error || "");
+    dialogRef.current
+      ?.querySelector<HTMLInputElement>(".task-title-input input")
+      ?.focus();
   }
   const set = <K extends keyof Task>(key: K, value: Task[K]) =>
     change({ task: { ...latestForm.current.task, [key]: value } });
@@ -384,23 +438,29 @@ export default function TaskDialog({
     if (
       busy.current ||
       !task ||
-      !window.confirm("Delete this task and its discussion?")
+      !window.confirm(
+        "Move this task and its discussion to Trash? You can restore it later.",
+      )
     )
       return;
     busy.current = true;
     setSaving(true);
     setError("");
     try {
-      await mutate({
-        action: "delete",
-        entity: "tasks",
-        id: task.id,
-        base: originalTask.current ? { ...originalTask.current } : null,
-      });
+      await moveToTrash(
+        mutate,
+        notify,
+        {
+          entity: "tasks",
+          id: task.id,
+          base: originalTask.current ? { ...originalTask.current } : null,
+        },
+        "Task",
+        scope,
+      );
       removeDraft(scope, "tasks", draftId, token.current);
       discardDraftMutations(scope, "tasks", task.id);
       dirty.current = false;
-      notify("Task deleted");
       onClose();
     } catch (error) {
       setError(
@@ -463,6 +523,58 @@ export default function TaskDialog({
           </button>
         </div>
         <div className="task-dialog-body">
+          <div className="task-template-toolbar" data-tour="task-templates">
+            <button
+              className="btn"
+              disabled={saving}
+              onClick={() => setTemplatesOpen(true)}
+            >
+              <Copy size={15} />
+              My task templates
+            </button>
+            {task && onDuplicate && (
+              <button
+                className="btn"
+                disabled={saving}
+                data-tour="duplicate-task"
+                onClick={async () => {
+                  if (dirty.current && !(await save(false))) return;
+                  onDuplicate(duplicateTask(originalTask.current || task, w));
+                }}
+              >
+                <Copy size={15} />
+                Duplicate task
+              </button>
+            )}
+          </div>
+          {copyPending && (
+            <div
+              className="warning-box duplicate-recovery-choice"
+              role="status"
+            >
+              <span>
+                An unfinished new task was recovered. Your requested copy is
+                ready if you prefer to start with it.
+              </span>
+              <button
+                className="btn"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Replace the recovered new-task draft with this copy?",
+                    )
+                  )
+                    return;
+                  replaceUnfinishedTask(freshForm);
+                }}
+              >
+                Use copy instead
+              </button>
+              <button className="btn" onClick={() => setCopyPending(false)}>
+                Keep recovered task
+              </button>
+            </div>
+          )}
           {recovered && (
             <p className="draft-recovery-note" role="status">
               Recovered task draft from this device.
@@ -972,13 +1084,13 @@ export default function TaskDialog({
           {task && (
             <button
               className="btn danger editor-delete"
-              aria-label="Delete task"
-              title="Delete task"
+              aria-label="Move task to Trash"
+              title="Move task to Trash"
               disabled={saving}
               onClick={() => void deleteTask()}
             >
               <Trash2 size={16} />
-              <span>Delete</span>
+              <span>Trash</span>
             </button>
           )}
           <span className="small-text muted">
@@ -999,6 +1111,51 @@ export default function TaskDialog({
           </button>
         </footer>
       </section>
+      {templatesOpen && (
+        <PersonalTemplates
+          kind="task"
+          source={taskTemplateContent({
+            ...draft,
+            tags: tagText
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+          })}
+          sourceTitle={draft.title}
+          onClose={() => setTemplatesOpen(false)}
+          onUse={async (template) => {
+            if (template.kind !== "task") return;
+            const seeded = instantiateTaskTemplate(template.content, {
+              projectId: draft.projectId,
+            });
+            if (exists) {
+              if (!onDuplicate)
+                throw new Error("Create a new task to use this template.");
+              if (dirty.current && !(await save(false)))
+                throw new Error(
+                  "Save your current task before using a template.",
+                );
+              onDuplicate(seeded);
+              return;
+            }
+            const next = {
+              task: { ...seeded, id: draft.id },
+              tagText: seeded.tags.join(", "),
+              comment: "",
+              subtask: "",
+            };
+            if (dirty.current) {
+              if (
+                !window.confirm(
+                  "Replace the current unfinished task with this template?",
+                )
+              )
+                throw new Error("Your current task is kept.");
+              replaceUnfinishedTask(next);
+            } else change(next);
+          }}
+        />
+      )}
     </div>
   );
 }

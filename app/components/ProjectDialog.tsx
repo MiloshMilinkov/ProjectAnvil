@@ -11,7 +11,7 @@ interface Props {
   project: Project | null;
   mutate: FeatureProps["mutate"];
   onClose: () => void;
-  notify: (message: string) => void;
+  notify: FeatureProps["notify"];
 }
 
 function isProject(value: unknown): value is Project {
@@ -80,10 +80,15 @@ export default function ProjectDialog({
   }
 
   async function remove() {
-    if (!window.confirm("Delete this project? Move its notes and tasks first."))
+    if (
+      !window.confirm(
+        "Move this project to Trash? Move its notes and tasks first.",
+      )
+    )
       return;
-    if (await editor.remove()) {
-      notify("Project deleted");
+    const undoId = await editor.remove();
+    if (undoId) {
+      notify("Project moved to Trash", { undoId });
       onClose();
     }
   }
@@ -219,12 +224,12 @@ export default function ProjectDialog({
             <button
               type="button"
               className="btn danger editor-delete"
-              aria-label="Delete project"
+              aria-label="Move project to Trash"
               disabled={editor.busy}
               onClick={() => void remove()}
             >
               <Trash2 size={16} />
-              <span>Delete</span>
+              <span>Move to Trash</span>
             </button>
           )}
           <button
