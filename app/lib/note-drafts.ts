@@ -1,5 +1,6 @@
 import type { DraftRecord } from "./draft-store";
 import type { Note, Priority } from "./types";
+import { isDecisionDraft } from "./note-structures";
 import {
   instantiateNoteTemplate,
   type PersonalTemplate,
@@ -20,6 +21,7 @@ export const noteTemplateIds = [
   "character",
   "research",
   "meeting",
+  "decision",
 ] as const;
 export type NoteTemplateId = (typeof noteTemplateIds)[number];
 
@@ -106,9 +108,15 @@ export function isRecoverableNote(value: unknown): value is Note {
     !reference(value.projectId) ||
     typeof value.bookmarked !== "boolean" ||
     typeof value.kind !== "string" ||
-    !["note", "world", "character", "research", "daily", "meeting"].includes(
-      value.kind,
-    ) ||
+    ![
+      "note",
+      "world",
+      "character",
+      "research",
+      "daily",
+      "meeting",
+      "decision",
+    ].includes(value.kind) ||
     !Array.isArray(value.tags) ||
     !value.tags.every((tag) => typeof tag === "string") ||
     !object(value.properties) ||
@@ -118,6 +126,22 @@ export function isRecoverableNote(value: unknown): value is Note {
     !timestamp(value.createdAt) ||
     !timestamp(value.updatedAt) ||
     !Array.isArray(value.snapshots)
+  )
+    return false;
+  if (value.customTypeId !== undefined && !reference(value.customTypeId))
+    return false;
+  if (
+    value.propertyValues !== undefined &&
+    (!object(value.propertyValues) ||
+      !Object.values(value.propertyValues).every(
+        (property) => typeof property === "string",
+      ))
+  )
+    return false;
+  if (
+    value.decision !== undefined &&
+    value.decision !== null &&
+    !isDecisionDraft(value.decision)
   )
     return false;
   return value.snapshots.every(

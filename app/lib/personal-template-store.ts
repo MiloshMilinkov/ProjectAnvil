@@ -37,6 +37,7 @@ const noteContent = z
       "research",
       "daily",
       "meeting",
+      "decision",
     ]),
     folder: z.string().max(300),
     tags,

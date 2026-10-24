@@ -1,0 +1,249 @@
+.note-type-manager,
+.note-type-editor {
+  width: min(720px, calc(100vw - 32px));
+}
+.note-type-manager .btn,
+.note-type-editor .btn,
+.note-structured-fields .btn,
+.decision-fields .btn {
+  min-height: 44px;
+  white-space: normal;
+}
+.note-structure-help {
+  color: var(--text-secondary, var(--muted));
+  font-size: var(--font-size-caption, 13px);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.note-type-list {
+  padding: 0;
+  margin: var(--space-5, 20px) 0;
+  list-style: none;
+}
+.note-type-list li {
+  display: flex;
+  gap: var(--space-3, 12px);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4, 16px) 0;
+  border-bottom: 1px solid var(--control-border, var(--border));
+}
+.note-type-list li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.note-type-list strong {
+  display: block;
+  font-size: var(--font-size-body, 15px);
+}
+.note-type-list span {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--font-size-caption, 13px);
+  color: var(--text-secondary, var(--muted));
+}
+.note-type-list p:empty {
+  display: none;
+}
+.note-type-list p {
+  font-size: var(--font-size-caption, 13px);
+  margin: 8px 0 0;
+}
+.note-type-list .btn {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow-wrap: anywhere;
+}
+.note-structure-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+.note-structure-heading h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.note-structure-heading span {
+  font-size: 13px;
+  color: var(--text-secondary, var(--muted));
+}
+.note-type-fields {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+}
+.note-type-field {
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface-raised, var(--panel-2));
+  padding: 16px;
+  min-width: 0;
+}
+.note-type-field-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.note-type-field-actions label,
+.note-type-archive {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.note-type-archive {
+  margin-top: 20px;
+}
+.note-type-field-actions input,
+.note-type-archive input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.note-structured-fields {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--control-border, var(--border));
+  border-bottom: 1px solid var(--control-border, var(--border));
+  min-width: 0;
+}
+.note-structured-fields .form-label {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  min-width: 0;
+}
+.note-structured-fields .field {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  font-size: 14px;
+}
+.note-structured-property > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.note-structured-property small {
+  font-size: 12px;
+  color: var(--text-secondary, var(--muted));
+}
+.note-structured-fields p {
+  margin: 0;
+}
+.note-document:has(> .decision-fields) {
+  overflow-y: auto;
+}
+.decision-fields {
+  margin: 0 28px 20px;
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface-raised, var(--panel-2));
+  min-width: 0;
+  flex-shrink: 0;
+}
+.decision-fields summary {
+  padding: 14px 16px;
+  min-height: 48px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.decision-fields summary span {
+  margin-left: 12px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary, var(--muted));
+}
+.decision-fields summary:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 3px;
+}
+.decision-fields-body {
+  padding: 0 16px 16px;
+}
+.decision-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.decision-text-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+.decision-fields .form-label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+.decision-fields .field {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  font-size: 14px;
+}
+.decision-fields textarea {
+  resize: vertical;
+}
+.note-type-filter {
+  padding: 0 14px 10px;
+}
+.note-type-filter select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+.note-types-browser-action {
+  margin: 0 14px 12px;
+  min-height: 44px;
+}
+@media (max-width: 750px) {
+  .note-type-manager,
+  .note-type-editor {
+    width: calc(100vw - 20px);
+    padding: 20px 16px;
+  }
+  .note-type-list li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .note-type-list .btn {
+    max-width: 100%;
+    align-self: flex-start;
+  }
+  .note-type-field {
+    padding: 12px;
+  }
+  .note-type-editor .field,
+  .note-structured-fields .field,
+  .decision-fields .field,
+  .note-type-filter select {
+    font-size: 16px;
+  }
+  .decision-fields {
+    margin: 0 14px 16px;
+  }
+  .decision-meta,
+  .decision-text-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .note-types-browser-action {
+    width: calc(100% - 28px);
+  }
+}

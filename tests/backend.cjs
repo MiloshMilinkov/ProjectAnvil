@@ -1049,6 +1049,12 @@ async function main() {
     request,
     users,
   });
+  await require("./phase3-connected.cjs")({
+    sql,
+    store: rawStore,
+    request,
+    users,
+  });
   Module._load = originalLoad;
   sql.close();
   console.log(

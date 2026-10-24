@@ -44,6 +44,9 @@ export function createSignatureReader(
   const projects = new Map(
     workspace.projects.map((project) => [project.id, project]),
   );
+  const noteTypes = new Map(
+    (workspace.noteTypes || []).map((type) => [type.id, type]),
+  );
   const cache = new Map<string, string>();
 
   return (reference) => {
@@ -53,6 +56,9 @@ export function createSignatureReader(
     let value: unknown;
     if (reference.type === "note") {
       const note = notes.get(reference.id);
+      const noteType = note?.customTypeId
+        ? noteTypes.get(note.customTypeId)
+        : undefined;
       if (note)
         value = {
           title: note.title,
@@ -60,6 +66,14 @@ export function createSignatureReader(
           projectId: note.projectId,
           properties: note.properties,
           kind: note.kind,
+          ...(note.customTypeId ? { customTypeId: note.customTypeId } : {}),
+          ...(noteType
+            ? { customType: { name: noteType.name, fields: noteType.fields } }
+            : {}),
+          ...(note.propertyValues && Object.keys(note.propertyValues).length
+            ? { propertyValues: note.propertyValues }
+            : {}),
+          ...(note.decision ? { decision: note.decision } : {}),
         };
     } else if (reference.type === "task") {
       const task = tasks.get(reference.id);

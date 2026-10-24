@@ -1,4 +1,5 @@
 import type { Note, Task } from "./types";
+import { decisionReasoningMarkdown, emptyDecision } from "./note-structures";
 
 export interface TaskTemplateContent {
   title: string;
@@ -57,7 +58,14 @@ export function taskTemplateContent(task: Task): TaskTemplateContent {
 export function noteTemplateContent(note: Note): NoteTemplateContent {
   return {
     title: note.title,
-    content: omitPrivateAttachments(note.content),
+    content: omitPrivateAttachments(
+      [
+        note.decision ? decisionReasoningMarkdown(note.decision) : "",
+        note.content,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    ),
     kind: note.kind,
     folder: note.folder,
     tags: [...note.tags],
@@ -119,6 +127,9 @@ export function instantiateNoteTemplate(
     ),
     projectId: context.projectId || "",
     bookmarked: false,
+    customTypeId: "",
+    propertyValues: {},
+    decision: content.kind === "decision" ? emptyDecision() : null,
     snapshots: [],
     createdAt: now,
     updatedAt: now,

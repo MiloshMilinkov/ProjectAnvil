@@ -1,0 +1,342 @@
+.brainstorm-page {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.brainstorm-page-heading,
+.brainstorm-board-heading,
+.brainstorm-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.brainstorm-page-heading h1 {
+  margin: 0;
+  font-size: 28px;
+}
+.brainstorm-page-heading p,
+.brainstorm-board-heading p,
+.brainstorm-help {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  line-height: var(--line-height-body);
+  font-size: var(--font-size-body);
+  overflow-wrap: anywhere;
+}
+.brainstorm-board-heading h2 {
+  margin: 0;
+  font-size: 23px;
+  overflow-wrap: anywhere;
+}
+.brainstorm-board-heading > div:first-child,
+.brainstorm-page-heading > div {
+  min-width: 0;
+}
+.brainstorm-board-heading p {
+  max-width: 70ch;
+  white-space: pre-wrap;
+}
+.brainstorm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.brainstorm-page .btn,
+.brainstorm-editor .btn {
+  border: 1px solid var(--control-border);
+  min-height: var(--control-height);
+}
+.brainstorm-page .btn-primary,
+.brainstorm-editor .btn-primary {
+  border-color: var(--accent);
+}
+.brainstorm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.brainstorm-toolbar label {
+  flex: 1 1 200px;
+  max-width: 400px;
+}
+.brainstorm-toolbar label,
+.brainstorm-fields label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
+.brainstorm-toolbar .field,
+.brainstorm-fields .field {
+  width: 100%;
+  min-width: 0;
+}
+.brainstorm-scope {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+.brainstorm-board-heading .brainstorm-scope {
+  margin-top: var(--space-2);
+}
+.brainstorm-notice {
+  padding: var(--space-4);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+.brainstorm-notice p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+}
+.brainstorm-error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.brainstorm-groups {
+  display: grid;
+  gap: var(--space-5);
+}
+.brainstorm-group {
+  min-width: 0;
+}
+.brainstorm-group h3 {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0 0 var(--space-3);
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.brainstorm-group h3 span {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+.brainstorm-ideas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-3);
+}
+.brainstorm-idea {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.brainstorm-idea h4 {
+  margin: 0;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.brainstorm-idea > p {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+.brainstorm-idea footer {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-2);
+}
+.brainstorm-idea footer > span {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+.brainstorm-idea button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.brainstorm-links {
+  display: grid;
+  gap: var(--space-2);
+}
+.brainstorm-links button {
+  text-align: left;
+  min-height: var(--control-height);
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}
+.brainstorm-empty {
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+  border: 1px dashed var(--control-border);
+  border-radius: var(--radius-lg);
+}
+.brainstorm-empty svg {
+  color: var(--accent);
+  margin: 0 auto var(--space-3);
+}
+.brainstorm-empty h2 {
+  font-size: 23px;
+  margin: 0;
+}
+.brainstorm-empty p {
+  max-width: 55ch;
+  color: var(--text-secondary);
+  margin: var(--space-3) auto var(--space-5);
+  line-height: var(--line-height-body);
+}
+.brainstorm-empty-copy {
+  margin: 0;
+  padding: var(--space-3) 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+.brainstorm-editor {
+  width: min(820px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: var(--space-6);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-xl);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-popover);
+}
+.brainstorm-editor > .brainstorm-notice {
+  margin-top: var(--space-4);
+}
+.brainstorm-fields {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: var(--space-5) 0 0;
+  display: grid;
+  gap: var(--space-4);
+}
+.brainstorm-two-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.brainstorm-editor-section {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.brainstorm-section-heading {
+  align-items: center;
+}
+.brainstorm-section-heading h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.brainstorm-group-field {
+  display: flex;
+  gap: var(--space-2);
+  align-items: end;
+  min-width: 0;
+}
+.brainstorm-group-field label {
+  flex: 1;
+}
+.brainstorm-group-field button {
+  flex-shrink: 0;
+  border: 1px solid var(--control-border);
+}
+.brainstorm-idea-form {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+.brainstorm-idea-form > button {
+  justify-self: start;
+}
+.brainstorm-editor-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+}
+.brainstorm-editor-footer p {
+  flex-basis: 100%;
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  line-height: var(--line-height-body);
+}
+@media (max-width: 700px) {
+  .brainstorm-page-heading,
+  .brainstorm-board-heading {
+    flex-direction: column;
+  }
+  .brainstorm-actions {
+    width: 100%;
+  }
+  .brainstorm-actions .btn {
+    flex: 1 1 auto;
+  }
+  .brainstorm-page .btn,
+  .brainstorm-editor .btn,
+  .brainstorm-editor .btn-icon,
+  .brainstorm-links button {
+    min-height: 44px;
+  }
+  .brainstorm-editor .btn-icon {
+    min-width: 44px;
+  }
+  .brainstorm-toolbar {
+    padding: var(--space-3);
+  }
+  .brainstorm-toolbar label {
+    max-width: none;
+    flex-basis: 100%;
+  }
+  .brainstorm-editor {
+    width: calc(100vw - 20px);
+    padding: var(--space-4);
+    max-height: calc(100dvh - 20px);
+  }
+  .brainstorm-editor .field,
+  .brainstorm-toolbar .field {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .brainstorm-two-fields {
+    grid-template-columns: 1fr;
+  }
+  .brainstorm-editor-footer .btn {
+    flex: 1 1 auto;
+  }
+  .brainstorm-idea {
+    padding: var(--space-4);
+  }
+}

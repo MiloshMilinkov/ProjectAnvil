@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FeatureProps, Person, Project, Workspace } from "../lib/types";
+import type {
+  FeatureProps,
+  Person,
+  Project,
+  Workspace,
+  NoteType,
+  RelationshipPreset,
+} from "../lib/types";
 import {
   discardDraftMutations,
   readDraft,
@@ -14,7 +21,7 @@ import { useWorkspaceFetch } from "./WorkspaceScope";
 import { recoverPendingOperation } from "../lib/editor-mutations";
 import { uid } from "../lib/types";
 
-type Editable = Project | Person;
+type Editable = Project | Person | NoteType | RelationshipPreset;
 
 /** Shared persistence and conflict protection for explicit-save entity forms. */
 export function useEntityEditor<T extends Editable>({
@@ -25,7 +32,7 @@ export function useEntityEditor<T extends Editable>({
   mutate,
   onClose,
 }: {
-  entity: "projects" | "people";
+  entity: "projects" | "people" | "noteTypes" | "relationshipPresets";
   original: T | null;
   create: () => T;
   validate: (value: unknown) => value is T;
@@ -203,7 +210,7 @@ export function useEntityEditor<T extends Editable>({
         throw new Error(
           result.error || "The latest saved version could not be loaded.",
         );
-      const latest = result.workspace[entity].find(
+      const latest = (result.workspace[entity] || []).find(
         (item) => item.id === current.current.id,
       );
       if (!validate(latest))

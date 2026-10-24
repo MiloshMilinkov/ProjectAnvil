@@ -26,10 +26,22 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { FeatureProps, Note } from "../lib/types";
+import type {
+  FeatureProps,
+  Note,
+  NoteType,
+  NotePropertyField,
+  Workspace,
+} from "../lib/types";
 import "./collections.css";
 import { readBrowserPreference } from "../lib/browser-preferences";
 import { useDraftScope } from "./useRecoverableDraft";
+import {
+  collectionTypeName,
+  normalizeCollectionKeys,
+  storedCollectionColumns,
+  structuredPropertyKey,
+} from "../lib/collection-keys";
 
 type Layout = "table" | "list" | "gallery" | "kanban";
 type Preferences = {
@@ -68,7 +80,15 @@ const layouts: { id: Layout; label: string; icon: typeof Table2 }[] = [
   { id: "gallery", label: "Gallery", icon: GalleryHorizontalEnd },
   { id: "kanban", label: "Board", icon: Columns3 },
 ];
-const kinds = ["note", "world", "character", "research", "daily", "meeting"];
+const kinds = [
+  "note",
+  "world",
+  "character",
+  "research",
+  "daily",
+  "meeting",
+  "decision",
+];
 const kindIcons: Record<string, typeof BookOpen> = {
   note: FileText,
   world: Network,
@@ -96,7 +116,7 @@ const date = (value: string) =>
     day: "numeric",
   });
 
-function storedPreferences(key: string): Preferences {
+function storedPreferences(key: string, workspace: Workspace): Preferences {
   try {
     const saved: unknown = JSON.parse(readBrowserPreference(key) || "null");
     if (!saved || typeof saved !== "object") return defaults;
@@ -124,18 +144,12 @@ function storedPreferences(key: string): Preferences {
     )
       ? value.summaryOperation!
       : "sum";
-    for (const field of ["columns", "extraColumns"] as const) {
-      result[field] = Array.isArray(value[field])
-        ? [
-            ...new Set(
-              value[field].filter(
-                (item) => typeof item === "string" && item.length <= 80,
-              ),
-            ),
-          ].slice(0, 50)
-        : [];
-    }
-    return result;
+    result.columns = storedCollectionColumns(value.columns, true);
+    result.extraColumns = storedCollectionColumns(value.extraColumns, false);
+    return normalizeCollectionKeys(result, workspace.noteTypes || [], [
+      ...workspace.notes.flatMap((note) => Object.keys(note.properties)),
+      ...result.extraColumns,
+    ]);
   } catch {
     return defaults;
   }
@@ -197,7 +211,7 @@ export default function Collections({
   const scope = useDraftScope();
   const storageKey = `projectanvil.collections.${encodeURIComponent(scope.accountId)}.${encodeURIComponent(scope.workspaceId)}`;
   const [prefs, setPrefs] = useState<Preferences>(() =>
-    storedPreferences(storageKey),
+    storedPreferences(storageKey, workspace),
   );
   const [optionsOpen, setOptionsOpen] = useState(false);
   const propertiesButton = useRef<HTMLButtonElement>(null);
@@ -230,7 +244,7 @@ export default function Collections({
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (event.key === storageKey || event.key === null)
-        setPrefs(storedPreferences(storageKey));
+        setPrefs(storedPreferences(storageKey, workspaceRef.current));
     };
     window.addEventListener("storage", sync);
     return () => window.removeEventListener("storage", sync);
@@ -308,10 +322,49 @@ export default function Collections({
       ),
     [workspace.notes, optimistic],
   );
+  const structuredColumns = new Map<
+    string,
+    { type: NoteType; field: NotePropertyField }
+  >(
+    (workspace.noteTypes || []).flatMap((type) =>
+      type.fields.map(
+        (field) =>
+          [structuredPropertyKey(type.id, field.id), { type, field }] as const,
+      ),
+    ),
+  );
+  const propertyLabel = (key: string) => {
+    const column = structuredColumns.get(key);
+    return column
+      ? `${collectionTypeName(column.type.name, kinds)} · ${column.field.name}`
+      : key;
+  };
+  const propertyValue = (note: Note, key: string) => {
+    const column = structuredColumns.get(key);
+    if (!column) return note.properties[key] || "";
+    if (note.customTypeId !== column.type.id) return "";
+    const value = note.propertyValues?.[column.field.id] || "";
+    return column.field.type === "checkbox" && value
+      ? value === "true"
+        ? "Yes"
+        : "No"
+      : value;
+  };
+  const typeLabel = (note: Note) => {
+    const type = (workspace.noteTypes || []).find(
+      (type) => type.id === note.customTypeId,
+    );
+    return type ? collectionTypeName(type.name, kinds) : label(note.kind);
+  };
   const properties = [
     ...new Set([
       ...allNotes.flatMap((note) => Object.keys(note.properties)),
       ...prefs.extraColumns,
+      ...[...structuredColumns.keys()].filter((key) =>
+        allNotes.some(
+          (note) => note.customTypeId === structuredColumns.get(key)?.type.id,
+        ),
+      ),
     ]),
   ].sort();
   const visibleColumns = (
@@ -325,13 +378,13 @@ export default function Collections({
     "No project";
   const fieldValue = (note: Note, field: string): string =>
     field.startsWith("prop:")
-      ? note.properties[field.slice(5)] || ""
+      ? propertyValue(note, field.slice(5))
       : field === "project"
         ? projectName(note.projectId)
         : field === "folder"
           ? note.folder || "Unfiled"
           : field === "kind"
-            ? label(note.kind)
+            ? typeLabel(note)
             : field === "updated"
               ? note.updatedAt
               : note.title;
@@ -340,7 +393,10 @@ export default function Collections({
     .filter(
       (note) =>
         (!activeProject || note.projectId === activeProject) &&
-        (!prefs.kind || note.kind === prefs.kind) &&
+        (!prefs.kind ||
+          (prefs.kind.startsWith("custom:")
+            ? note.customTypeId === prefs.kind.slice(7)
+            : note.kind === prefs.kind)) &&
         (!prefs.tag || note.tags.includes(prefs.tag)) &&
         (!query ||
           [
@@ -349,6 +405,9 @@ export default function Collections({
             note.folder,
             ...note.tags,
             ...Object.values(note.properties),
+            ...Object.values(note.propertyValues || {}),
+            typeLabel(note),
+            ...Object.values(note.decision || {}),
           ]
             .join(" ")
             .toLowerCase()
@@ -398,7 +457,7 @@ export default function Collections({
   const status = (note: Note) => note.properties[statusKey] || "Draft";
   const numericProperties = properties.filter((key) => {
     const values = filtered
-      .map((note) => note.properties[key] || "")
+      .map((note) => propertyValue(note, key))
       .filter((value) => value.trim());
     return values.length > 0 && values.every(numeric);
   });
@@ -407,7 +466,7 @@ export default function Collections({
       ? prefs.summaryProperty
       : numericProperties[0] || properties[0] || "";
   const summaryValues = filtered
-    .map((note) => note.properties[summaryKey] || "")
+    .map((note) => propertyValue(note, summaryKey))
     .filter((value) => value.trim());
   const summaryNumbers = summaryValues.filter(numeric).map(Number);
   const sum = summaryNumbers.reduce((total, value) => total + value, 0);
@@ -434,7 +493,7 @@ export default function Collections({
       <option value="project">Project</option>
       {properties.map((key) => (
         <option key={key} value={`prop:${key}`}>
-          {key}
+          {propertyLabel(key)}
         </option>
       ))}
     </>
@@ -478,7 +537,7 @@ export default function Collections({
                   ) : (
                     <Database size={10} />
                   )}{" "}
-                  {key}
+                  {propertyLabel(key)}
                 </span>
               </th>
             ))}
@@ -500,7 +559,7 @@ export default function Collections({
               </td>
               <td>
                 <span className={`base-kind type-${note.kind}`}>
-                  {label(note.kind)}
+                  {typeLabel(note)}
                 </span>
               </td>
               <td>
@@ -521,7 +580,18 @@ export default function Collections({
               </td>
               {visibleColumns.map((key) => (
                 <td className="base-editable-cell" key={key}>
-                  {key.toLowerCase() === "status" ? (
+                  {structuredColumns.has(key) &&
+                  note.customTypeId !== structuredColumns.get(key)?.type.id ? (
+                    <span className="muted">—</span>
+                  ) : structuredColumns.has(key) ? (
+                    <button
+                      className="base-note-link"
+                      aria-label={`Edit ${propertyLabel(key)} for ${note.title}`}
+                      onClick={() => openNote(note.id)}
+                    >
+                      {propertyValue(note, key) || "—"}
+                    </button>
+                  ) : key.toLowerCase() === "status" ? (
                     statusSelect(note)
                   ) : (
                     <PropertyCell
@@ -585,7 +655,7 @@ export default function Collections({
             aria-label={`Open ${note.title}`}
           >
             {icon(note, 36)}
-            <span>{label(note.kind)}</span>
+            <span>{typeLabel(note)}</span>
             <span className="base-art-orbit" />
           </button>
           <div className="base-gallery-content">
@@ -731,6 +801,12 @@ export default function Collections({
               {label(kind)}
             </option>
           ))}
+          {(workspace.noteTypes || []).map((type) => (
+            <option key={type.id} value={`custom:${type.id}`}>
+              {collectionTypeName(type.name, kinds)}
+              {type.archived ? " (archived)" : ""}
+            </option>
+          ))}
         </select>
         <select
           aria-label="Filter collection by tag"
@@ -780,7 +856,7 @@ export default function Collections({
             <option value="project">Project</option>
             {properties.map((key) => (
               <option key={key} value={`prop:${key}`}>
-                {key}
+                {propertyLabel(key)}
               </option>
             ))}
           </select>
@@ -818,7 +894,7 @@ export default function Collections({
         )}
         <span className="base-edit-hint">
           {prefs.layout === "table"
-            ? "Edit a property · Enter or Tab saves · Escape cancels"
+            ? "Freeform fields save with Enter or Tab. Open structured fields to edit in the note."
             : ""}
         </span>
       </div>
@@ -841,8 +917,8 @@ export default function Collections({
                 Properties & calculations
               </h3>
               <p>
-                Properties live on each note. Add a column, then enter values in
-                the table.
+                Properties live on each note. Edit freeform values in the table;
+                open a structured field to edit it in the note.
               </p>
             </div>
             <button
@@ -874,7 +950,7 @@ export default function Collections({
                         })
                       }
                     />
-                    {key}
+                    {propertyLabel(key)}
                   </label>
                 ))}
                 {!properties.length && (
@@ -928,7 +1004,9 @@ export default function Collections({
                 >
                   <option value="">Choose a property</option>
                   {properties.map((key) => (
-                    <option key={key}>{key}</option>
+                    <option key={key} value={key}>
+                      {propertyLabel(key)}
+                    </option>
                   ))}
                 </select>
                 <select
@@ -1025,7 +1103,7 @@ export default function Collections({
                         >
                           <div className="base-board-type">
                             {icon(note, 12)}
-                            {label(note.kind)}
+                            {typeLabel(note)}
                             <GripVertical size={12} />
                           </div>
                           <button
@@ -1149,7 +1227,7 @@ export default function Collections({
           <Hash size={16} />
           <span>
             {summaryKey
-              ? `${label(prefs.summaryOperation)} · ${summaryKey}`
+              ? `${label(prefs.summaryOperation)} · ${propertyLabel(summaryKey)}`
               : "Add a calculation"}
             <strong>{summaryKey ? format(calculated) : "—"}</strong>
           </span>

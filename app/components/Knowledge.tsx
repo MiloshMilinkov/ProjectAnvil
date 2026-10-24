@@ -70,6 +70,14 @@ import Markdown from "./Markdown";
 import NoteTaskComposer from "./NoteTaskComposer";
 import LinkedNoteTasks from "./LinkedNoteTasks";
 import PersonalTemplates from "./PersonalTemplates";
+import NoteTypeManager from "./NoteTypeManager";
+import NoteStructuredFields from "./NoteStructuredFields";
+import DecisionFields from "./DecisionFields";
+import {
+  emptyDecision,
+  exportNoteMarkdown,
+  noteTypeLabel,
+} from "../lib/note-structures";
 import { noteTemplateContent } from "../lib/personal-templates";
 import { moveToTrash } from "../lib/trash-actions";
 import "./knowledge.css";
@@ -92,7 +100,10 @@ type EditableKey =
   | "projectId"
   | "kind"
   | "bookmarked"
-  | "properties";
+  | "properties"
+  | "customTypeId"
+  | "propertyValues"
+  | "decision";
 const editableKeys: EditableKey[] = [
   "title",
   "content",
@@ -102,6 +113,9 @@ const editableKeys: EditableKey[] = [
   "kind",
   "bookmarked",
   "properties",
+  "customTypeId",
+  "propertyValues",
+  "decision",
 ];
 type LocalEdit = {
   value: Note[EditableKey];
@@ -305,6 +319,15 @@ const templates: {
     folder: "Meetings",
     body: "# Agenda\n\n- \n\n## Notes\n\n## Decisions\n\n## Action items\n\n- [ ] \n",
   },
+  {
+    id: "decision",
+    kind: "decision",
+    label: "Decision record",
+    description: "Compare options and preserve the reason behind an outcome.",
+    category: "Planning",
+    folder: "Decisions",
+    body: "# Supporting notes\n\n## Evidence and references\n\n## Follow-up actions\n\n- [ ] \n",
+  },
 ];
 const noteKinds: { kind: Kind; label: string }[] = [
   { kind: "note", label: "Note" },
@@ -313,6 +336,7 @@ const noteKinds: { kind: Kind; label: string }[] = [
   { kind: "research", label: "Research" },
   { kind: "daily", label: "Daily journal" },
   { kind: "meeting", label: "Meeting" },
+  { kind: "decision", label: "Decision record" },
 ];
 
 function newNote(
@@ -332,6 +356,9 @@ function newNote(
     tags: [],
     projectId,
     bookmarked: false,
+    customTypeId: "",
+    propertyValues: {},
+    decision: kind === "decision" ? emptyDecision() : null,
     properties:
       kind === "character"
         ? { Role: "", Faction: "", Status: "Draft" }
@@ -406,6 +433,8 @@ export default function Knowledge({
   const [search, setSearch] = useState("");
   const [folder, setFolder] = useState("all");
   const [tag, setTag] = useState("all");
+  const [noteTypeFilter, setNoteTypeFilter] = useState("all");
+  const [noteTypesOpen, setNoteTypesOpen] = useState(false);
   const [bookmarksOnly, setBookmarksOnly] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [newTemplateId, setNewTemplateId] = useState<TemplateId>(
@@ -421,6 +450,7 @@ export default function Knowledge({
     "saved" | "saving" | "pending" | "error"
   >("saved");
   const [details, setDetails] = useState(true);
+  const [saveError, setSaveError] = useState("");
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -573,6 +603,7 @@ export default function Knowledge({
     sentVersions.current.set(note.id, sent);
     if (mounted.current && selectedRef.current === note.id)
       setSaveState("saving");
+    if (mounted.current && selectedRef.current === note.id) setSaveError("");
     // Send only fields edited here. The server merges them with current teammate edits
     // and owns timestamps and snapshots; those fields never come from a local draft.
     const patch = {
@@ -656,7 +687,7 @@ export default function Knowledge({
         }
         return true;
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         for (const [key, change] of captured)
           if (sentVersions.current.get(note.id)?.get(key) === change.version)
             sentVersions.current.get(note.id)?.set(key, 0);
@@ -666,6 +697,12 @@ export default function Knowledge({
           pending.current = draftRef.current;
         if (mounted.current && selectedRef.current === note.id)
           setSaveState("error");
+        if (mounted.current && selectedRef.current === note.id)
+          setSaveError(
+            cause instanceof Error
+              ? cause.message
+              : "This note could not be saved. Your changes are kept for recovery.",
+          );
         else if (mounted.current)
           notify(
             "A note could not be saved. Open it again to retry; your edits are kept in this session.",
@@ -1034,8 +1071,12 @@ export default function Knowledge({
       (note) =>
         (folder === "all" || (note.folder || "Notes") === folder) &&
         (tag === "all" || note.tags.includes(tag)) &&
+        (noteTypeFilter === "all" ||
+          (noteTypeFilter === "decision"
+            ? note.kind === "decision"
+            : `custom:${note.customTypeId}` === noteTypeFilter)) &&
         (!bookmarksOnly || note.bookmarked) &&
-        `${note.title} ${note.content} ${note.tags.join(" ")}`
+        `${note.title} ${note.content} ${note.tags.join(" ")} ${Object.values(note.propertyValues || {}).join(" ")} ${note.decision ? Object.values(note.decision).join(" ") : ""}`
           .toLowerCase()
           .includes(search.toLowerCase()),
     )
@@ -1342,7 +1383,7 @@ export default function Knowledge({
 
   const exportNote = () => {
     if (!draft) return;
-    const blob = new Blob([`# ${draft.title}\n\n${draft.content}`], {
+    const blob = new Blob([exportNoteMarkdown(draft, workspace)], {
       type: "text/markdown;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -1783,6 +1824,29 @@ export default function Knowledge({
             </select>
           </label>
         </div>
+        <label className="note-type-filter">
+          <select
+            aria-label="Filter by note type"
+            value={noteTypeFilter}
+            onChange={(event) => setNoteTypeFilter(event.target.value)}
+          >
+            <option value="all">All note types</option>
+            <option value="decision">Decision records</option>
+            {(workspace.noteTypes || []).map((type) => (
+              <option key={type.id} value={`custom:${type.id}`}>
+                {type.name}
+                {type.archived ? " (archived)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="btn note-types-browser-action"
+          onClick={() => setNoteTypesOpen(true)}
+          data-tour="custom-note-types"
+        >
+          Manage note types
+        </button>
         <div className="note-list">
           {visible.length ? (
             visible.map((note) => (
@@ -1818,7 +1882,12 @@ export default function Knowledge({
                     .slice(0, 90) || "A blank page, a new possibility."}
                 </p>
                 <div className="note-list-meta">
-                  <span>{note.folder}</span>
+                  <span>
+                    {noteTypeLabel(note, workspace.noteTypes || []) ||
+                      (note.kind === "decision"
+                        ? "Decision record"
+                        : note.folder)}
+                  </span>
                   <span>{shortDate(note.updatedAt)}</span>
                 </div>
               </button>
@@ -1828,7 +1897,7 @@ export default function Knowledge({
               <Search size={25} />
               <p>
                 {notes.length
-                  ? "No notes match these filters. Try another search, folder, tag, or bookmark filter."
+                  ? "No notes match these filters. Try another search, folder, tag, type, or bookmark filter."
                   : "No notes here yet. Create your first note to get started."}
               </p>
               <button className="btn" onClick={openNewNote}>
@@ -1851,6 +1920,11 @@ export default function Knowledge({
       </aside>
 
       <main className="note-workspace">
+        {saveState === "error" && saveError && (
+          <div className="note-recovery-message" role="alert">
+            {saveError}
+          </div>
+        )}
         {draftStorageError && (
           <div className="note-recovery-message" role="alert">
             {draftStorageError}
@@ -2081,7 +2155,8 @@ export default function Knowledge({
                 <div className="note-heading">
                   <div className="note-kind-label">
                     <span />
-                    {kindLabel(draft.kind)}
+                    {noteTypeLabel(draft, workspace.noteTypes || []) ||
+                      kindLabel(draft.kind)}
                     <span className="note-heading-date">
                       Updated {shortDate(draft.updatedAt)}
                     </span>
@@ -2131,6 +2206,12 @@ export default function Knowledge({
                     />
                   </div>
                 </div>
+                <DecisionFields
+                  note={draft}
+                  workspace={workspace}
+                  onChange={edit}
+                  openNote={openNote}
+                />
                 <div className="note-editor-toolbar">
                   <div
                     className="note-view-switch"
@@ -2416,9 +2497,24 @@ export default function Knowledge({
                       <select
                         aria-label="Note type"
                         value={draft.kind}
-                        onChange={(event) =>
-                          edit({ kind: event.target.value as Kind })
-                        }
+                        onChange={(event) => {
+                          const kind = event.target.value as Kind;
+                          if (
+                            draft.kind === "decision" &&
+                            kind !== "decision" &&
+                            !window.confirm(
+                              "Change this note type and remove its structured decision record? The note content stays available.",
+                            )
+                          )
+                            return;
+                          edit({
+                            kind,
+                            decision:
+                              kind === "decision"
+                                ? draft.decision || emptyDecision()
+                                : null,
+                          });
+                        }}
                       >
                         {noteKinds.map((item) => (
                           <option key={item.kind} value={item.kind}>
@@ -2427,6 +2523,12 @@ export default function Knowledge({
                         ))}
                       </select>
                     </label>
+                    <NoteStructuredFields
+                      note={draft}
+                      types={workspace.noteTypes || []}
+                      onChange={edit}
+                      onManage={() => setNoteTypesOpen(true)}
+                    />
                     {Object.entries(draft.properties).map(([key, value]) => (
                       <label
                         className="note-property note-custom-property"
@@ -2979,6 +3081,14 @@ export default function Knowledge({
         </div>
       )}
 
+      {noteTypesOpen && (
+        <NoteTypeManager
+          workspace={workspace}
+          mutate={mutate}
+          notify={notify}
+          onClose={() => setNoteTypesOpen(false)}
+        />
+      )}
       {personalTemplatesOpen && (
         <PersonalTemplates
           kind="note"

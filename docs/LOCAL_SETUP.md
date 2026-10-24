@@ -44,10 +44,10 @@ Personal note/task templates belong to the account across its workspaces, includ
 
 ProjectAnvil stores its database and uploaded files under **`.wrangler/state`**. The private **`.dev.vars`** file contains the account session signing secret. Preserve both together. They and local backups are excluded from Git.
 
-| Backup option | Includes | Excludes |
-| --- | --- | --- |
-| **Workspace settings → Export workspace** | Active workspace notes, tasks, discussions, labels, projects, saved views, relationships, and canvas layouts | Trash, personal templates, archived note history, attachment files, accounts, sessions, membership, invitations, and personal rooms/checkpoints |
-| **Complete local backup** | Database including Trash and personal templates, archived note history, uploads, accounts, membership, sessions, room checkpoints, and relationship review state | Unsaved browser drafts, browser preferences, and source code; preserve the matching source version too |
+| Backup option                             | Includes                                                                                                                                                                               | Excludes                                                                                                                                        |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Workspace settings → Export workspace** | Active workspace notes, tasks, discussions, labels, projects, saved views, relationships, canvas layouts, note types, decision records, relationship presets, and brainstorming boards | Trash, personal templates, archived note history, attachment files, accounts, sessions, membership, invitations, and personal rooms/checkpoints |
+| **Complete local backup**                 | Database including Trash and personal templates, archived note history, uploads, accounts, membership, sessions, room checkpoints, and relationship review state                       | Unsaved browser drafts, browser preferences, and source code; preserve the matching source version too                                          |
 
 ### Make a complete backup
 
@@ -126,35 +126,54 @@ A local time skipped by a daylight-saving change is rejected so you can choose a
 
 Drafts are device/browser recovery copies, not confirmed database saves. Save or download them before clearing browser data, changing browser profiles, or making a complete backup.
 
+## Connected thinking
+
+**Custom note types:** open **Manage note types** in Notes. Define named text, number, date, checkbox, or choice properties, then select a custom type in a note's details. Required marks incomplete fields while allowing unfinished notes to save. Nonblank values must match their format. Existing freeform properties remain separate. Property IDs stay stable when names change; schema edits that invalidate existing values are rejected. Clear or migrate those values before changing the structure. Archive a type to hide it from new assignments while keeping existing notes readable; restore it to reuse it.
+
+Collections filters by custom type and shows structured fields as columns. Structured values support sorting, grouping, and calculations; select their table value to open the note for editing. Fields from different types stay separate even if their names match. Note and collection searches include structured values and decision reasoning. Individual Markdown exports include readable structured data; workspace JSON preserves the full definitions and values.
+
+**Decision records:** use the built-in **Decision record** template or choose the decision note kind. Capture the context, options, outcome, consequences, owner, and date. Proposed notes can remain unfinished; accepting needs an outcome and date. Superseding requires another decision in this workspace and cannot form a cycle. The replacement remains an ordinary note link; use an explicit **was decided because of** relationship for evidence and change-impact review. Deleting a replacement clears the link and returns the older record to Accepted if it still has an outcome/date, otherwise Proposed. Browser recovery includes structured reasoning; historical note snapshots continue to track Markdown content, not full property versions.
+
+**Relationship presets:** manage presets below the graph. Save a name, one of the four existing relationship meanings, allowed endpoint types, and an optional suggested reason. Choose a preset in **Add relationship**, then review and save the actual connection. Presets fill new relationships; editing or archiving one does not rewrite existing connections or their review markers. Changes to a linked note's structured values, decision record, or assigned type structure can trigger the same impact checks as content changes.
+
+**Brainstorming:** create a board for a project or leave its project blank. Add ideas, named groups, and optional links to existing notes/tasks. Move ideas with the group selector; removing a group leaves its ideas ungrouped. Compare original order or vote order within each group. Editing has an explicit save, recoverable browser draft, and conflict checks. Two simultaneous edits to the idea list need review; voting alone does not overwrite or conflict with an idea edit. Deleting a linked note/task clears its board references; Trash restoration reconnects available references without replacing newer edits. Move or remove associated boards before deleting a project.
+
+Open voting allows each signed-in member one vote per idea. Each person may vote on multiple ideas and remove their votes while voting is open. Guest mode has one shared guest identity. Counts are visible to accepted workspace members; votes use the server's signed-in identity, not assignment labels. Closed voting rejects further changes. The existing workspace polling refreshes other open tabs; no new remote access is enabled.
+
+**Import and recovery:** workspace JSON includes type definitions, property values, decision records, presets, groups, and ideas. Import treats vote data as a snapshot rather than permission to impersonate members: matching board/idea IDs retain their current trusted votes; new imported ideas start at zero. To restore the full confirmed vote state on this installation, use a complete local backup. Import still requires the workspace owner and resets relationship review markers. Brainstorm boards can be moved to Trash and restored; archive reusable types and presets to keep their definitions available.
+
+Personal templates retain reusable decision reasoning in Markdown and begin with fresh decision status, ownership, dates, and replacement links. Custom type IDs and values are workspace-specific and are excluded from personal templates. If a typed note is in Trash and its custom type is later deleted, restore the type first, then restore the note; its structured values remain in its recovery copy.
+
 ## Storage limits
 
-| Item | Current limit |
-| --- | --- |
-| Workspace text and metadata | 1.5 MB total; uploads are separate |
-| Uploaded file | 20 MB per file |
-| Note content or task description | 100,000 characters, subject to total workspace size |
-| Workspace collections | 1,500 tasks · 1,000 notes · 500 people · 100 projects · 100 canvases · 500 attachments · 2,000 meaningful relationships |
-| Note history | Archived separately from active records; normal edits capture versions at least 30 seconds apart, with explicit restores and deletions also preserving replaced content |
-| Linked task source quote | 8,000 characters |
-| Work rooms | 30 per account/workspace; up to 20 pinned notes per room |
-| Project milestones | 100 per project, including archived milestones |
-| Bulk editing | Up to 100 tasks per batch; failures are reported per task |
-| Personal templates | 200 entries including deleted templates, 2 MB per account library, 120 KB per template |
-| Workspace Trash | Stored separately from the active workspace allowance; retained without automatic expiry |
+| Item                             | Current limit                                                                                                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace text and metadata      | 1.5 MB total; uploads are separate                                                                                                                                      |
+| Uploaded file                    | 20 MB per file                                                                                                                                                          |
+| Note content or task description | 100,000 characters, subject to total workspace size                                                                                                                     |
+| Workspace collections            | 1,500 tasks · 1,000 notes · 500 people · 100 projects · 100 canvases · 500 attachments · 2,000 meaningful relationships                                                 |
+| Note history                     | Archived separately from active records; normal edits capture versions at least 30 seconds apart, with explicit restores and deletions also preserving replaced content |
+| Linked task source quote         | 8,000 characters                                                                                                                                                        |
+| Work rooms                       | 30 per account/workspace; up to 20 pinned notes per room                                                                                                                |
+| Project milestones               | 100 per project, including archived milestones                                                                                                                          |
+| Bulk editing                     | Up to 100 tasks per batch; failures are reported per task                                                                                                               |
+| Connected thinking               | 100 custom note types, 30 fields per type, 50 choices per choice field; 100 relationship presets; 100 brainstorming boards, 30 groups and 200 ideas per board           |
+| Personal templates               | 200 entries including deleted templates, 2 MB per account library, 120 KB per template                                                                                  |
+| Workspace Trash                  | Stored separately from the active workspace allowance; retained without automatic expiry                                                                                |
 
 Archived history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. History, Trash, and unreferenced attachment files are retained without automatic deletion; complete backups preserve them. **Settings → Storage & recovery** checks active usage, retained files, and missing attachments without deleting files. History is loaded in pages of 20 versions. Change-impact markers indicate possible consequences; review the connected content before acknowledging them.
 
 ## Troubleshooting
 
-| Problem | What to check |
-| --- | --- |
-| Browser did not open | Open `http://127.0.0.1:5173` after the console reports readiness. |
-| Address will not load | Keep the server console open; check its error before restarting. |
-| Port 5173 is occupied | Wait for a starting ProjectAnvil instance or close the program using that port. The launcher does not kill other programs. |
-| Node is missing | Install Node.js 22.13+ and restart your terminal or VS Code. The Windows launcher expects the standard installation path. |
-| Dependencies are missing | Run `npm run install:ci` from the repository folder. This needs internet access. |
-| Saving failed | Read the error and use Retry saves; review conflicting edits in their editor. Download a recovery copy before discarding pending work. |
-| Database or migration error | Back up the complete state and secret. Do not delete `.wrangler` or blindly rerun initial SQL. |
+| Problem                     | What to check                                                                                                                          |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser did not open        | Open `http://127.0.0.1:5173` after the console reports readiness.                                                                      |
+| Address will not load       | Keep the server console open; check its error before restarting.                                                                       |
+| Port 5173 is occupied       | Wait for a starting ProjectAnvil instance or close the program using that port. The launcher does not kill other programs.             |
+| Node is missing             | Install Node.js 22.13+ and restart your terminal or VS Code. The Windows launcher expects the standard installation path.              |
+| Dependencies are missing    | Run `npm run install:ci` from the repository folder. This needs internet access.                                                       |
+| Saving failed               | Read the error and use Retry saves; review conflicting edits in their editor. Download a recovery copy before discarding pending work. |
+| Database or migration error | Back up the complete state and secret. Do not delete `.wrangler` or blindly rerun initial SQL.                                         |
 
 ## Development notes
 

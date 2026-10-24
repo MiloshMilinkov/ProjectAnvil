@@ -6,6 +6,7 @@ import {
   type Entity,
   type Mutation,
   type Workspace,
+  type BrainstormBoard,
 } from "./types";
 import { createSignatureReader, entityKey } from "./relationships";
 import { normalizeSourceExcerpt } from "./source-excerpts";
@@ -20,6 +21,14 @@ import {
   calendarDayDifference,
   nextRecurrenceDate,
 } from "./recurrence";
+import {
+  brainstormsSchema,
+  connectedThinkingError,
+  decisionSchema,
+  emptyDecision,
+  noteTypesSchema,
+  relationshipPresetsSchema,
+} from "./connected-thinking-model";
 
 export class WorkspaceError extends Error {
   constructor(
@@ -217,7 +226,17 @@ const notes = z
       "research",
       "daily",
       "meeting",
+      "decision",
     ]),
+    customTypeId: reference.default(""),
+    propertyValues: z
+      .record(id, z.string().max(2000))
+      .refine(
+        (values) => Object.keys(values).length <= 30,
+        "Use at most 30 structured properties.",
+      )
+      .default({}),
+    decision: decisionSchema.nullable().default(null),
     bookmarked: z.boolean(),
     properties: z
       .record(z.string().max(80), z.string().max(2000))
@@ -327,6 +346,9 @@ const entitySchemas = {
   canvases,
   savedViews,
   relationships,
+  noteTypes: noteTypesSchema,
+  relationshipPresets: relationshipPresetsSchema,
+  brainstorms: brainstormsSchema,
 };
 const workspaceSchema = z
   .object({
@@ -365,6 +387,21 @@ const workspaceSchema = z
       .max(2000)
       .refine(uniqueIds, "Relationship IDs must be unique.")
       .default([]),
+    noteTypes: z
+      .array(noteTypesSchema)
+      .max(100)
+      .refine(uniqueIds, "Note type IDs must be unique.")
+      .default([]),
+    relationshipPresets: z
+      .array(relationshipPresetsSchema)
+      .max(100)
+      .refine(uniqueIds, "Preset IDs must be unique.")
+      .default([]),
+    brainstorms: z
+      .array(brainstormsSchema)
+      .max(100)
+      .refine(uniqueIds, "Brainstorm IDs must be unique.")
+      .default([]),
   })
   .strict();
 const mutationSchema = z.discriminatedUnion("action", [
@@ -383,6 +420,9 @@ const mutationSchema = z.discriminatedUnion("action", [
         "canvases",
         "savedViews",
         "relationships",
+        "noteTypes",
+        "relationshipPresets",
+        "brainstorms",
       ]),
       item: z.record(z.string(), z.unknown()),
       base: z.record(z.string(), z.unknown()).nullable(),
@@ -402,6 +442,9 @@ const mutationSchema = z.discriminatedUnion("action", [
         "canvases",
         "savedViews",
         "relationships",
+        "noteTypes",
+        "relationshipPresets",
+        "brainstorms",
       ]),
       id,
       base: z.record(z.string(), z.unknown()),
@@ -420,6 +463,15 @@ const mutationSchema = z.discriminatedUnion("action", [
     .object({
       action: z.literal("import"),
       workspace: workspaceSchema,
+      operationId: id.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("vote-idea"),
+      id,
+      ideaId: id,
+      vote: z.boolean(),
       operationId: id.optional(),
     })
     .strict(),
@@ -512,6 +564,8 @@ export function validateWorkspace(value: unknown): Workspace {
   if (invalidPlan) throw new WorkspaceError(invalidPlan);
   const titles = new Set<string>();
   for (const note of workspace.notes) {
+    if (note.kind === "decision" && !note.decision)
+      note.decision = emptyDecision();
     const normalized = note.title.trim().toLowerCase();
     if (titles.has(normalized))
       throw new WorkspaceError(
@@ -519,6 +573,16 @@ export function validateWorkspace(value: unknown): Workspace {
       );
     titles.add(normalized);
     check(note.projectId, "projects", note.title);
+    if (note.decision) check(note.decision.ownerId, "people", "Decision owner");
+  }
+  const connectedError = connectedThinkingError(workspace);
+  if (connectedError) throw new WorkspaceError(connectedError);
+  for (const board of workspace.brainstorms || []) {
+    check(board.projectId, "projects", board.title);
+    for (const idea of board.ideas) {
+      check(idea.noteId, "notes", idea.title);
+      check(idea.taskId, "tasks", idea.title);
+    }
   }
   const projectKeys = new Set<string>();
   for (const project of workspace.projects) {
@@ -648,10 +712,18 @@ function comparableField(entity: Entity, key: string, value: unknown): string {
       value = null;
     if (entity === "projects" && key === "milestones") value = [];
     if (entity === "canvases" && key === "projectId") value = "";
+    if (entity === "notes" && key === "customTypeId") value = "";
+    if (entity === "notes" && key === "propertyValues") value = {};
+    if (entity === "notes" && key === "decision") value = null;
     if (entity === "savedViews" && key === "dateFilter") value = "all";
     if (entity === "savedViews" && key === "sort") value = "priority";
     if (entity === "savedViews" && key === "layout") value = "board";
   }
+  if (entity === "brainstorms" && key === "ideas" && Array.isArray(value))
+    value = value.map((idea) => {
+      if (!idea || typeof idea !== "object") return idea;
+      return { ...idea, votes: [] };
+    });
   return comparable(value);
 }
 
@@ -793,6 +865,9 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         tags: [],
         projectId: "",
         kind: "note",
+        customTypeId: "",
+        propertyValues: {},
+        decision: null,
         bookmarked: false,
         properties: {},
         snapshots: [],
@@ -824,6 +899,29 @@ function defaults(entity: Entity, now: string): Record<string, unknown> {
         fromSignature: "",
         toSignature: "",
       };
+    case "noteTypes":
+      return { ...base, description: "", archived: false, fields: [] };
+    case "relationshipPresets":
+      return {
+        ...base,
+        description: "",
+        label: "",
+        kind: "depends-on",
+        fromType: "any",
+        toType: "any",
+        archived: false,
+      };
+    case "brainstorms":
+      return {
+        ...base,
+        description: "",
+        projectId: "",
+        groups: [],
+        ideas: [],
+        votingOpen: true,
+        createdAt: now,
+        updatedAt: now,
+      };
   }
 }
 
@@ -835,6 +933,7 @@ export function applyMutation(
   current: Workspace,
   input: unknown,
   now = new Date().toISOString(),
+  actorId?: string,
 ): Workspace {
   const mutation = validateMutation(input);
   if (mutation.action === "restore")
@@ -843,6 +942,9 @@ export function applyMutation(
   const next = structuredClone({
     ...current,
     relationships: current.relationships || [],
+    noteTypes: current.noteTypes || [],
+    relationshipPresets: current.relationshipPresets || [],
+    brainstorms: current.brainstorms || [],
   });
   if (mutation.action === "rename") next.name = mutation.name!.trim();
   if (mutation.action === "import") {
@@ -855,6 +957,17 @@ export function applyMutation(
       ...mutation.workspace!,
       revision: current.revision + 1,
     });
+    // Backup text is portable, but it cannot cast votes on other members' behalf.
+    for (const board of imported.brainstorms || []) {
+      const previous = current.brainstorms?.find(
+        (existing) => existing.id === board.id,
+      );
+      for (const idea of board.ideas)
+        idea.votes = [
+          ...(previous?.ideas.find((existing) => existing.id === idea.id)
+            ?.votes || []),
+        ];
+    }
     // An import is an explicit replacement, so its relationships start reviewed
     // against the imported content rather than accepting supplied signatures.
     const readSignature = createSignatureReader(imported);
@@ -865,6 +978,27 @@ export function applyMutation(
       toSignature: readSignature(relationship.to),
     }));
     return imported;
+  }
+  if (mutation.action === "vote-idea") {
+    if (!actorId)
+      throw new WorkspaceError(
+        "Voting requires a verified workspace identity.",
+        403,
+      );
+    const board = next.brainstorms.find((board) => board.id === mutation.id);
+    if (!board)
+      throw new WorkspaceError(
+        "This brainstorming board is no longer available.",
+        404,
+      );
+    if (!board.votingOpen)
+      throw new WorkspaceError("Voting is closed for this board.", 409);
+    const idea = board.ideas.find((idea) => idea.id === mutation.ideaId);
+    if (!idea)
+      throw new WorkspaceError("This idea is no longer available.", 404);
+    idea.votes = idea.votes.filter((id) => id !== actorId);
+    if (mutation.vote) idea.votes.push(actorId);
+    board.updatedAt = now;
   }
   if (mutation.action === "review-relationship") {
     const relationship = next.relationships.find(
@@ -912,6 +1046,37 @@ export function applyMutation(
       ...existing,
       ...item,
     };
+    if (entity === "brainstorms") {
+      const previous = existing as BrainstormBoard | undefined;
+      if (Array.isArray(merged.ideas))
+        merged.ideas = merged.ideas.map((idea) => {
+          if (!idea || typeof idea !== "object") return idea;
+          return {
+            ...idea,
+            votes: [
+              ...(previous?.ideas.find((old) => old.id === idea.id)?.votes ||
+                []),
+            ],
+          };
+        });
+      merged.createdAt = previous?.createdAt || now;
+      merged.updatedAt = now;
+    }
+    if (entity === "notes") {
+      const previous = existing as Workspace["notes"][number] | undefined;
+      if (merged.kind === "decision" && !merged.decision)
+        merged.decision = emptyDecision();
+      const assignedType = next.noteTypes.find(
+        (type) => type.id === merged.customTypeId,
+      );
+      if (
+        assignedType?.archived &&
+        merged.customTypeId !== previous?.customTypeId
+      )
+        throw new WorkspaceError(
+          "This note type is archived. Restore it before assigning it to another note.",
+        );
+    }
     if (entity === "relationships") {
       const previous = existing as
         | Workspace["relationships"][number]
@@ -1153,17 +1318,28 @@ export function applyMutation(
       entity === "projects" &&
       (next.tasks.some((item) => item.projectId === deletedId) ||
         next.notes.some((item) => item.projectId === deletedId) ||
-        next.canvases.some((item) => item.projectId === deletedId))
+        next.canvases.some((item) => item.projectId === deletedId) ||
+        next.brainstorms.some((item) => item.projectId === deletedId))
     ) {
       throw new WorkspaceError(
-        "Move or delete this project’s tasks, notes, and canvases before deleting the project.",
+        "Move or delete this project’s tasks, notes, canvases, and brainstorming boards before deleting the project.",
       );
     }
+    if (
+      entity === "noteTypes" &&
+      next.notes.some((note) => note.customTypeId === deletedId)
+    )
+      throw new WorkspaceError(
+        "This note type is still in use. Archive it or change its notes before deleting it.",
+      );
     values.splice(
       values.findIndex((item) => item.id === deletedId),
       1,
     );
     if (entity === "people") {
+      next.notes.forEach((note) => {
+        if (note.decision?.ownerId === deletedId) note.decision.ownerId = "";
+      });
       next.tasks.forEach((task) => {
         if (task.assigneeId === deletedId) task.assigneeId = "";
         task.comments.forEach((comment) => {
@@ -1183,6 +1359,23 @@ export function applyMutation(
         task.noteIds = task.noteIds.filter((value) => value !== deletedId);
         if (task.source?.noteId === deletedId) delete task.source;
       });
+    if (entity === "notes")
+      next.notes.forEach((note) => {
+        if (note.decision?.supersededById === deletedId) {
+          note.decision.supersededById = "";
+          note.decision.status =
+            note.decision.outcome.trim() && note.decision.decidedOn
+              ? "accepted"
+              : "proposed";
+        }
+      });
+    if (entity === "notes" || entity === "tasks")
+      next.brainstorms.forEach((board) =>
+        board.ideas.forEach((idea) => {
+          if (entity === "notes" && idea.noteId === deletedId) idea.noteId = "";
+          if (entity === "tasks" && idea.taskId === deletedId) idea.taskId = "";
+        }),
+      );
     if (entity === "tasks")
       next.tasks.forEach((task) => {
         task.blockedBy = task.blockedBy.filter((value) => value !== deletedId);

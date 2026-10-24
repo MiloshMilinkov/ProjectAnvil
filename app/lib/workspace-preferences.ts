@@ -5,6 +5,7 @@ export const workspacePages = [
   "projects",
   "rooms",
   "notes",
+  "brainstorm",
   "graph",
   "canvas",
   "collections",

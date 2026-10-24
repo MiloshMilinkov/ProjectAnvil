@@ -99,7 +99,17 @@ export interface Note {
   folder: string;
   tags: string[];
   projectId: string;
-  kind: "note" | "world" | "character" | "research" | "daily" | "meeting";
+  kind:
+    | "note"
+    | "world"
+    | "character"
+    | "research"
+    | "daily"
+    | "meeting"
+    | "decision";
+  customTypeId?: string;
+  propertyValues?: Record<string, string>;
+  decision?: DecisionRecord | null;
   bookmarked: boolean;
   properties: Record<string, string>;
   snapshots: { id: string; content: string; savedAt: string }[];
@@ -170,6 +180,60 @@ export interface Relationship {
   fromSignature: string;
   toSignature: string;
 }
+export interface NotePropertyField {
+  id: string;
+  name: string;
+  type: "text" | "number" | "date" | "checkbox" | "select";
+  required: boolean;
+  options: string[];
+}
+export interface NoteType {
+  id: string;
+  name: string;
+  description: string;
+  archived: boolean;
+  fields: NotePropertyField[];
+}
+export interface DecisionRecord {
+  status: "proposed" | "accepted" | "rejected" | "superseded";
+  context: string;
+  options: string;
+  outcome: string;
+  consequences: string;
+  decidedOn: string;
+  ownerId: string;
+  supersededById: string;
+}
+export interface RelationshipPreset {
+  id: string;
+  name: string;
+  description: string;
+  kind: RelationshipKind;
+  label: string;
+  fromType: "any" | EntityRef["type"];
+  toType: "any" | EntityRef["type"];
+  archived: boolean;
+}
+export interface BrainstormIdea {
+  id: string;
+  title: string;
+  description: string;
+  groupId: string;
+  noteId: string;
+  taskId: string;
+  votes: string[];
+}
+export interface BrainstormBoard {
+  id: string;
+  title: string;
+  description: string;
+  projectId: string;
+  groups: { id: string; title: string }[];
+  ideas: BrainstormIdea[];
+  votingOpen: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface Workspace {
   name: string;
   people: Person[];
@@ -180,6 +244,9 @@ export interface Workspace {
   canvases: Canvas[];
   savedViews: SavedView[];
   relationships: Relationship[];
+  noteTypes?: NoteType[];
+  relationshipPresets?: RelationshipPreset[];
+  brainstorms?: BrainstormBoard[];
   revision: number;
 }
 export type Entity =
@@ -190,7 +257,10 @@ export type Entity =
   | "media"
   | "canvases"
   | "savedViews"
-  | "relationships";
+  | "relationships"
+  | "noteTypes"
+  | "relationshipPresets"
+  | "brainstorms";
 export type MutationItem =
   | Person
   | Project
@@ -200,6 +270,9 @@ export type MutationItem =
   | Canvas
   | SavedView
   | Relationship
+  | NoteType
+  | RelationshipPreset
+  | BrainstormBoard
   | Record<string, unknown>;
 export interface Mutation {
   action:
@@ -208,7 +281,8 @@ export interface Mutation {
     | "restore"
     | "rename"
     | "import"
-    | "review-relationship";
+    | "review-relationship"
+    | "vote-idea";
   entity?: Entity;
   item?: MutationItem;
   id?: string;
@@ -219,6 +293,8 @@ export interface Mutation {
   restoreSnapshotId?: string;
   expectedFromSignature?: string;
   expectedToSignature?: string;
+  ideaId?: string;
+  vote?: boolean;
 }
 export type Mutate = (mutation: Mutation) => Promise<Workspace>;
 export type Notify = (message: string, options?: { undoId: string }) => void;

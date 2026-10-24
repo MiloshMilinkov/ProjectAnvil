@@ -232,6 +232,14 @@
 }
 
 @media (max-width: 760px) {
+  :root .appearance-dropdown {
+    position: fixed;
+    top: calc(64px + var(--space-2));
+    left: var(--space-3);
+    right: var(--space-3);
+    width: auto;
+  }
+
   :root .appearance-options {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -18,6 +18,7 @@ export type TourPage =
   | "projects"
   | "rooms"
   | "notes"
+  | "brainstorm"
   | "graph"
   | "canvas"
   | "collections"
@@ -156,7 +157,7 @@ export const tourSteps: TourStep[] = [
     id: "personal-templates",
     page: "notes",
     title: "Make your own reusable starting points",
-    body: "My note templates and My task templates save reusable structures from the current editor. Name, rename, update, and reuse a template to begin a new editable task or a note creation form. For notes, review the suggested unique title, then choose Create note. The 14 built-in note templates remain available too.",
+    body: "My note templates and My task templates save reusable structures from the current editor. Name, rename, update, and reuse a template to begin a new editable task or a note creation form. For notes, review the suggested unique title, then choose Create note. The 15 built-in note templates remain available too.",
     tip: "Your library belongs to your account across its workspaces. Guest templates have a separate local library. Templates omit assignments, project links, history, dates, and private attachments. Removed templates can be restored in the library's Deleted tab.",
     anchors: [
       '[data-tour="personal-note-templates"]',
@@ -306,6 +307,30 @@ export const tourSteps: TourStep[] = [
     ],
   },
   {
+    id: "custom-note-types",
+    page: "notes",
+    title: "Give your notes a useful structure",
+    body: "Open Manage note types to create a reusable structure for this workspace. Add named text, number, date, checkbox, or choice fields. Assign a type in a note's details, then fill its structured properties. Required fields guide completeness while unfinished notes can still save.",
+    tip: "Field IDs keep values connected when labels change. Archive a type to hide it from new assignments. Existing notes keep their values. Collections can filter by type and show, sort, group, and summarize structured fields; open a field to edit it in the note.",
+    anchors: [
+      '[data-tour="custom-note-types"]',
+      ".note-details",
+      ".note-workspace",
+    ],
+  },
+  {
+    id: "decision-records",
+    page: "notes",
+    title: "Keep the reason behind a decision",
+    body: "Choose the Decision record template, or select Decision record under Type in a note's details. Capture context, options, outcome, consequences, a responsible person, and decision date. Use Proposed while exploring; Accepted needs an outcome and date. Rejected and Superseded keep the reasoning available.",
+    tip: "Link a replacement decision when superseding an older one. Connect supporting notes through the graph's was decided because of relationship. Changes to the reasoning or structured values can highlight connected work for review.",
+    anchors: [
+      '[data-tour="decision-records"]',
+      '[data-tour="new-note"]',
+      ".note-workspace",
+    ],
+  },
+  {
     id: "media",
     page: "notes",
     title: "Keep references beside your notes",
@@ -353,6 +378,17 @@ export const tourSteps: TourStep[] = [
     ],
   },
   {
+    id: "relationship-presets",
+    page: "graph",
+    title: "Reuse connections with a clear meaning",
+    body: "Open Relationship presets to save a name, meaning, allowed item types, and suggested explanation. In Add relationship, choose a preset, select two matching items, and review the connection before saving.",
+    tip: "A preset fills a new connection. Editing or archiving it leaves existing relationships and their review history intact. Presets belong to the active workspace.",
+    anchors: [
+      '[data-tour="relationship-presets"]',
+      '[data-tour="meaningful-relationships"]',
+    ],
+  },
+  {
     id: "change-impact",
     page: "graph",
     title: "Review the consequences of a change",
@@ -370,6 +406,26 @@ export const tourSteps: TourStep[] = [
       '[data-tour="canvas-controls"]',
       ".canvas-toolbar",
       ".visual-heading",
+    ],
+  },
+  {
+    id: "brainstorming",
+    page: "brainstorm",
+    title: "Explore ideas before turning them into work",
+    body: "Create a brainstorming board for a project or the whole workspace. Add ideas with a title and description, arrange them into named groups, and link existing notes or tasks. Edit the board to rename groups or move ideas using ordinary controls.",
+    tip: "Board edits have browser drafts and conflict checks. Removing a group keeps its ideas ungrouped. A board moved to Trash can be restored with available links.",
+    anchors: ['[data-tour="brainstorming"]', '[data-tour="nav-brainstorm"]'],
+  },
+  {
+    id: "brainstorm-voting",
+    page: "brainstorm",
+    title: "Find the ideas people want to pursue",
+    body: "Open voting on a board to let workspace members vote once on each idea. Vote again to remove your vote, and sort by votes to compare the results. Close voting when the group is ready to move forward.",
+    tip: "Counts are shared with the workspace. Guest mode has one shared guest vote. Account votes use the signed-in identity; assignment labels cannot cast votes. JSON import preserves current trusted votes on matching ideas and starts new imported ideas at zero.",
+    anchors: [
+      '[data-tour="brainstorm-voting"]',
+      '[data-tour="brainstorming"]',
+      '[data-tour="nav-brainstorm"]',
     ],
   },
   {
@@ -438,7 +494,7 @@ export const tourSteps: TourStep[] = [
     id: "backups",
     page: "settings",
     title: "Keep a copy of your work",
-    body: "Storage & recovery reports the active workspace allowance, archived history, and attachment problems. Export downloads confirmed records as JSON; Import replaces records after confirmation and resets relationship review markers. JSON excludes personal rooms, archived versions, and uploaded files.",
+    body: "Storage & recovery reports the active workspace allowance, archived history, and attachment problems. Export downloads confirmed records, including note types, decisions, presets, and brainstorming boards. Import replaces records after confirmation and resets relationship review markers. New imported ideas start without votes; matching ideas retain current trusted votes. JSON excludes personal rooms, archived versions, and uploaded files.",
     tip: "Finish pending saves first. Complete backups need .wrangler/state and the matching .dev.vars file while the app is stopped. Browser drafts stay separate; download conflicted text you need to keep.",
     anchors: [
       '[data-tour="storage-health"]',

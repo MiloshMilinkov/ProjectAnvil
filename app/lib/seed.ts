@@ -14,5 +14,8 @@ export function createSeedWorkspace(): Workspace {
     canvases: [],
     savedViews: [],
     relationships: [],
+    noteTypes: [],
+    relationshipPresets: [],
+    brainstorms: [],
   };
 }

@@ -114,6 +114,7 @@ import RemindersCenter from "./RemindersCenter";
 import TaskBulkDialog from "./TaskBulkDialog";
 import { projectProgress } from "../lib/planning-progress";
 import { instantiateTaskTemplate } from "../lib/personal-templates";
+import Brainstorming from "./Brainstorming";
 
 type Page = TourPage;
 const nav = [
@@ -123,6 +124,7 @@ const nav = [
   { id: "projects", title: "Projects", icon: FolderKanban },
   { id: "rooms", title: "Work rooms", icon: PanelsTopLeft },
   { id: "notes", title: "Notes", icon: BookOpen },
+  { id: "brainstorm", title: "Brainstorming", icon: Zap },
   { id: "graph", title: "Relationship graph", icon: Network },
   { id: "canvas", title: "Canvas", icon: PanelsTopLeft },
   { id: "collections", title: "Collections", icon: Database },
@@ -974,6 +976,7 @@ export default function ProjectAnvil() {
               onClearProjectFilter={() => setProjectFilter("")}
             />
           )}
+          {page === "brainstorm" && <Brainstorming {...featureProps} />}
           {page === "canvas" && (
             <CanvasView
               {...featureProps}
@@ -2343,10 +2346,12 @@ function SettingsView(
         <h2>Your data stays portable</h2>
         <p>
           Export workspace records as JSON, including notes, tasks, discussions,
-          relationships, and canvas layouts. Archived note history, personal
-          work rooms, accounts, and attachment files require a complete local
-          backup. Importing resets relationship review markers against the
-          imported content.
+          relationships, canvas layouts, custom note types, decisions, presets,
+          and brainstorming boards. Archived note history, personal work rooms,
+          accounts, and attachment files require a complete local backup.
+          Importing resets relationship review markers against the imported
+          content. New imported ideas start without votes; matching ideas keep
+          their current trusted votes.
         </p>
         <div className="settings-data-actions">
           <button className="btn" onClick={exportData}>

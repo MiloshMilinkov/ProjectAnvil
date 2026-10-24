@@ -153,7 +153,7 @@ export function useWorkspaceData() {
             mutation.action === "delete" ? mutation.id : mutation.item?.id;
           const record =
             mutation.entity &&
-            latest.current?.[mutation.entity].find((item) => item.id === id);
+            latest.current?.[mutation.entity]?.find((item) => item.id === id);
           mutation.base = record
             ? (structuredClone(record) as unknown as Record<string, unknown>)
             : null;

@@ -29,6 +29,7 @@ import {
   restoreWarnings,
 } from "./workspace-trash";
 import type { TrashCommit, WorkspaceMutationResult } from "./trash-types";
+import { emptyDecision } from "./connected-thinking-model";
 
 interface WorkspaceRow {
   data: string;
@@ -61,6 +62,16 @@ async function rawWorkspace(access: ResolvedWorkspace): Promise<Workspace> {
   if (!row) throw new WorkspaceError("The workspace could not be opened.", 404);
   const workspace = JSON.parse(row.data) as Workspace;
   workspace.relationships ??= [];
+  workspace.noteTypes ??= [];
+  workspace.relationshipPresets ??= [];
+  workspace.brainstorms ??= [];
+  for (const note of workspace.notes) {
+    note.customTypeId ??= "";
+    note.propertyValues ??= {};
+    note.decision ??= null;
+    if (note.kind === "decision" && !note.decision)
+      note.decision = emptyDecision();
+  }
   // Normalize optional scheduling fields from workspaces saved before scheduling
   // was introduced. Reading a workspace never rewrites its stored records.
   for (const task of workspace.tasks) {
@@ -231,6 +242,30 @@ function prepareMutation(
     );
   if (
     mutation.action === "upsert" &&
+    mutation.entity === "notes" &&
+    item &&
+    typeof item === "object" &&
+    item.decision &&
+    typeof item.decision === "object"
+  ) {
+    const decision = item.decision as Record<string, unknown>;
+    const previous = current.notes.find(
+      (note) => note.id === item.id,
+    )?.decision;
+    const owner = current.people.find(
+      (person) => person.id === decision.ownerId,
+    );
+    if (
+      owner?.userId &&
+      owner.inactive &&
+      decision.ownerId !== previous?.ownerId
+    )
+      throw new WorkspaceError(
+        "This account is no longer a member. Choose an active decision owner or leave it unassigned.",
+      );
+  }
+  if (
+    mutation.action === "upsert" &&
     mutation.entity === "tasks" &&
     item &&
     typeof item === "object"
@@ -335,6 +370,10 @@ function prepareMutation(
       }
       for (const view of imported.savedViews || [])
         view.assignee = remap.get(view.assignee) || view.assignee;
+      for (const note of imported.notes || [])
+        if (note.decision)
+          note.decision.ownerId =
+            remap.get(note.decision.ownerId) || note.decision.ownerId;
     }
     // Keep verified members present even if the imported backup predates them.
     const memberPeople = current.people.filter((person) => person.userId);
@@ -495,6 +534,8 @@ export async function mutateWorkspaceResult(
       updated = applyMutation(
         current,
         prepareMutation(mutation, current, access),
+        new Date().toISOString(),
+        access.user ? accountPersonId(access.user.id) : "guest",
       );
       if (input.action === "delete")
         trash.deleted = captureDeletion(
@@ -517,6 +558,20 @@ export async function mutateWorkspaceResult(
       )
         throw new WorkspaceError(
           "This account is no longer a member. Choose an active member or another assignment label.",
+        );
+    }
+    for (const note of updated.notes) {
+      const owner = updated.people.find(
+        (person) => person.id === note.decision?.ownerId,
+      );
+      if (
+        owner?.userId &&
+        owner.inactive &&
+        current.notes.find((existing) => existing.id === note.id)?.decision
+          ?.ownerId !== note.decision?.ownerId
+      )
+        throw new WorkspaceError(
+          "This account is no longer a member. Choose an active decision owner or leave it unassigned.",
         );
     }
     if (

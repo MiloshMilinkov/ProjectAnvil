@@ -12,6 +12,9 @@ const entities: Entity[] = [
   "canvases",
   "savedViews",
   "relationships",
+  "noteTypes",
+  "relationshipPresets",
+  "brainstorms",
 ];
 type Snapshot = Note["snapshots"][number];
 type ArchivedSnapshot = Snapshot & { noteId: string };
@@ -148,8 +151,8 @@ export async function commitWorkspace(
   }
   const removed: { entity: Entity; id: string }[] = [];
   for (const entity of entities) {
-    const remaining = new Set(updated[entity].map((item) => item.id));
-    for (const item of current[entity])
+    const remaining = new Set((updated[entity] || []).map((item) => item.id));
+    for (const item of current[entity] || [])
       if (!remaining.has(item.id)) removed.push({ entity, id: item.id });
   }
   const authorization = access.user

@@ -1,4 +1,14 @@
-export type WorkPage = 'overview' | 'my-work' | 'tasks' | 'projects' | 'notes' | 'graph' | 'canvas' | 'collections' | 'daily';
+export type WorkPage =
+  | "overview"
+  | "my-work"
+  | "tasks"
+  | "projects"
+  | "notes"
+  | "brainstorm"
+  | "graph"
+  | "canvas"
+  | "collections"
+  | "daily";
 
 export interface CanvasViewport {
   x: number;

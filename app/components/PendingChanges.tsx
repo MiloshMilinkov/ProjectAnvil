@@ -63,7 +63,7 @@ export default function PendingChanges({
     const id = mutation.id || mutation.item?.id;
     const saved =
       mutation.entity &&
-      workspace[mutation.entity].find((item) => item.id === id);
+      workspace[mutation.entity]?.find((item) => item.id === id);
     const item = mutation.item;
     return String(
       (item &&

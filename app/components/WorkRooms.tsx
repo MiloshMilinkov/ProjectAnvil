@@ -87,6 +87,7 @@ const locationLabels: Record<WorkLocation["page"], string> = {
   graph: "Relationship graph",
   canvas: "Canvas",
   collections: "Collections",
+  brainstorm: "Brainstorming",
   daily: "Daily planner",
 };
 

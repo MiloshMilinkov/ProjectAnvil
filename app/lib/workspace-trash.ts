@@ -28,6 +28,9 @@ const entities: Entity[] = [
   "canvases",
   "savedViews",
   "relationships",
+  "noteTypes",
+  "relationshipPresets",
+  "brainstorms",
 ];
 type Row = {
   trash_id: string;
@@ -42,7 +45,7 @@ type Row = {
 };
 type Item = TrashRecord["item"];
 const records = (workspace: Workspace, entity: Entity) =>
-  workspace[entity] as unknown as Item[];
+  (workspace[entity] || []) as unknown as Item[];
 const same = (left: unknown, right: unknown) =>
   JSON.stringify(left) === JSON.stringify(right);
 const validId = (value: string) => /^[a-zA-Z0-9_-]{1,120}$/.test(value);
@@ -266,6 +269,9 @@ export async function prepareTrashRestore(
     );
   }
   const next = structuredClone(current);
+  next.noteTypes ??= [];
+  next.relationshipPresets ??= [];
+  next.brainstorms ??= [];
   next.revision = current.revision + 1;
   const warnings: string[] = [];
   const warn = (message: string) => {
@@ -456,6 +462,40 @@ export async function prepareTrashRestore(
     }
     if (result.entity === "notes") {
       reference(item, "projectId", "projects");
+      const note = item as unknown as Workspace["notes"][number];
+      note.customTypeId ??= "";
+      note.propertyValues ??= {};
+      note.decision ??= null;
+      if (note.customTypeId && !exists("noteTypes", note.customTypeId))
+        throw new WorkspaceError(
+          "Restore this note’s custom type before restoring the note. Its structured values have been preserved in Trash.",
+          409,
+        );
+      if (note.decision) {
+        if (note.decision.ownerId && !exists("people", note.decision.ownerId)) {
+          note.decision.ownerId = "";
+          warn(
+            "The decision owner is unavailable; the record was preserved without that assignment.",
+          );
+        }
+        if (
+          note.decision.supersededById &&
+          !next.notes.some(
+            (value) =>
+              value.id === note.decision?.supersededById &&
+              value.kind === "decision",
+          )
+        ) {
+          note.decision.supersededById = "";
+          note.decision.status =
+            note.decision.outcome.trim() && note.decision.decidedOn
+              ? "accepted"
+              : "proposed";
+          warn(
+            "The replacement decision is unavailable; the record was restored without that link.",
+          );
+        }
+      }
       const title = String(item.title);
       let number = 1;
       while (
@@ -503,6 +543,26 @@ export async function prepareTrashRestore(
     if (result.entity === "canvases") {
       reference(item, "projectId", "projects");
       cleanCanvas(item as unknown as Canvas);
+    }
+    if (result.entity === "brainstorms") {
+      reference(item, "projectId", "projects");
+      const board = item as unknown as NonNullable<
+        Workspace["brainstorms"]
+      >[number];
+      for (const idea of board.ideas) {
+        if (idea.noteId && !exists("notes", idea.noteId)) {
+          idea.noteId = "";
+          warn(
+            "Some idea links were left unlinked because their notes are unavailable.",
+          );
+        }
+        if (idea.taskId && !exists("tasks", idea.taskId)) {
+          idea.taskId = "";
+          warn(
+            "Some idea links were left unlinked because their tasks are unavailable.",
+          );
+        }
+      }
     }
     return result;
   };
@@ -627,6 +687,21 @@ export async function prepareTrashRestore(
         item[field] = structuredClone(value);
       }
       const addedBytes = size(item) - beforeBytes;
+      if (
+        (change.entity === "notes" && field === "decision") ||
+        (change.entity === "brainstorms" && field === "ideas")
+      ) {
+        try {
+          validateWorkspace(next);
+        } catch {
+          if (old === undefined) delete item[field];
+          else item[field] = old;
+          warn(
+            "Some connected-thinking links were left unchanged because newer changes make them invalid.",
+          );
+          return;
+        }
+      }
       if (activeBytes + addedBytes > 1_500_000) {
         if (old === undefined) {
           delete item[field];

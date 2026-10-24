@@ -9,6 +9,7 @@ import {
   Search,
   Trash2,
   TriangleAlert,
+  Settings2,
   X,
 } from "lucide-react";
 import {
@@ -31,6 +32,7 @@ import {
 import "./relationships.css";
 import { moveToTrash } from "../lib/trash-actions";
 import { useDraftScope } from "./useRecoverableDraft";
+import RelationshipPresetManager from "./RelationshipPresetManager";
 
 type Props = Pick<FeatureProps, "workspace" | "mutate" | "notify"> & {
   impact: ReturnType<typeof relationshipImpact>;
@@ -59,6 +61,15 @@ export default function GraphRelationships({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [removingId, setRemovingId] = useState("");
+  const [presetId, setPresetId] = useState("");
+  const [presetSnapshot, setPresetSnapshot] = useState("");
+  const [managePresets, setManagePresets] = useState(false);
+  const preset = workspace.relationshipPresets?.find(
+    (item) =>
+      item.id === presetId &&
+      !item.archived &&
+      JSON.stringify(item) === presetSnapshot,
+  );
 
   const entities = useMemo(() => workspaceEntities(workspace), [workspace]);
   const byKey = useMemo(
@@ -113,6 +124,7 @@ export default function GraphRelationships({
     setToKey("");
     setKind("depends-on");
     setLabel("");
+    setPresetId("");
     setError("");
     setComposing(true);
   }
@@ -123,6 +135,16 @@ export default function GraphRelationships({
     const to = byKey.get(toKey);
     if (!from || !to || fromKey === toKey) {
       setError("Choose two different items in this workspace.");
+      return;
+    }
+    if (
+      preset &&
+      ((preset.fromType !== "any" && from.type !== preset.fromType) ||
+        (preset.toType !== "any" && to.type !== preset.toType))
+    ) {
+      setError(
+        "Choose items that match this preset, or choose a custom connection.",
+      );
       return;
     }
     setBusy("create");
@@ -202,7 +224,7 @@ export default function GraphRelationships({
     }
   }
 
-  function entityOptions(excludeKey = "") {
+  function entityOptions(excludeKey = "", allowed = "any") {
     return (["note", "task", "project"] as const).map((type) => (
       <optgroup
         key={type}
@@ -211,7 +233,12 @@ export default function GraphRelationships({
         }
       >
         {entities
-          .filter((ref) => ref.type === type && entityKey(ref) !== excludeKey)
+          .filter(
+            (ref) =>
+              ref.type === type &&
+              entityKey(ref) !== excludeKey &&
+              (allowed === "any" || ref.type === allowed),
+          )
           .map((ref) => (
             <option key={entityKey(ref)} value={entityKey(ref)}>
               {titleOf(ref)}
@@ -247,6 +274,30 @@ export default function GraphRelationships({
           Add relationship
         </button>
       </header>
+      <div
+        className="relationship-preset-tools"
+        data-tour="relationship-presets"
+      >
+        <p className="muted">
+          Reuse the meaning and suggested explanation of a connection.
+        </p>
+        <button
+          className="btn"
+          onClick={() => setManagePresets(true)}
+          disabled={!!busy}
+        >
+          <Settings2 size={16} />
+          Relationship presets
+        </button>
+      </div>
+      {managePresets && (
+        <RelationshipPresetManager
+          workspace={workspace}
+          mutate={mutate}
+          notify={notify}
+          onClose={() => setManagePresets(false)}
+        />
+      )}
 
       <section
         className="relationship-impact"
@@ -311,6 +362,49 @@ export default function GraphRelationships({
               <X size={18} />
             </button>
           </div>
+          <label className="relationship-label-field">
+            Start from a preset
+            <select
+              className="field"
+              value={preset?.id || ""}
+              disabled={!!busy}
+              onChange={(event) => {
+                const selected = workspace.relationshipPresets?.find(
+                  (item) => item.id === event.target.value && !item.archived,
+                );
+                setPresetId(selected?.id || "");
+                setPresetSnapshot(selected ? JSON.stringify(selected) : "");
+                if (selected) {
+                  setKind(selected.kind);
+                  setLabel(selected.label);
+                  const from = byKey.get(fromKey),
+                    to = byKey.get(toKey);
+                  if (
+                    from &&
+                    selected.fromType !== "any" &&
+                    from.type !== selected.fromType
+                  )
+                    setFromKey("");
+                  if (
+                    to &&
+                    selected.toType !== "any" &&
+                    to.type !== selected.toType
+                  )
+                    setToKey("");
+                }
+              }}
+            >
+              <option value="">Custom connection</option>
+              {(workspace.relationshipPresets || [])
+                .filter((item) => !item.archived)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {preset?.description && <p className="muted">{preset.description}</p>}
           <div className="relationship-form-grid">
             <label>
               First item
@@ -326,7 +420,7 @@ export default function GraphRelationships({
                 disabled={!!busy}
               >
                 <option value="">Choose an item</option>
-                {entityOptions()}
+                {entityOptions("", preset?.fromType)}
               </select>
             </label>
             <label>
@@ -334,9 +428,10 @@ export default function GraphRelationships({
               <select
                 className="field"
                 value={kind}
-                onChange={(event) =>
-                  setKind(event.target.value as RelationshipKind)
-                }
+                onChange={(event) => {
+                  setKind(event.target.value as RelationshipKind);
+                  setPresetId("");
+                }}
                 disabled={!!busy}
               >
                 {relationshipOptions.map((option) => (
@@ -356,7 +451,7 @@ export default function GraphRelationships({
                 disabled={!!busy}
               >
                 <option value="">Choose an item</option>
-                {entityOptions(fromKey)}
+                {entityOptions(fromKey, preset?.toType)}
               </select>
             </label>
           </div>

@@ -17,6 +17,9 @@ const labels: Record<Entity, string> = {
   people: "Assignment label",
   savedViews: "Saved view",
   relationships: "Relationship",
+  noteTypes: "Note type",
+  relationshipPresets: "Relationship preset",
+  brainstorms: "Brainstorm board",
 };
 
 export default function TrashDialog({
