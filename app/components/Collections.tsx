@@ -36,6 +36,7 @@ import type {
 import "./collections.css";
 import { readBrowserPreference } from "../lib/browser-preferences";
 import { useDraftScope } from "./useRecoverableDraft";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 import {
   collectionTypeName,
   normalizeCollectionKeys,
@@ -160,11 +161,13 @@ function PropertyCell({
   onCommit,
   name,
   numeric: asNumber = false,
+  readOnly = false,
 }: {
   value: string;
   onCommit: (value: string) => void;
   name: string;
   numeric?: boolean;
+  readOnly?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   const focused = useRef(false);
@@ -176,7 +179,12 @@ function PropertyCell({
     <input
       className={`base-property-input ${asNumber ? "numeric" : ""}`}
       aria-label={name}
-      title="Edit this property. Enter or Tab saves; Escape cancels."
+      title={
+        readOnly
+          ? "View only. Editing access is required to change this property."
+          : "Edit this property. Enter or Tab saves; Escape cancels."
+      }
+      readOnly={readOnly}
       value={draft}
       placeholder="—"
       inputMode={asNumber ? "decimal" : "text"}
@@ -187,7 +195,7 @@ function PropertyCell({
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => {
         focused.current = false;
-        if (!cancelled.current && draft !== value) onCommit(draft);
+        if (!readOnly && !cancelled.current && draft !== value) onCommit(draft);
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter") event.currentTarget.blur();
@@ -208,6 +216,9 @@ export default function Collections({
   openNote,
   notify,
 }: FeatureProps) {
+  const { canCreate, canEditProject } = useWorkspacePermissions(workspace);
+  const permissionsRef = useRef(canEditProject);
+  permissionsRef.current = canEditProject;
   const scope = useDraftScope();
   const storageKey = `projectanvil.collections.${encodeURIComponent(scope.accountId)}.${encodeURIComponent(scope.workspaceId)}`;
   const [prefs, setPrefs] = useState<Preferences>(() =>
@@ -257,6 +268,8 @@ export default function Collections({
   }, []);
 
   const saveProperty = (noteId: string, key: string, value: string) => {
+    const note = workspaceRef.current.notes.find((item) => item.id === noteId);
+    if (!note || !permissionsRef.current(note.projectId)) return;
     let succeeded = false;
     const version = ++counter.current;
     const versionKey = `${noteId}:${key}`;
@@ -274,6 +287,10 @@ export default function Collections({
           (note) => note.id === noteId,
         );
         if (!current) throw new Error("Note removed");
+        if (!permissionsRef.current(current.projectId))
+          throw new Error(
+            "This note is now view only. Your edit has not been saved.",
+          );
         const next = await mutateRef.current({
           action: "upsert",
           entity: "notes",
@@ -503,6 +520,7 @@ export default function Collections({
       className="base-status-select"
       value={status(note)}
       aria-label={`Status of ${note.title}`}
+      disabled={!canEditProject(note.projectId)}
       onChange={(event) => saveProperty(note.id, statusKey, event.target.value)}
     >
       {statuses.map((value) => (
@@ -598,6 +616,7 @@ export default function Collections({
                       value={note.properties[key] || ""}
                       name={`${key} for ${note.title}`}
                       numeric={numericProperties.includes(key)}
+                      readOnly={!canEditProject(note.projectId)}
                       onCommit={(value) => saveProperty(note.id, key, value)}
                     />
                   )}
@@ -1053,6 +1072,16 @@ export default function Collections({
                     className={`base-board-column ${dragColumn === column ? "drop-active" : ""}`}
                     key={column}
                     onDragOver={(event) => {
+                      if (
+                        !canCreate ||
+                        !dragging ||
+                        !filtered.some(
+                          (note) =>
+                            note.id === dragging &&
+                            canEditProject(note.projectId),
+                        )
+                      )
+                        return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                       setDragColumn(column);
@@ -1087,8 +1116,12 @@ export default function Collections({
                         <article
                           key={note.id}
                           className={`base-board-card ${dragging === note.id ? "dragging" : ""}`}
-                          draggable
+                          draggable={canEditProject(note.projectId)}
                           onDragStart={(event) => {
+                            if (!canEditProject(note.projectId)) {
+                              event.preventDefault();
+                              return;
+                            }
                             event.dataTransfer.setData(
                               "application/projectanvil-note",
                               note.id,

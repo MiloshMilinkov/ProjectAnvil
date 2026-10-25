@@ -20,6 +20,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 import {
   uid,
@@ -28,6 +29,7 @@ import {
   type Milestone,
   type Project,
   type Task,
+  type Media,
 } from "../lib/types";
 import {
   effectiveMilestoneId,
@@ -38,6 +40,11 @@ import {
 } from "../lib/planning-progress";
 import { TaskDates, useCalendarToday } from "./TaskSchedule";
 import MilestoneEditor from "./MilestoneEditor";
+import ProjectAccessPanel from "./ProjectAccessPanel";
+import WatchControl from "./WatchControl";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
+import { useDraftScope } from "./useRecoverableDraft";
+import { moveToTrash } from "../lib/trash-actions";
 import "./project-planning.css";
 
 type Props = FeatureProps & {
@@ -123,6 +130,9 @@ export default function ProjectHome({
   onOpenCanvas,
 }: Props) {
   const referenceDate = useCalendarToday();
+  const permissions = useWorkspacePermissions(workspace);
+  const readOnly = !permissions.canEditProject(projectId);
+  const draftScope = useDraftScope();
   const project = workspace.projects.find((item) => item.id === projectId);
   const tasks = useMemo(
     () =>
@@ -151,6 +161,7 @@ export default function ProjectHome({
   const [taskLimit, setTaskLimit] = useState(20);
   const [noteLimit, setNoteLimit] = useState(6);
   const [canvasLimit, setCanvasLimit] = useState(6);
+  const [attachmentLimit, setAttachmentLimit] = useState(12);
   const [attachId, setAttachId] = useState("");
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -160,9 +171,12 @@ export default function ProjectHome({
   const attachSelect = useRef<HTMLSelectElement>(null);
   const newCanvasButton = useRef<HTMLButtonElement>(null);
   const errorRegion = useRef<HTMLDivElement>(null);
+  const attachmentsHeading = useRef<HTMLHeadingElement>(null);
   const milestoneOpener = useRef<HTMLButtonElement | null>(null);
   const restoreMilestoneFocus = useRef(false);
-  const focusAfter = useRef<"milestones" | "canvases" | null>(null);
+  const focusAfter = useRef<"milestones" | "canvases" | "attachments" | null>(
+    null,
+  );
   useEffect(() => {
     if (pending) return;
     if (error) errorRegion.current?.focus();
@@ -170,6 +184,8 @@ export default function ProjectHome({
       collectionButton.current?.focus();
     else if (focusAfter.current === "canvases")
       (attachSelect.current || newCanvasButton.current)?.focus();
+    else if (focusAfter.current === "attachments")
+      attachmentsHeading.current?.focus();
     focusAfter.current = null;
   }, [pending, error]);
   useEffect(() => {
@@ -204,7 +220,7 @@ export default function ProjectHome({
   );
 
   async function archiveMilestone(item: Milestone) {
-    if (guard.current || !project) return;
+    if (guard.current || !project || readOnly) return;
     guard.current = true;
     setPending(item.id);
     setError("");
@@ -241,7 +257,7 @@ export default function ProjectHome({
   }
   async function attachCanvas() {
     const canvas = workspace.canvases.find((item) => item.id === attachId);
-    if (!canvas || !project || guard.current) return;
+    if (!canvas || !project || guard.current || readOnly) return;
     guard.current = true;
     setPending("attach");
     setError("");
@@ -266,8 +282,33 @@ export default function ProjectHome({
       setPending("");
     }
   }
+  async function removeAttachment(file: Media) {
+    if (guard.current || readOnly) return;
+    guard.current = true;
+    setPending(file.id);
+    setError("");
+    try {
+      await moveToTrash(
+        mutate,
+        notify,
+        { entity: "media", id: file.id, base: { ...file } },
+        "Attachment",
+        draftScope,
+      );
+      focusAfter.current = "attachments";
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "This attachment could not be moved to Trash.",
+      );
+    } finally {
+      guard.current = false;
+      setPending("");
+    }
+  }
   async function createCanvas() {
-    if (guard.current || !project) return;
+    if (guard.current || !project || readOnly) return;
     guard.current = true;
     setPending("canvas");
     setError("");
@@ -316,12 +357,21 @@ export default function ProjectHome({
           </p>
         </div>
         <div className="project-home-heading-actions">
-          <button className="btn btn-secondary" onClick={onEdit}>
+          <WatchControl
+            reference={{ type: "project", id: projectId }}
+            notify={notify}
+          />
+          <button
+            className="btn btn-secondary"
+            onClick={onEdit}
+            disabled={readOnly}
+          >
             <Pencil size={15} />
             Edit project
           </button>
           <button
             className="btn btn-primary"
+            disabled={readOnly}
             onClick={() => onCreateTask(projectId)}
           >
             <Plus size={16} />
@@ -329,6 +379,7 @@ export default function ProjectHome({
           </button>
         </div>
       </header>
+      <ProjectAccessPanel projectId={projectId} notify={notify} />
       <section className="project-home-summary" aria-label="Project overview">
         <div>
           <span className="project-status-label">
@@ -384,7 +435,9 @@ export default function ProjectHome({
               milestoneOpener.current = event.currentTarget;
               setMilestoneEditor("new");
             }}
-            disabled={!!pending || (project.milestones || []).length >= 100}
+            disabled={
+              readOnly || !!pending || (project.milestones || []).length >= 100
+            }
           >
             <Plus size={15} />
             Add milestone
@@ -439,6 +492,7 @@ export default function ProjectHome({
                     <button
                       className="btn btn-subtle"
                       onClick={() => onCreateTask(projectId, item.id)}
+                      disabled={readOnly}
                     >
                       <Plus size={14} />
                       Add task
@@ -449,7 +503,7 @@ export default function ProjectHome({
                         milestoneOpener.current = event.currentTarget;
                         setMilestoneEditor(item);
                       }}
-                      disabled={!!pending}
+                      disabled={readOnly || !!pending}
                     >
                       <Pencil size={14} />
                       Edit
@@ -458,7 +512,7 @@ export default function ProjectHome({
                 )}
                 <button
                   className="btn btn-subtle"
-                  disabled={!!pending}
+                  disabled={readOnly || !!pending}
                   onClick={() => void archiveMilestone(item)}
                 >
                   {item.archived ? (
@@ -623,7 +677,7 @@ export default function ProjectHome({
             <button
               ref={newCanvasButton}
               className="btn btn-subtle"
-              disabled={!!pending}
+              disabled={readOnly || !!pending}
               onClick={() => void createCanvas()}
             >
               <Plus size={15} />
@@ -675,7 +729,7 @@ export default function ProjectHome({
                   id={`attach-canvas-${projectId}`}
                   className="field"
                   value={attachId}
-                  disabled={!!pending}
+                  disabled={readOnly || !!pending}
                   onChange={(event) => setAttachId(event.target.value)}
                 >
                   <option value="">Choose an unattached canvas…</option>
@@ -687,7 +741,7 @@ export default function ProjectHome({
                 </select>
                 <button
                   className="btn btn-secondary"
-                  disabled={!attachId || !!pending}
+                  disabled={readOnly || !attachId || !!pending}
                 >
                   <Link2 size={15} />
                   {pending === "attach" ? "Attaching…" : "Attach"}
@@ -697,7 +751,56 @@ export default function ProjectHome({
           )}
         </section>
       </div>
-      {milestoneEditor && (
+      {workspace.media.some((file) => file.projectId === projectId) && (
+        <section
+          className="project-home-section"
+          data-tour="project-attachments"
+        >
+          <header>
+            <div>
+              <h2 ref={attachmentsHeading} tabIndex={-1}>
+                Project attachments
+              </h2>
+              <p>
+                Files uploaded from this project keep its access rules. Move
+                unused files to Trash before deleting the project.
+              </p>
+            </div>
+          </header>
+          <div className="project-attachment-list">
+            {workspace.media
+              .filter((file) => file.projectId === projectId)
+              .slice(0, attachmentLimit)
+              .map((file) => (
+                <article key={file.id}>
+                  <a href={file.url} target="_blank" rel="noopener noreferrer">
+                    {file.name}
+                    <ArrowUpRight size={16} />
+                  </a>
+                  <button
+                    className="btn"
+                    disabled={readOnly || !!pending}
+                    aria-label={`Move attachment to Trash: ${file.name}`}
+                    onClick={() => void removeAttachment(file)}
+                  >
+                    <Trash2 size={16} />
+                    Trash
+                  </button>
+                </article>
+              ))}
+          </div>
+          {workspace.media.filter((file) => file.projectId === projectId)
+            .length > attachmentLimit && (
+            <button
+              className="btn"
+              onClick={() => setAttachmentLimit((value) => value + 12)}
+            >
+              Show more attachments
+            </button>
+          )}
+        </section>
+      )}
+      {milestoneEditor && !readOnly && (
         <MilestoneEditor
           key={milestoneEditor === "new" ? "new" : milestoneEditor.id}
           project={project as Project}

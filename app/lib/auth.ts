@@ -7,6 +7,8 @@ import workspaceSQL from "../../drizzle/0000_dear_mimic.sql?raw";
 import accessSQL from "../../db/access.sql?raw";
 import workroomSQL from "../../db/workrooms.sql?raw";
 import reliabilitySQL from "../../db/reliability.sql?raw";
+import collaborationSQL from "../../db/collaboration.sql?raw";
+import noteCollaborationSQL from "../../db/note-collaboration.sql?raw";
 
 let schemaReady: Promise<unknown> | undefined;
 const instances = new Map<string, ReturnType<typeof betterAuth>>();
@@ -26,7 +28,11 @@ export async function getAuth(request: Request) {
       "\n" +
       workroomSQL +
       "\n" +
-      reliabilitySQL
+      reliabilitySQL +
+      "\n" +
+      collaborationSQL +
+      "\n" +
+      noteCollaborationSQL
     )
       .replace(/^--.*$/gm, "")
       .split(";")

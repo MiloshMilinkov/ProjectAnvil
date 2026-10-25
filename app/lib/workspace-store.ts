@@ -27,9 +27,17 @@ import {
   captureDeletion,
   prepareTrashRestore,
   restoreWarnings,
+  canAccessTrash,
 } from "./workspace-trash";
 import type { TrashCommit, WorkspaceMutationResult } from "./trash-types";
 import { emptyDecision } from "./connected-thinking-model";
+import {
+  assertMutationAccess,
+  assertMutationInputAccess,
+  assertWorkspaceWritable,
+  canEditEntity,
+  filterWorkspaceForAccess,
+} from "./permissions";
 
 interface WorkspaceRow {
   data: string;
@@ -437,10 +445,21 @@ function authenticatedComments(
   return [...previous, ...additions];
 }
 
+export async function readRawWorkspace(
+  access: ResolvedWorkspace,
+): Promise<Workspace> {
+  return withAccountPeople(
+    await rawWorkspace(access),
+    access,
+    await verifiedMembers(access),
+  );
+}
+
 export async function readWorkspace(request: Request): Promise<Workspace> {
   const access = await resolveWorkspace(request);
-  const workspace = await rawWorkspace(access);
-  return withAccountPeople(workspace, access, await verifiedMembers(access));
+  const workspace = await readRawWorkspace(access);
+  const latestAccess = await resolveWorkspace(request);
+  return filterWorkspaceForAccess(latestAccess, workspace);
 }
 
 export async function mutateWorkspace(
@@ -471,15 +490,77 @@ export async function mutateWorkspaceResult(
   for (let attempt = 0; attempt < 12; attempt++) {
     // Recheck membership on retries, including a removal during an edit.
     const access = await resolveWorkspace(request);
+    assertWorkspaceWritable(access);
     const current = withAccountPeople(
       await rawWorkspace(access),
       access,
       await verifiedMembers(access),
     );
+    assertMutationInputAccess(access, current, mutation);
+    if (
+      (input.action === "upsert" || input.action === "delete") &&
+      typeof input.entity === "string"
+    ) {
+      const typeForEntity = {
+        people: "person",
+        projects: "project",
+        tasks: "task",
+        notes: "note",
+        media: "media",
+        canvases: "canvas",
+        savedViews: "savedView",
+        relationships: "relationship",
+        noteTypes: "noteType",
+        relationshipPresets: "relationshipPreset",
+        brainstorms: "brainstorm",
+      } as const;
+      const entity = input.entity as keyof typeof typeForEntity;
+      const id = input.action === "upsert" ? item.id : input.id;
+      if (
+        typeForEntity[entity] &&
+        typeof id === "string" &&
+        (current[entity] || []).some((record) => record.id === id) &&
+        !canEditEntity(access, current, { type: typeForEntity[entity], id })
+      )
+        throw new WorkspaceError(
+          "You do not have editing access to this item.",
+          403,
+        );
+    }
+    if (
+      input.action === "review-relationship" &&
+      typeof input.id === "string" &&
+      !canEditEntity(access, current, { type: "relationship", id: input.id })
+    )
+      throw new WorkspaceError(
+        "You do not have editing access to this relationship.",
+        403,
+      );
+    if (
+      input.action === "vote-idea" &&
+      typeof input.id === "string" &&
+      !canEditEntity(access, current, { type: "brainstorm", id: input.id })
+    )
+      throw new WorkspaceError(
+        "You do not have editing access to this brainstorming board.",
+        403,
+      );
+    if (input.action === "restore" && typeof input.id === "string") {
+      if (!(await canAccessTrash(access, current, input.id)))
+        throw new WorkspaceError("This Trash item is unavailable.", 404);
+      if (!(await canAccessTrash(access, current, input.id, true)))
+        throw new WorkspaceError(
+          "This Trash item is outside your current editing access.",
+          403,
+        );
+    }
     if (await hasReceipt(access, operationId, hash)) {
       await resolveWorkspace(request);
       return {
-        workspace: activeWorkspace(current),
+        workspace: filterWorkspaceForAccess(
+          await resolveWorkspace(request),
+          activeWorkspace(current),
+        ),
         warnings:
           input.action === "restore" && typeof input.id === "string"
             ? await restoreWarnings(access.id, input.id)
@@ -546,6 +627,7 @@ export async function mutateWorkspaceResult(
           trashId,
         );
     }
+    assertMutationAccess(access, current, updated, mutation as Mutation);
     for (const task of updated.tasks) {
       const assignee = updated.people.find(
         (person) => person.id === task.assigneeId,
@@ -583,10 +665,14 @@ export async function mutateWorkspaceResult(
         hash,
         input.action === "import",
         trash,
+        { mutation: mutation as Mutation },
       )
     )
       return {
-        workspace: activeWorkspace(updated),
+        workspace: filterWorkspaceForAccess(
+          await resolveWorkspace(request),
+          activeWorkspace(updated),
+        ),
         warnings: trash.restore?.warnings || [],
       };
     await new Promise((resolve) =>

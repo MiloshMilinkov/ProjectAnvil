@@ -2,6 +2,11 @@ import { env } from "cloudflare:workers";
 import { database, type ResolvedWorkspace } from "./access-store";
 import { WorkspaceError } from "./workspace-model";
 import type { Workspace } from "./types";
+import {
+  assertWorkspaceWritable,
+  canManageWorkspace,
+  permissionsSnapshotSQL,
+} from "./permissions";
 
 interface MediaObjectRow {
   media_id: string;
@@ -16,10 +21,10 @@ export async function recordUpload(
   mediaId: string,
   objectKey: string,
 ): Promise<void> {
-  const membership = access.user
-    ? " AND EXISTS (SELECT 1 FROM appmembers WHERE workspace_id = ? AND user_id = ?)"
-    : "";
-  const values = access.user ? [access.id, access.user.id] : [];
+  assertWorkspaceWritable(access);
+  const authorization = permissionsSnapshotSQL(access);
+  const membership = ` AND (${authorization.sql})`;
+  const values = authorization.bindings;
   const result = await database()
     .prepare(
       `INSERT INTO media_objects (workspace_id, media_id, object_key, state, created_at)
@@ -58,6 +63,11 @@ export async function storageHealth(
   access: ResolvedWorkspace,
   workspace: Workspace,
 ) {
+  if (!canManageWorkspace(access))
+    throw new WorkspaceError(
+      "Workspace storage reports are available to owners and admins.",
+      403,
+    );
   if (!env.BUCKET)
     throw new WorkspaceError("Media storage is unavailable.", 503);
   const rows = await database()

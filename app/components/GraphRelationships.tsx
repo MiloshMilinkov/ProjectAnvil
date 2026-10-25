@@ -33,6 +33,7 @@ import "./relationships.css";
 import { moveToTrash } from "../lib/trash-actions";
 import { useDraftScope } from "./useRecoverableDraft";
 import RelationshipPresetManager from "./RelationshipPresetManager";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 
 type Props = Pick<FeatureProps, "workspace" | "mutate" | "notify"> & {
   impact: ReturnType<typeof relationshipImpact>;
@@ -50,6 +51,9 @@ export default function GraphRelationships({
   onSelect,
   onOpen,
 }: Props) {
+  const { canCreate, canEditRef } = useWorkspacePermissions(workspace);
+  const editable = (relationship: Relationship) =>
+    canEditRef(relationship.from) || canEditRef(relationship.to);
   const [composing, setComposing] = useState(false);
   const [fromKey, setFromKey] = useState("");
   const [toKey, setToKey] = useState("");
@@ -114,6 +118,7 @@ export default function GraphRelationships({
   });
 
   function startRelationship() {
+    if (!canCreate) return;
     setFromKey(
       byKey.has(selectedKey)
         ? selectedKey
@@ -135,6 +140,10 @@ export default function GraphRelationships({
     const to = byKey.get(toKey);
     if (!from || !to || fromKey === toKey) {
       setError("Choose two different items in this workspace.");
+      return;
+    }
+    if (!canCreate || (!canEditRef(from) && !canEditRef(to))) {
+      setError("At least one connected item needs editing access.");
       return;
     }
     if (
@@ -172,6 +181,7 @@ export default function GraphRelationships({
   }
 
   async function reviewRelationship(relationship: Relationship) {
+    if (!editable(relationship)) return;
     setBusy(relationship.id);
     setError("");
     try {
@@ -195,6 +205,8 @@ export default function GraphRelationships({
 
   const draftScope = useDraftScope();
   async function removeRelationship(id: string) {
+    const selected = workspace.relationships.find((item) => item.id === id);
+    if (!selected || !editable(selected)) return;
     setBusy(id);
     setError("");
     try {
@@ -268,7 +280,7 @@ export default function GraphRelationships({
         <button
           className="btn btn-primary"
           onClick={startRelationship}
-          disabled={entities.length < 2 || !!busy}
+          disabled={!canCreate || entities.length < 2 || !!busy}
         >
           <Plus size={16} />
           Add relationship
@@ -284,13 +296,13 @@ export default function GraphRelationships({
         <button
           className="btn"
           onClick={() => setManagePresets(true)}
-          disabled={!!busy}
+          disabled={!canCreate || !!busy}
         >
           <Settings2 size={16} />
           Relationship presets
         </button>
       </div>
-      {managePresets && (
+      {managePresets && canCreate && (
         <RelationshipPresetManager
           workspace={workspace}
           mutate={mutate}
@@ -367,7 +379,7 @@ export default function GraphRelationships({
             <select
               className="field"
               value={preset?.id || ""}
-              disabled={!!busy}
+              disabled={!canCreate || !!busy}
               onChange={(event) => {
                 const selected = workspace.relationshipPresets?.find(
                   (item) => item.id === event.target.value && !item.archived,
@@ -417,7 +429,7 @@ export default function GraphRelationships({
                 }}
                 required
                 autoFocus
-                disabled={!!busy}
+                disabled={!canCreate || !!busy}
               >
                 <option value="">Choose an item</option>
                 {entityOptions("", preset?.fromType)}
@@ -432,7 +444,7 @@ export default function GraphRelationships({
                   setKind(event.target.value as RelationshipKind);
                   setPresetId("");
                 }}
-                disabled={!!busy}
+                disabled={!canCreate || !!busy}
               >
                 {relationshipOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -448,7 +460,7 @@ export default function GraphRelationships({
                 value={toKey}
                 onChange={(event) => setToKey(event.target.value)}
                 required
-                disabled={!!busy}
+                disabled={!canCreate || !!busy}
               >
                 <option value="">Choose an item</option>
                 {entityOptions(fromKey, preset?.toType)}
@@ -469,7 +481,7 @@ export default function GraphRelationships({
               onChange={(event) => setLabel(event.target.value)}
               maxLength={240}
               placeholder="Describe the reason for this connection"
-              disabled={!!busy}
+              disabled={!canCreate || !!busy}
             />
           </label>
           <footer>
@@ -481,7 +493,7 @@ export default function GraphRelationships({
             >
               Cancel
             </button>
-            <button className="btn btn-primary" disabled={!!busy}>
+            <button className="btn btn-primary" disabled={!canCreate || !!busy}>
               {busy === "create" ? "Saving…" : "Save relationship"}
             </button>
           </footer>
@@ -560,7 +572,7 @@ export default function GraphRelationships({
                   {needsReview && (
                     <button
                       className="btn"
-                      disabled={!!busy}
+                      disabled={!!busy || !editable(relationship)}
                       onClick={() => reviewRelationship(relationship)}
                     >
                       <Check size={15} />
@@ -571,7 +583,7 @@ export default function GraphRelationships({
                     className="btn-icon"
                     aria-label={`Remove relationship: ${titleOf(relationship.from)} ${relationshipLabel(relationship.kind)} ${titleOf(relationship.to)}`}
                     onClick={() => setRemovingId(relationship.id)}
-                    disabled={!!busy}
+                    disabled={!!busy || !editable(relationship)}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -592,7 +604,7 @@ export default function GraphRelationships({
                   <button
                     className="btn"
                     onClick={() => removeRelationship(relationship.id)}
-                    disabled={!!busy}
+                    disabled={!!busy || !editable(relationship)}
                   >
                     Remove connection
                   </button>

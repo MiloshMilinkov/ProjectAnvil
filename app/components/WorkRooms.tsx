@@ -88,6 +88,7 @@ const locationLabels: Record<WorkLocation["page"], string> = {
   canvas: "Canvas",
   collections: "Collections",
   brainstorm: "Brainstorming",
+  activity: "Activity",
   daily: "Daily planner",
 };
 

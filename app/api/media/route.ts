@@ -10,6 +10,7 @@ import { WorkspaceError } from "../../lib/workspace-model";
 import { recordUpload, retainFailedUpload } from "../../lib/media-store";
 import { readBoundedBody } from "../../lib/request-body";
 import type { Media } from "../../lib/types";
+import { assertProjectWritable } from "../../lib/permissions";
 
 const maximumSize = 20 * 1024 * 1024;
 
@@ -44,6 +45,19 @@ export async function POST(request: Request) {
       headers: { "Content-Type": request.headers.get("content-type")! },
     }).formData();
     const file = form.get("file");
+    const projectId =
+      typeof form.get("projectId") === "string"
+        ? String(form.get("projectId"))
+        : "";
+    if (projectId && !/^[A-Za-z0-9_-]{1,120}$/.test(projectId))
+      throw new WorkspaceError("Choose a valid project for this attachment.");
+    assertProjectWritable(access, projectId);
+    const visibleWorkspace = await readWorkspace(request);
+    if (
+      projectId &&
+      !visibleWorkspace.projects.some((project) => project.id === projectId)
+    )
+      throw new WorkspaceError("The attachment’s project is unavailable.", 404);
     if (!file || typeof file === "string" || !("arrayBuffer" in file))
       throw new WorkspaceError("Choose a file to upload.");
     if (file.size > maximumSize)
@@ -61,6 +75,7 @@ export async function POST(request: Request) {
       size: file.size,
       url: `/api/media/${id}`,
       createdAt: new Date().toISOString(),
+      projectId,
     };
     uploadedKey = `media/${access.id}/${id}`;
     await readWorkspace(request);

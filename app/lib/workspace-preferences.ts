@@ -6,6 +6,7 @@ export const workspacePages = [
   "rooms",
   "notes",
   "brainstorm",
+  "activity",
   "graph",
   "canvas",
   "collections",

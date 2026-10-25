@@ -48,6 +48,7 @@ import type { EntityRef } from "../lib/types";
 import GraphRelationships from "./GraphRelationships";
 import { useCanvasPersistence } from "./useCanvasPersistence";
 import { useDialog } from "./useDialog";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 import "./visuals.css";
 import "./project-planning.css";
 
@@ -1093,6 +1094,7 @@ interface CanvasViewProps extends FeatureProps {
 export function CanvasView(props: CanvasViewProps) {
   const scopedFetch = useWorkspaceFetch();
   const { workspace, mutate, notify, resumeContext, onContextChange } = props;
+  const { canCreate, canEditProject } = useWorkspacePermissions(workspace);
   const {
     canvasId,
     canvas,
@@ -1114,6 +1116,9 @@ export function CanvasView(props: CanvasViewProps) {
     notify,
     preferredId: resumeContext?.canvasId,
   });
+  const writable = canvas
+    ? canEditProject(canvas.projectId || "")
+    : canCreate && canEditProject(props.projectFilter || "");
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, scale: 0.85 });
   const resumedRoom = useRef("");
   const { ref, width, height } = useSize();
@@ -1131,7 +1136,7 @@ export function CanvasView(props: CanvasViewProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [uploadMedia, setUploadMedia] = useState<Media[]>([]);
-  useDialog(addDialog, () => setShowAdd(false), false, showAdd);
+  useDialog(addDialog, () => setShowAdd(false), false, showAdd && writable);
   const drag = useRef<CanvasDrag | null>(null);
   const mediaInput = useRef<HTMLInputElement>(null);
   const restoredCameraFor = useRef<string | null>(null);
@@ -1204,8 +1209,20 @@ export function CanvasView(props: CanvasViewProps) {
   }, [ref]);
 
   const save = useCallback(
-    (input: Canvas) => persistCanvas(sanitizeCanvas(input)),
-    [persistCanvas],
+    (input: Canvas) => {
+      const saved = workspace.canvases.find((item) => item.id === input.id);
+      if (
+        !canEditProject(input.projectId || "") ||
+        (saved && !canEditProject(saved.projectId || ""))
+      ) {
+        notify(
+          "This canvas is view only. Ask an administrator for editing access.",
+        );
+        return;
+      }
+      return persistCanvas(sanitizeCanvas(input));
+    },
+    [persistCanvas, canEditProject, workspace.canvases, notify],
   );
   const updateCard = (
     id: string,
@@ -1213,7 +1230,7 @@ export function CanvasView(props: CanvasViewProps) {
     persist = true,
   ) => {
     const current = canvasRef.current;
-    if (!current) return;
+    if (!current || !writable) return;
     const next = {
       ...current,
       cards: current.cards.map((c) => (c.id === id ? { ...c, ...patch } : c)),
@@ -1259,6 +1276,7 @@ export function CanvasView(props: CanvasViewProps) {
     return () => cancelAnimationFrame(frame);
   }, [resumeContext, workspace.canvases, switchCanvas]);
   const createCanvas = () => {
+    if (!canCreate || !canEditProject(props.projectFilter || "")) return;
     const next = blankCanvas(
       workspace.projects.some((project) => project.id === props.projectFilter)
         ? props.projectFilter
@@ -1272,7 +1290,7 @@ export function CanvasView(props: CanvasViewProps) {
   };
   const removeSelection = () => {
     const current = canvasRef.current;
-    if (!current) return;
+    if (!current || !writable) return;
     if (selected)
       save({
         ...current,
@@ -1291,6 +1309,7 @@ export function CanvasView(props: CanvasViewProps) {
     setConnectFrom("");
   };
   const addCard = (type: CanvasCard["type"], entityId = "", text = "") => {
+    if (!writable) return;
     let current = canvasRef.current;
     if (!current)
       current = blankCanvas(
@@ -1318,6 +1337,7 @@ export function CanvasView(props: CanvasViewProps) {
     setAddSearch("");
   };
   const upload = async (file: File) => {
+    if (!writable) return;
     if (file.size > 20 * 1024 * 1024) {
       notify("Choose a file smaller than 20 MB.");
       return;
@@ -1326,6 +1346,10 @@ export function CanvasView(props: CanvasViewProps) {
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append(
+        "projectId",
+        canvasRef.current?.projectId || props.projectFilter || "",
+      );
       const result = await scopedFetch("/api/media", {
         method: "POST",
         body: form,
@@ -1389,6 +1413,7 @@ export function CanvasView(props: CanvasViewProps) {
     type: CanvasDrag["type"],
     card?: CanvasCard,
   ) => {
+    if (type !== "pan" && !writable) return;
     if (event.button !== 0) return;
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1443,7 +1468,7 @@ export function CanvasView(props: CanvasViewProps) {
     drag.current = null;
   };
   const selectCard = (id: string) => {
-    if (connecting) {
+    if (connecting && writable) {
       if (!connectFrom) {
         setConnectFrom(id);
         notify("Choose another card to connect it.");
@@ -1470,7 +1495,7 @@ export function CanvasView(props: CanvasViewProps) {
   };
   const rename = () => {
     setEditingTitle(false);
-    if (canvasRef.current && titleDraft.trim())
+    if (writable && canvasRef.current && titleDraft.trim())
       void save({ ...canvasRef.current, title: titleDraft.trim() });
   };
   const visibleItems =
@@ -1501,6 +1526,7 @@ export function CanvasView(props: CanvasViewProps) {
         </div>
         <button
           className="btn btn-primary"
+          disabled={!writable}
           onClick={() => {
             setShowAdd(true);
             setAddType("note");
@@ -1535,6 +1561,7 @@ export function CanvasView(props: CanvasViewProps) {
           className="btn-icon"
           title="New canvas"
           aria-label="New canvas"
+          disabled={!canCreate || !canEditProject(props.projectFilter || "")}
           onClick={createCanvas}
         >
           <Plus size={16} />
@@ -1545,6 +1572,7 @@ export function CanvasView(props: CanvasViewProps) {
             <span>Project</span>
             <select
               aria-label="Canvas project"
+              disabled={!writable}
               value={canvas.projectId || ""}
               onChange={(event) => {
                 const current = canvasRef.current;
@@ -1562,7 +1590,11 @@ export function CanvasView(props: CanvasViewProps) {
                   </option>
                 )}
               {workspace.projects.map((project) => (
-                <option key={project.id} value={project.id}>
+                <option
+                  key={project.id}
+                  value={project.id}
+                  disabled={!canEditProject(project.id)}
+                >
                   {project.name}
                 </option>
               ))}
@@ -1574,6 +1606,7 @@ export function CanvasView(props: CanvasViewProps) {
           aria-pressed={connecting}
           aria-label={connecting ? "Cancel connecting cards" : "Connect cards"}
           title={connecting ? "Cancel connecting cards" : "Connect cards"}
+          disabled={!writable}
           onClick={() => {
             setConnecting(!connecting);
             setConnectFrom("");
@@ -1603,19 +1636,23 @@ export function CanvasView(props: CanvasViewProps) {
           aria-live="polite"
           aria-atomic="true"
         >
-          {saving ? (
+          {!writable ? (
+            <span>View only</span>
+          ) : saving ? (
             <>
               <Loader2 size={13} className="visual-spin" /> Saving…
             </>
           ) : error ? (
             <button
               onClick={() => canvasRef.current && void save(canvasRef.current)}
+              disabled={!writable}
             >
               Retry save
             </button>
           ) : unsaved ? (
             <button
               onClick={() => canvasRef.current && void save(canvasRef.current)}
+              disabled={!writable}
             >
               Unsaved · Save now
             </button>
@@ -1669,7 +1706,7 @@ export function CanvasView(props: CanvasViewProps) {
           ref={ref}
           tabIndex={0}
           role="region"
-          aria-label="Visual planning canvas. Select a card to edit its details."
+          aria-label={`Visual planning canvas. Select a card to ${writable ? "edit" : "view"} its details.`}
           aria-describedby="canvas-keyboard-help"
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
@@ -1873,7 +1910,7 @@ export function CanvasView(props: CanvasViewProps) {
                   style={style}
                   tabIndex={0}
                   role="group"
-                  aria-label={`${card.type}: ${title}. Enter to select, arrow keys to move.`}
+                  aria-label={`${card.type}: ${title}. Enter to select${writable ? ", arrow keys to move" : " and view details"}.`}
                   onFocus={() => {
                     setSelected(card.id);
                     setSelectedEdge("");
@@ -2083,6 +2120,7 @@ export function CanvasView(props: CanvasViewProps) {
                   </div>
                   <button
                     className="canvas-resize"
+                    disabled={!writable}
                     aria-label={`Resize ${title}. Use arrow keys to adjust its size.`}
                     title="Drag or use arrow keys to resize"
                     onKeyDown={(event) => {
@@ -2133,13 +2171,14 @@ export function CanvasView(props: CanvasViewProps) {
               </p>
               <button
                 className="btn btn-primary"
+                disabled={!writable}
                 onClick={() => setShowAdd(true)}
               >
                 <Plus size={15} /> Add your first card
               </button>
             </div>
           )}
-          {connecting && (
+          {connecting && writable && (
             <div
               className="canvas-connect-notice"
               role="status"
@@ -2163,6 +2202,7 @@ export function CanvasView(props: CanvasViewProps) {
           <div className="canvas-quick-add">
             <button
               aria-label="Add text card"
+              disabled={!writable}
               title="Add a thought"
               onClick={() => {
                 setAddType("text");
@@ -2173,6 +2213,7 @@ export function CanvasView(props: CanvasViewProps) {
             </button>
             <button
               aria-label="Add note card"
+              disabled={!writable}
               title="Add a note"
               onClick={() => {
                 setAddType("note");
@@ -2183,6 +2224,7 @@ export function CanvasView(props: CanvasViewProps) {
             </button>
             <button
               aria-label="Add task card"
+              disabled={!writable}
               title="Add a task"
               onClick={() => {
                 setAddType("task");
@@ -2195,7 +2237,7 @@ export function CanvasView(props: CanvasViewProps) {
             <button
               aria-label="Upload media"
               title="Add media"
-              disabled={uploading}
+              disabled={!writable || uploading}
               onClick={() => mediaInput.current?.click()}
             >
               {uploading ? (
@@ -2265,6 +2307,7 @@ export function CanvasView(props: CanvasViewProps) {
                   <button
                     className="btn-icon visual-danger"
                     aria-label="Delete card"
+                    disabled={!writable}
                     title="Delete card"
                     onClick={removeSelection}
                   >
@@ -2281,6 +2324,7 @@ export function CanvasView(props: CanvasViewProps) {
                     <button
                       key={color}
                       aria-label={`${cardColorNames[index]} accent`}
+                      disabled={!writable}
                       aria-pressed={selectedCard.color === color}
                       title={`${cardColorNames[index]} accent`}
                       style={{ background: color }}
@@ -2304,6 +2348,7 @@ export function CanvasView(props: CanvasViewProps) {
                     </label>
                     <textarea
                       id="canvas-card-text"
+                      readOnly={!writable}
                       className="field canvas-edit-text"
                       value={selectedCard.text}
                       placeholder={
@@ -2347,6 +2392,7 @@ export function CanvasView(props: CanvasViewProps) {
                       className="field"
                       min={200}
                       value={Math.round(selectedCard.width)}
+                      readOnly={!writable}
                       onChange={(e) =>
                         updateCard(
                           selectedCard.id,
@@ -2368,6 +2414,7 @@ export function CanvasView(props: CanvasViewProps) {
                       className="field"
                       min={150}
                       value={Math.round(selectedCard.height)}
+                      readOnly={!writable}
                       onChange={(e) =>
                         updateCard(
                           selectedCard.id,
@@ -2394,6 +2441,7 @@ export function CanvasView(props: CanvasViewProps) {
                       type="number"
                       className="field"
                       value={Math.round(selectedCard.x)}
+                      readOnly={!writable}
                       onChange={(e) =>
                         updateCard(
                           selectedCard.id,
@@ -2412,6 +2460,7 @@ export function CanvasView(props: CanvasViewProps) {
                       type="number"
                       className="field"
                       value={Math.round(selectedCard.y)}
+                      readOnly={!writable}
                       onChange={(e) =>
                         updateCard(
                           selectedCard.id,
@@ -2427,6 +2476,7 @@ export function CanvasView(props: CanvasViewProps) {
                 </div>
                 <button
                   className="btn canvas-connect-button"
+                  disabled={!writable}
                   aria-pressed={connecting && connectFrom === selectedCard.id}
                   onClick={() => {
                     setConnecting(true);
@@ -2447,6 +2497,7 @@ export function CanvasView(props: CanvasViewProps) {
                   <button
                     className="btn-icon visual-danger"
                     aria-label="Delete connection"
+                    disabled={!writable}
                     onClick={removeSelection}
                   >
                     <Unlink size={15} />
@@ -2461,6 +2512,7 @@ export function CanvasView(props: CanvasViewProps) {
                 <input
                   key={edge.id}
                   id="canvas-edge-label"
+                  readOnly={!writable}
                   className="field"
                   defaultValue={edge.label}
                   placeholder="e.g. inspires, depends on…"
@@ -2490,6 +2542,7 @@ export function CanvasView(props: CanvasViewProps) {
                   <input
                     className="field canvas-title-input"
                     aria-label="Canvas title"
+                    readOnly={!writable}
                     autoFocus
                     value={titleDraft}
                     onChange={(e) => setTitleDraft(e.target.value)}
@@ -2502,13 +2555,14 @@ export function CanvasView(props: CanvasViewProps) {
                 ) : (
                   <button
                     className="canvas-title-button"
+                    disabled={!writable}
                     onClick={() => {
                       setEditingTitle(true);
                       setTitleDraft(canvas?.title || "Untitled canvas");
                     }}
                   >
                     {canvas?.title || "Your first canvas"}
-                    <span>Click to rename</span>
+                    <span>{writable ? "Click to rename" : "View only"}</span>
                   </button>
                 )}
                 <p className="visual-muted">
@@ -2540,7 +2594,13 @@ export function CanvasView(props: CanvasViewProps) {
                   <ImagePlus size={15} />
                   <span>Bring in concept art, audio, videos, and PDFs.</span>
                 </div>
-                <button className="btn graph-open" onClick={createCanvas}>
+                <button
+                  className="btn graph-open"
+                  onClick={createCanvas}
+                  disabled={
+                    !canCreate || !canEditProject(props.projectFilter || "")
+                  }
+                >
                   <Plus size={14} /> New canvas
                 </button>
               </>
@@ -2551,7 +2611,9 @@ export function CanvasView(props: CanvasViewProps) {
       <div className="visual-footer">
         <span id="canvas-keyboard-help">
           <MousePointer2 size={13} /> Drag to pan · Scroll or +/− to zoom ·
-          Arrow keys move a focused card
+          {writable
+            ? "Arrow keys move a focused card"
+            : "View only: open linked items from their cards"}
         </span>
         <span>
           {error
@@ -2562,6 +2624,7 @@ export function CanvasView(props: CanvasViewProps) {
       <input
         ref={mediaInput}
         type="file"
+        disabled={!writable}
         className="visual-hidden-input"
         accept="image/*,audio/*,video/*,application/pdf"
         onChange={(e) => {
@@ -2569,7 +2632,7 @@ export function CanvasView(props: CanvasViewProps) {
           if (file) upload(file);
         }}
       />
-      {showAdd && (
+      {showAdd && writable && (
         <div
           className="visual-modal-overlay"
           onClick={(e) => {

@@ -11,6 +11,7 @@ import {
 import { moveToTrash } from "../lib/trash-actions";
 import "./everyday-workflow.css";
 import { useDraftScope } from "./useRecoverableDraft";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 
 export default function SavedTaskViews({
   workspace,
@@ -24,6 +25,7 @@ export default function SavedTaskViews({
   onApply: (config: SavedViewConfig) => void;
   mine: boolean;
 }) {
+  const permissions = useWorkspacePermissions(workspace);
   const [selected, setSelected] = useState<SavedView | null>(null);
   const [editing, setEditing] = useState<"new" | "rename" | null>(null);
   const [name, setName] = useState("");
@@ -48,6 +50,12 @@ export default function SavedTaskViews({
   }, [editing, pending, selected]);
 
   function start(mode: "new" | "rename") {
+    if (
+      !permissions.canEditProject(
+        mode === "new" ? config.project : active?.project || "",
+      )
+    )
+      return;
     setName(mode === "rename" ? selected?.name || "" : "");
     setError("");
     setEditing(mode);
@@ -58,6 +66,12 @@ export default function SavedTaskViews({
   }
   async function persist(mode: "new" | "rename" | "update", event?: FormEvent) {
     event?.preventDefault();
+    if (
+      !permissions.canEditProject(
+        mode === "new" ? config.project : active?.project || "",
+      )
+    )
+      return;
     if (guard.current || (mode !== "update" && !name.trim())) return;
     if (mode !== "new" && (!selected || !active)) return;
     guard.current = true;
@@ -99,6 +113,7 @@ export default function SavedTaskViews({
     }
   }
   async function remove() {
+    if (!permissions.canEditProject(active?.project || "")) return;
     if (!selected || !active || guard.current) return;
     guard.current = true;
     setPending(true);
@@ -160,7 +175,7 @@ export default function SavedTaskViews({
         <button
           ref={saveButton}
           className="btn btn-subtle"
-          disabled={pending}
+          disabled={pending || !permissions.canEditProject(config.project)}
           aria-expanded={editing === "new"}
           aria-controls={formId}
           onClick={() => start("new")}
@@ -181,7 +196,11 @@ export default function SavedTaskViews({
           </span>
           <button
             className="btn btn-secondary"
-            disabled={pending || !modified}
+            disabled={
+              pending ||
+              !modified ||
+              !permissions.canEditProject(active.project)
+            }
             onClick={() => void persist("update")}
           >
             <Check size={14} />
@@ -189,7 +208,7 @@ export default function SavedTaskViews({
           </button>
           <button
             className="btn btn-subtle"
-            disabled={pending}
+            disabled={pending || !permissions.canEditProject(active.project)}
             onClick={() => start("rename")}
           >
             <Pencil size={14} />
@@ -197,7 +216,7 @@ export default function SavedTaskViews({
           </button>
           <button
             className="btn btn-subtle"
-            disabled={pending}
+            disabled={pending || !permissions.canEditProject(active.project)}
             onClick={() => void remove()}
           >
             <Trash2 size={14} />

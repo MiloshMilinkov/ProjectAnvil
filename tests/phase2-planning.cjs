@@ -132,7 +132,7 @@ module.exports = async function checkPlanning({ sql, store, request }) {
         id: "plan",
         base: plan.projects[0],
       }),
-    /tasks, notes, canvases, and brainstorming boards/,
+    /tasks, notes, canvases, attachments, and brainstorming boards/,
   );
   failure(
     "tasks",

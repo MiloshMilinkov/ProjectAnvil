@@ -637,6 +637,8 @@ async function main() {
     "db/access.sql",
     "db/workrooms.sql",
     "db/reliability.sql",
+    "db/collaboration.sql",
+    "db/note-collaboration.sql",
   ])
     sql.exec(fs.readFileSync(path.join(root, relative), "utf8"));
   const requiredTables = [
@@ -657,6 +659,17 @@ async function main() {
     "media_objects",
     "workspace_trash",
     "personal_templates",
+    "appmember_roles",
+    "appinvite_roles",
+    "project_permissions",
+    "project_members",
+    "workspace_security",
+    "workspace_security_guards",
+    "workspace_activity",
+    "workspace_watchers",
+    "workspace_notifications",
+    "note_collaboration",
+    "note_presence",
   ];
   const migratedTables = new Set(
     sql
@@ -666,7 +679,7 @@ async function main() {
   );
   assert.equal(
     requiredTables.filter((name) => migratedTables.has(name)).length,
-    17,
+    requiredTables.length,
     "Runtime bootstrap must create every auth, access, work room and recovery table",
   );
   const userColumns = sql
@@ -1055,6 +1068,25 @@ async function main() {
     request,
     users,
   });
+  await require("./phase4-permissions.cjs")({
+    sql,
+    store: rawStore,
+    request,
+    users,
+  });
+  await require("./phase4-collaboration.cjs")({
+    sql,
+    store: rawStore,
+    request,
+    users,
+  });
+  await require("./phase4-coedit.cjs")({
+    sql,
+    store: rawStore,
+    request,
+    users,
+  });
+  await require("./phase4-boundaries.cjs")({ sql, store: rawStore, request, users });
   Module._load = originalLoad;
   sql.close();
   console.log(

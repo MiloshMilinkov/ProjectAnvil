@@ -7,6 +7,7 @@ import {
   useEffectEvent,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -43,6 +44,7 @@ import {
   Square,
   Tag,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import type { FeatureProps, Media, Note, Workspace } from "../lib/types";
@@ -84,6 +86,11 @@ import "./knowledge.css";
 import "./templates.css";
 import "./note-recovery.css";
 import "./knowledge-ux.css";
+import { useNoteCollaboration } from "./useNoteCollaboration";
+import LiveNoteStatus from "./LiveNoteStatus";
+import { hasSharedNoteDraft } from "../lib/note-collaboration-draft-keys";
+import WatchControl, { MentionHelp } from "./WatchControl";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 
 type Props = FeatureProps & {
   selectedNote: string;
@@ -397,16 +404,34 @@ export default function Knowledge({
   const browserRef = useRef<HTMLElement>(null);
   const mobileLayout = useMediaQuery("(max-width: 750px)");
   const draftScope = useDraftScope();
+  const visibleProjects = useMemo(
+    () => new Set(workspace.projects.map((project) => project.id)),
+    [workspace.projects],
+  );
+  const noteVisible = useCallback(
+    (note: Pick<Note, "projectId">) =>
+      !note.projectId || visibleProjects.has(note.projectId),
+    [visibleProjects],
+  );
   const [recoveredNotes] = useState(() => recoveredNoteDrafts(draftScope));
+  const accessibleRecovered = recoveredNotes.filter((item) =>
+    noteVisible(item.record.value),
+  );
+  const [hiddenRecovery, setHiddenRecovery] = useState<Note | null>(
+    () =>
+      recoveredNotes.find((item) => !noteVisible(item.record.value))?.record
+        .value || null,
+  );
   const [localNoteValues, setLocalNoteValues] = useState<Record<string, Note>>(
     () =>
       Object.fromEntries(
-        recoveredNotes.map((item) => [item.id, item.record.value]),
+        accessibleRecovered.map((item) => [item.id, item.record.value]),
       ),
   );
   const [draft, setDraft] = useState<Note | null>(
     () =>
-      recoveredNotes.find((item) => item.id === selectedNote)?.record.value ||
+      accessibleRecovered.find((item) => item.id === selectedNote)?.record
+        .value ||
       workspace.notes.find((note) => note.id === selectedNote) ||
       null,
   );
@@ -485,14 +510,14 @@ export default function Knowledge({
   const [taskSourceError, setTaskSourceError] = useState("");
   const draftRef = useRef(draft);
   const draftCache = useRef(
-    new Map(recoveredNotes.map((item) => [item.id, item.record.value])),
+    new Map(accessibleRecovered.map((item) => [item.id, item.record.value])),
   );
   const draftTokens = useRef(
-    new Map(recoveredNotes.map((item) => [item.id, item.record.token])),
+    new Map(accessibleRecovered.map((item) => [item.id, item.record.token])),
   );
   const localEdits = useRef(
     new Map(
-      recoveredNotes.map((item) => [
+      accessibleRecovered.map((item) => [
         item.id,
         restoredEdits(item.record.value, item.record.baseline),
       ]),
@@ -523,6 +548,15 @@ export default function Knowledge({
   );
   const creatingRef = useRef(false);
   const workspaceRef = useRef(workspace);
+  const permissions = useWorkspacePermissions(workspace);
+  const [liveNoteId, setLiveNoteId] = useState(() =>
+    draft?.id && hasSharedNoteDraft(draftScope, draft.id) ? draft.id : "",
+  );
+  const sharedFlush = useRef<() => Promise<boolean>>(() =>
+    Promise.resolve(true),
+  );
+  const sharedChange = useRef<(content: string) => boolean>(() => false);
+  const sharedNote = useRef("");
   useLayoutEffect(() => {
     mutateRef.current = mutate;
     workspaceRef.current = workspace;
@@ -582,7 +616,115 @@ export default function Knowledge({
     [draftScope, setDraftStorageError],
   );
 
-  const flush = useCallback(() => {
+  const liveEditing = !!draft && liveNoteId === draft.id;
+  useEffect(() => {
+    const cached = [...draftCache.current.values()].filter(
+      (note) => !noteVisible(note),
+    );
+    if (!cached.length && (!draftRef.current || noteVisible(draftRef.current)))
+      return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const current = draftRef.current;
+      const hidden = current && !noteVisible(current) ? current : null;
+      const copies = new Map(cached.map((note) => [note.id, note]));
+      if (hidden) copies.set(hidden.id, hidden);
+      for (const note of copies.values()) {
+        persistDraft(note);
+        draftCache.current.delete(note.id);
+        localEdits.current.delete(note.id);
+        sentVersions.current.delete(note.id);
+        if (pending.current?.id === note.id) pending.current = null;
+      }
+      if (copies.size)
+        setHiddenRecovery(hidden || copies.values().next().value || null);
+      setLocalNoteValues((values) =>
+        Object.fromEntries(
+          Object.entries(values).filter(([, note]) => noteVisible(note)),
+        ),
+      );
+      if (hidden) {
+        draftRef.current = null;
+        setDraft(null);
+        setLiveNoteId("");
+        setTaskSource(null);
+        setSnapshotsOpen(false);
+        setHistory([]);
+        setMergeOpen(false);
+        setDeleteOpen(false);
+        setPersonalTemplatesOpen(false);
+        setSlides(false);
+        if (
+          recordingTarget.current === hidden.id &&
+          recorder.current?.state === "recording"
+        )
+          recorder.current.stop();
+        setSaveState("saved");
+        setSaveError("");
+        const next = workspace.notes.find(
+          (note) =>
+            noteVisible(note) &&
+            (!projectFilter ||
+              projectFilter === "all" ||
+              note.projectId === projectFilter),
+        );
+        if (next) {
+          draftRef.current = next;
+          setDraft(next);
+        }
+        onSelectNote(next?.id || "");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [noteVisible, persistDraft, workspace.notes, projectFilter, onSelectNote]);
+  const shared = useNoteCollaboration({
+    noteId: draft?.id || "",
+    enabled: liveEditing,
+    initialContent: draft?.content || "",
+    textareaRef: editor,
+    onContent: (content) => {
+      const previous = draftRef.current;
+      if (!previous || previous.id !== liveNoteId) return;
+      const next = { ...previous, content };
+      const changes = localEdits.current.get(next.id);
+      changes?.delete("content");
+      if (changes?.size) {
+        draftCache.current.set(next.id, next);
+        persistDraft(next);
+      } else {
+        localEdits.current.delete(next.id);
+        draftCache.current.delete(next.id);
+      }
+      draftRef.current = next;
+      setDraft(next);
+    },
+  });
+  useLayoutEffect(() => {
+    sharedNote.current = liveEditing && draft ? draft.id : "";
+    sharedFlush.current = liveEditing
+      ? shared.flush
+      : () => Promise.resolve(true);
+    sharedChange.current = shared.change;
+  }, [liveEditing, draft, shared.flush, shared.change]);
+  const canEditNote =
+    !!draft && permissions.canEditRef({ type: "note", id: draft.id });
+  const canCreateNote =
+    permissions.canEditProject(projectFilter === "all" ? "" : projectFilter) &&
+    (!projectFilter ||
+      projectFilter === "all" ||
+      visibleProjects.has(projectFilter));
+  const noteSaveState =
+    liveEditing && shared.error
+      ? "error"
+      : liveEditing && (shared.pending || shared.status === "opening")
+        ? "saving"
+        : saveState;
+
+  const flush = useCallback(async () => {
+    if (!(await sharedFlush.current())) return false;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     const note = pending.current;
@@ -656,6 +798,9 @@ export default function Knowledge({
               change.value,
             ]),
           ),
+          ...(sharedNote.current === note.id && draftRef.current?.id === note.id
+            ? { content: draftRef.current.content }
+            : {}),
         } as Note;
         if (remaining.size) draftCache.current.set(note.id, rebased);
         else draftCache.current.delete(note.id);
@@ -715,6 +860,17 @@ export default function Knowledge({
   const edit = useCallback(
     (patch: Partial<Note>) => {
       if (!draftRef.current) return;
+      if (!permissions.canEditRef({ type: "note", id: draftRef.current.id }))
+        return;
+      if (
+        Object.hasOwn(patch, "content") &&
+        sharedNote.current === draftRef.current.id
+      ) {
+        if (!sharedChange.current(patch.content ?? "")) return;
+        patch = { ...patch };
+        delete patch.content;
+        if (!Object.keys(patch).length) return;
+      }
       const next = { ...draftRef.current, ...patch };
       version.current++;
       const changes =
@@ -742,7 +898,7 @@ export default function Knowledge({
         void flush();
       }, 650);
     },
-    [flush, persistDraft],
+    [flush, persistDraft, permissions],
   );
 
   useEffect(
@@ -840,6 +996,10 @@ export default function Knowledge({
             change.value,
           ]),
         ),
+        ...(sharedNote.current === incoming.id &&
+        draftRef.current?.id === incoming.id
+          ? { content: draftRef.current.content }
+          : {}),
       } as Note;
       if (
         changes?.size &&
@@ -1054,7 +1214,7 @@ export default function Knowledge({
     ...Object.values(localNoteValues).filter(
       (note) => !workspace.notes.some((saved) => saved.id === note.id),
     ),
-  ];
+  ].filter(noteVisible);
   const notes = availableNotes.filter(
     (note) =>
       (mode !== "daily" || note.kind === "daily") &&
@@ -1196,6 +1356,22 @@ export default function Knowledge({
   ): Promise<boolean> => {
     const target = targetNoteId || draftRef.current?.id;
     if (!target) return false;
+    const targetNote =
+      draftCache.current.get(target) ||
+      workspaceRef.current.notes.find((note) => note.id === target) ||
+      (draftRef.current?.id === target ? draftRef.current : null);
+    if (
+      !targetNote ||
+      (targetNote.projectId &&
+        !workspaceRef.current.projects.some(
+          (project) => project.id === targetNote.projectId,
+        ))
+    ) {
+      setRecordError(
+        "The original note or project is no longer available. Download your recording before leaving this page.",
+      );
+      return false;
+    }
     uploadPending.current = true;
     let binarySaved = false;
     if (mounted.current) {
@@ -1205,6 +1381,7 @@ export default function Knowledge({
     try {
       const data = new FormData();
       data.append("file", file);
+      data.append("projectId", targetNote.projectId);
       const response = await scopedFetch("/api/media", {
         method: "POST",
         body: data,
@@ -1477,10 +1654,22 @@ export default function Knowledge({
     if (timer.current) clearTimeout(timer.current);
     pending.current = null;
     try {
+      if (!(await flush()))
+        throw new Error(
+          "Save or recover the note's unfinished changes before moving it to Trash.",
+        );
       await queue.current;
-      const saved = workspaceRef.current.notes.find(
-        (note) => note.id === draft.id,
-      );
+      const response = await scopedFetch("/api/state", { cache: "no-store" });
+      const result = (await response.json()) as {
+        workspace?: Workspace;
+        error?: string;
+      };
+      if (!response.ok || !result.workspace)
+        throw new Error(
+          result.error ||
+            "The latest note could not be checked before deletion.",
+        );
+      const saved = result.workspace.notes.find((note) => note.id === draft.id);
       await moveToTrash(
         mutate,
         notify,
@@ -1496,13 +1685,16 @@ export default function Knowledge({
       sentVersions.current.delete(draft.id);
       draftCache.current.delete(draft.id);
       removeDraft(draftScope, "notes", draft.id);
+      if (liveNoteId === draft.id) setLiveNoteId("");
       onSelectNote(notes.find((note) => note.id !== draft.id)?.id || "");
       setDeleteOpen(false);
       requestAnimationFrame(() =>
         (moreButtonRef.current || emptyCreateRef.current)?.focus(),
       );
-    } catch {
-      notify("Could not delete the note.");
+    } catch (cause) {
+      notify(
+        cause instanceof Error ? cause.message : "Could not delete the note.",
+      );
     } finally {
       deletingRef.current = false;
       setDeleting(false);
@@ -1735,7 +1927,9 @@ export default function Knowledge({
   const slidesContent = draft?.content.split(/^---\s*$/m) || [];
 
   return (
-    <div className={`knowledge ${mode === "daily" ? "daily-knowledge" : ""}`}>
+    <div
+      className={`knowledge ${mode === "daily" ? "daily-knowledge" : ""} ${draft && !canEditNote ? "is-readonly" : ""}`}
+    >
       <aside
         ref={browserRef}
         id={`${controlId}-browser`}
@@ -1757,6 +1951,7 @@ export default function Knowledge({
             className="btn-icon"
             title="New note"
             aria-label="New note"
+            disabled={!canCreateNote}
             onClick={openNewNote}
           >
             <Plus size={17} />
@@ -1842,6 +2037,7 @@ export default function Knowledge({
         </label>
         <button
           className="btn note-types-browser-action"
+          disabled={!permissions.canCreate}
           onClick={() => setNoteTypesOpen(true)}
           data-tour="custom-note-types"
         >
@@ -1854,7 +2050,17 @@ export default function Knowledge({
                 key={note.id}
                 className={`note-list-item ${selectedNote === note.id ? "selected" : ""}`}
                 aria-current={selectedNote === note.id ? "page" : undefined}
-                onClick={() => onSelectNote(note.id)}
+                onClick={async () => {
+                  if (sharedNote.current && !(await flush())) {
+                    notify(
+                      "Your shared note still needs synchronization. Retry or download its unfinished text before leaving.",
+                    );
+                    return;
+                  }
+                  if (hasSharedNoteDraft(draftScope, note.id))
+                    setLiveNoteId(note.id);
+                  onSelectNote(note.id);
+                }}
               >
                 <div className="note-list-item-top">
                   <span className={`note-type-symbol kind-${note.kind}`}>
@@ -1912,6 +2118,7 @@ export default function Knowledge({
           <button
             className="btn-icon"
             title="New note from template"
+            disabled={!canCreateNote}
             onClick={openNewNote}
           >
             <Plus size={15} />
@@ -1920,6 +2127,42 @@ export default function Knowledge({
       </aside>
 
       <main className="note-workspace">
+        {hiddenRecovery && !noteVisible(hiddenRecovery) && (
+          <div className="note-recovery-message" role="status">
+            <span>
+              Your earlier draft is kept on this device. Its project is no
+              longer available to you.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob([exportNoteMarkdown(hiddenRecovery, workspace)], {
+                    type: "text/markdown;charset=utf-8",
+                  }),
+                );
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "projectanvil-earlier-draft.md";
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              <ArrowDownToLine size={15} />
+              Download earlier draft
+            </button>
+            {recordingRecovery && (
+              <>
+                <button type="button" onClick={downloadRecording}>
+                  Download audio
+                </button>
+                <button type="button" onClick={discardRecording}>
+                  Discard recording
+                </button>
+              </>
+            )}
+          </div>
+        )}
         {saveState === "error" && saveError && (
           <div className="note-recovery-message" role="alert">
             {saveError}
@@ -1945,7 +2188,7 @@ export default function Knowledge({
             </button>
           </div>
         )}
-        {draft && saveState === "error" && (
+        {draft && noteVisible(draft) && saveState === "error" && (
           <div className="note-recovery-message" role="alert">
             <span>
               Your changes are kept as a browser draft. Download a copy, save a
@@ -1962,7 +2205,7 @@ export default function Knowledge({
             </button>
           </div>
         )}
-        {draft ? (
+        {draft && noteVisible(draft) ? (
           <>
             <div className="note-toolbar">
               <div className="note-breadcrumb">
@@ -1983,26 +2226,58 @@ export default function Knowledge({
                 <span className="note-breadcrumb-current">{draft.title}</span>
               </div>
               <div className="note-toolbar-actions">
+                <WatchControl
+                  reference={{ type: "note", id: draft.id }}
+                  notify={notify}
+                />
+                <button
+                  type="button"
+                  className="btn live-edit-button"
+                  data-tour="simultaneous-editing"
+                  aria-pressed={liveEditing}
+                  disabled={
+                    (!liveEditing &&
+                      !permissions.canEditRef({
+                        type: "note",
+                        id: draft.id,
+                      })) ||
+                    (liveEditing &&
+                      !shared.ready &&
+                      shared.status === "opening")
+                  }
+                  onClick={async () => {
+                    if (!(await flush())) {
+                      notify(
+                        "Save or recover unfinished note changes before switching shared editing.",
+                      );
+                      return;
+                    }
+                    setLiveNoteId(liveEditing ? "" : draft.id);
+                  }}
+                >
+                  <Users size={16} />
+                  {liveEditing ? "Leave shared editing" : "Edit together"}
+                </button>
                 <span
-                  className={`note-save-state ${saveState}`}
+                  className={`note-save-state ${noteSaveState}`}
                   role="status"
                   aria-live="polite"
                 >
-                  {saveState === "saving" ? (
+                  {noteSaveState === "saving" ? (
                     <LoaderCircle size={12} className="spin" />
-                  ) : saveState === "error" ? (
+                  ) : noteSaveState === "error" ? (
                     <button onClick={() => void flush()}>Retry save</button>
-                  ) : saveState === "pending" ? (
+                  ) : noteSaveState === "pending" ? (
                     <span className="pending-dot" />
                   ) : (
                     <Check size={12} />
                   )}
                   <span>
-                    {saveState === "saved"
+                    {noteSaveState === "saved"
                       ? "Saved"
-                      : saveState === "saving"
+                      : noteSaveState === "saving"
                         ? "Saving…"
-                        : saveState === "pending"
+                        : noteSaveState === "pending"
                           ? "Unsaved"
                           : "Save failed"}
                   </span>
@@ -2014,6 +2289,7 @@ export default function Knowledge({
                   }
                   title={draft.bookmarked ? "Remove bookmark" : "Bookmark note"}
                   aria-pressed={draft.bookmarked}
+                  disabled={!canEditNote}
                   onClick={() => edit({ bookmarked: !draft.bookmarked })}
                 >
                   <Bookmark
@@ -2100,11 +2376,12 @@ export default function Knowledge({
                         <ExternalLink size={15} />
                         Open in a new window
                       </button>
-                      <button onClick={splitSelection}>
+                      <button onClick={splitSelection} disabled={!canEditNote}>
                         <Scissors size={15} />
                         Extract selected text
                       </button>
                       <button
+                        disabled={!canEditNote}
                         onClick={() => {
                           setMergeOpen(true);
                           setMergeId("");
@@ -2136,6 +2413,7 @@ export default function Knowledge({
                       </button>
                       <button
                         className="danger"
+                        disabled={!canEditNote}
                         onClick={() => {
                           setDeleteOpen(true);
                           setMoreOpen(false);
@@ -2149,6 +2427,20 @@ export default function Knowledge({
                 </div>
               </div>
             </div>
+
+            {liveEditing && (
+              <LiveNoteStatus
+                status={shared.status}
+                error={shared.error}
+                recoveryError={shared.recoveryError}
+                earlierDrafts={shared.earlierDrafts}
+                peers={shared.peers}
+                content={draft.content}
+                onRetry={() => void shared.retry()}
+                onReload={() => void shared.discardAndReload()}
+                onRestart={() => void shared.restartFromSaved()}
+              />
+            )}
 
             <div className="note-content-shell">
               <div className="note-document">
@@ -2165,6 +2457,9 @@ export default function Knowledge({
                     className="note-title-input"
                     aria-label="Note title"
                     value={draft.title}
+                    readOnly={
+                      !permissions.canEditRef({ type: "note", id: draft.id })
+                    }
                     placeholder="Untitled note"
                     onChange={(event) => edit({ title: event.target.value })}
                   />
@@ -2174,6 +2469,7 @@ export default function Knowledge({
                         #{item}
                         <button
                           aria-label={`Remove tag ${item}`}
+                          disabled={!canEditNote}
                           onClick={() =>
                             edit({
                               tags: draft.tags.filter(
@@ -2188,6 +2484,7 @@ export default function Knowledge({
                     ))}
                     <input
                       aria-label="Add tag"
+                      disabled={!canEditNote}
                       placeholder="+ Add tag"
                       value={tagInput}
                       onChange={(event) => setTagInput(event.target.value)}
@@ -2206,12 +2503,17 @@ export default function Knowledge({
                     />
                   </div>
                 </div>
-                <DecisionFields
-                  note={draft}
-                  workspace={workspace}
-                  onChange={edit}
-                  openNote={openNote}
-                />
+                <fieldset
+                  className="note-permission-fields"
+                  disabled={!canEditNote}
+                >
+                  <DecisionFields
+                    note={draft}
+                    workspace={workspace}
+                    onChange={edit}
+                    openNote={openNote}
+                  />
+                </fieldset>
                 <div className="note-editor-toolbar">
                   <div
                     className="note-view-switch"
@@ -2246,7 +2548,9 @@ export default function Knowledge({
                     className="note-task-trigger"
                     data-tour="note-to-task"
                     aria-label="Create linked task"
-                    disabled={preparingTask || !draft.content.trim()}
+                    disabled={
+                      !canEditNote || preparingTask || !draft.content.trim()
+                    }
                     onPointerDown={() => {
                       selectedTaskExcerpt.current = selectedNoteText();
                     }}
@@ -2261,7 +2565,13 @@ export default function Knowledge({
                       {preparingTask ? "Saving source…" : "Create linked task"}
                     </span>
                   </button>
-                  <div className="note-format-tools">
+                  <fieldset
+                    className="note-format-tools"
+                    disabled={
+                      !canEditNote ||
+                      (liveEditing && (!shared.ready || !shared.canEdit))
+                    }
+                  >
                     <button
                       title="Heading"
                       aria-label="Insert heading"
@@ -2322,7 +2632,7 @@ export default function Knowledge({
                         {String(recordSeconds % 60).padStart(2, "0")}
                       </span>
                     )}
-                  </div>
+                  </fieldset>
                 </div>
                 {taskSourceError && (
                   <p className="note-task-error" role="alert">
@@ -2394,11 +2704,14 @@ export default function Knowledge({
                 <div
                   className={`note-editing-area view-${effectiveView}`}
                   onDragOver={(event) => {
-                    if (event.dataTransfer.types.includes("Files"))
+                    if (
+                      canEditNote &&
+                      event.dataTransfer.types.includes("Files")
+                    )
                       event.preventDefault();
                   }}
                   onDrop={(event) => {
-                    if (event.dataTransfer.files.length) {
+                    if (canEditNote && event.dataTransfer.files.length) {
                       event.preventDefault();
                       void upload(event.dataTransfer.files[0]);
                     }
@@ -2412,6 +2725,13 @@ export default function Knowledge({
                         aria-label="Note content"
                         spellCheck
                         value={draft.content}
+                        readOnly={
+                          !permissions.canEditRef({
+                            type: "note",
+                            id: draft.id,
+                          }) ||
+                          (liveEditing && (!shared.ready || !shared.canEdit))
+                        }
                         placeholder="Start writing. Use [[note names]] to connect your ideas…"
                         onChange={(event) =>
                           edit({ content: event.target.value })
@@ -2437,6 +2757,7 @@ export default function Knowledge({
                     </div>
                   )}
                 </div>
+                <MentionHelp />
                 <div className="note-statusbar">
                   <span>
                     {wordCount} words <i>·</i>{" "}
@@ -2467,126 +2788,131 @@ export default function Knowledge({
                   </div>
                   <div className="note-details-section">
                     <h3>Properties</h3>
-                    <label className="note-property">
-                      <span>Folder</span>
-                      <input
-                        value={draft.folder}
-                        onChange={(event) =>
-                          edit({ folder: event.target.value })
-                        }
-                      />
-                    </label>
-                    <label className="note-property">
-                      <span>Project</span>
-                      <select
-                        value={draft.projectId}
-                        onChange={(event) =>
-                          edit({ projectId: event.target.value })
-                        }
-                      >
-                        <option value="">No project</option>
-                        {workspace.projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="note-property">
-                      <span>Type</span>
-                      <select
-                        aria-label="Note type"
-                        value={draft.kind}
-                        onChange={(event) => {
-                          const kind = event.target.value as Kind;
-                          if (
-                            draft.kind === "decision" &&
-                            kind !== "decision" &&
-                            !window.confirm(
-                              "Change this note type and remove its structured decision record? The note content stays available.",
-                            )
-                          )
-                            return;
-                          edit({
-                            kind,
-                            decision:
-                              kind === "decision"
-                                ? draft.decision || emptyDecision()
-                                : null,
-                          });
-                        }}
-                      >
-                        {noteKinds.map((item) => (
-                          <option key={item.kind} value={item.kind}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <NoteStructuredFields
-                      note={draft}
-                      types={workspace.noteTypes || []}
-                      onChange={edit}
-                      onManage={() => setNoteTypesOpen(true)}
-                    />
-                    {Object.entries(draft.properties).map(([key, value]) => (
-                      <label
-                        className="note-property note-custom-property"
-                        key={key}
-                      >
-                        <span title={key}>{key}</span>
+                    <fieldset
+                      className="note-permission-fields"
+                      disabled={!canEditNote}
+                    >
+                      <label className="note-property">
+                        <span>Folder</span>
                         <input
-                          value={value}
-                          placeholder="Empty"
+                          value={draft.folder}
                           onChange={(event) =>
-                            edit({
-                              properties: {
-                                ...draft.properties,
-                                [key]: event.target.value,
-                              },
-                            })
+                            edit({ folder: event.target.value })
                           }
                         />
-                        <button
-                          aria-label={`Remove property ${key}`}
-                          onClick={() => {
-                            const properties = { ...draft.properties };
-                            delete properties[key];
-                            edit({ properties });
+                      </label>
+                      <label className="note-property">
+                        <span>Project</span>
+                        <select
+                          value={draft.projectId}
+                          onChange={(event) =>
+                            edit({ projectId: event.target.value })
+                          }
+                        >
+                          <option value="">No project</option>
+                          {workspace.projects.map((project) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="note-property">
+                        <span>Type</span>
+                        <select
+                          aria-label="Note type"
+                          value={draft.kind}
+                          onChange={(event) => {
+                            const kind = event.target.value as Kind;
+                            if (
+                              draft.kind === "decision" &&
+                              kind !== "decision" &&
+                              !window.confirm(
+                                "Change this note type and remove its structured decision record? The note content stays available.",
+                              )
+                            )
+                              return;
+                            edit({
+                              kind,
+                              decision:
+                                kind === "decision"
+                                  ? draft.decision || emptyDecision()
+                                  : null,
+                            });
                           }}
                         >
-                          <X size={10} />
-                        </button>
+                          {noteKinds.map((item) => (
+                            <option key={item.kind} value={item.kind}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
                       </label>
-                    ))}
-                    <form
-                      className="note-add-property"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        const key = propertyName.trim();
-                        if (key && !(key in draft.properties)) {
-                          edit({
-                            properties: { ...draft.properties, [key]: "" },
-                          });
-                          setPropertyName("");
-                        }
-                      }}
-                    >
-                      <Plus size={12} />
-                      <input
-                        value={propertyName}
-                        onChange={(event) =>
-                          setPropertyName(event.target.value)
-                        }
-                        placeholder="Add property"
-                        aria-label="New property name"
+                      <NoteStructuredFields
+                        note={draft}
+                        types={workspace.noteTypes || []}
+                        onChange={edit}
+                        onManage={() => setNoteTypesOpen(true)}
                       />
-                      {propertyName && (
-                        <button type="submit" aria-label="Add property">
-                          <Check size={12} />
-                        </button>
-                      )}
-                    </form>
+                      {Object.entries(draft.properties).map(([key, value]) => (
+                        <label
+                          className="note-property note-custom-property"
+                          key={key}
+                        >
+                          <span title={key}>{key}</span>
+                          <input
+                            value={value}
+                            placeholder="Empty"
+                            onChange={(event) =>
+                              edit({
+                                properties: {
+                                  ...draft.properties,
+                                  [key]: event.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <button
+                            aria-label={`Remove property ${key}`}
+                            onClick={() => {
+                              const properties = { ...draft.properties };
+                              delete properties[key];
+                              edit({ properties });
+                            }}
+                          >
+                            <X size={10} />
+                          </button>
+                        </label>
+                      ))}
+                      <form
+                        className="note-add-property"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const key = propertyName.trim();
+                          if (key && !(key in draft.properties)) {
+                            edit({
+                              properties: { ...draft.properties, [key]: "" },
+                            });
+                            setPropertyName("");
+                          }
+                        }}
+                      >
+                        <Plus size={12} />
+                        <input
+                          value={propertyName}
+                          onChange={(event) =>
+                            setPropertyName(event.target.value)
+                          }
+                          placeholder="Add property"
+                          aria-label="New property name"
+                        />
+                        {propertyName && (
+                          <button type="submit" aria-label="Add property">
+                            <Check size={12} />
+                          </button>
+                        )}
+                      </form>
+                    </fieldset>
                   </div>
                   <div className="note-details-section">
                     <h3>
@@ -2684,6 +3010,7 @@ export default function Knowledge({
             <button
               ref={emptyCreateRef}
               className="btn btn-primary"
+              disabled={!canCreateNote}
               onClick={openNewNote}
             >
               <Plus size={16} />
@@ -2705,13 +3032,14 @@ export default function Knowledge({
         ref={fileInput}
         type="file"
         className="note-hidden-input"
+        disabled={!canEditNote}
         accept="image/*,audio/*,video/*,application/pdf,.txt,.md"
         onChange={(event) => {
           if (event.target.files?.[0]) void upload(event.target.files[0]);
         }}
       />
 
-      {taskSource && (
+      {taskSource && noteVisible(taskSource.note) && (
         <NoteTaskComposer
           note={taskSource.note}
           initialExcerpt={taskSource.excerpt}
@@ -2902,7 +3230,7 @@ export default function Knowledge({
         </div>
       )}
 
-      {snapshotsOpen && draft && (
+      {snapshotsOpen && draft && noteVisible(draft) && (
         <div
           className="knowledge-modal-backdrop"
           onClick={() => !restoringHistory && setSnapshotsOpen(false)}
@@ -2952,7 +3280,7 @@ export default function Knowledge({
                 </div>
                 <button
                   className="btn"
-                  disabled={restoringHistory || historyLoading}
+                  disabled={!canEditNote || restoringHistory || historyLoading}
                   onClick={() => void restoreHistory(snapshot)}
                 >
                   {restoringHistory ? "Restoring…" : "Restore"}
@@ -2979,7 +3307,7 @@ export default function Knowledge({
         </div>
       )}
 
-      {mergeOpen && draft && (
+      {mergeOpen && draft && noteVisible(draft) && (
         <div
           className="knowledge-modal-backdrop"
           onClick={() => setMergeOpen(false)}
@@ -3023,7 +3351,7 @@ export default function Knowledge({
               </button>
               <button
                 className="btn btn-primary"
-                disabled={!mergeId}
+                disabled={!canEditNote || !mergeId}
                 onClick={() => void merge()}
               >
                 <GitMerge size={15} />
@@ -3034,7 +3362,7 @@ export default function Knowledge({
         </div>
       )}
 
-      {deleteOpen && draft && (
+      {deleteOpen && draft && noteVisible(draft) && (
         <div
           className="knowledge-modal-backdrop"
           onClick={() => !deleting && setDeleteOpen(false)}
@@ -3070,7 +3398,7 @@ export default function Knowledge({
               </button>
               <button
                 className="btn note-delete-button"
-                disabled={deleting}
+                disabled={!canEditNote || deleting}
                 onClick={() => void remove()}
               >
                 <Trash2 size={15} />
@@ -3089,7 +3417,7 @@ export default function Knowledge({
           onClose={() => setNoteTypesOpen(false)}
         />
       )}
-      {personalTemplatesOpen && (
+      {personalTemplatesOpen && (!draft || noteVisible(draft)) && (
         <PersonalTemplates
           kind="note"
           source={draft ? noteTemplateContent(draft) : undefined}
@@ -3173,7 +3501,7 @@ export default function Knowledge({
         />
       )}
 
-      {slides && draft && (
+      {slides && draft && noteVisible(draft) && (
         <NoteDialog
           className="knowledge-slides"
           label="Note presentation"

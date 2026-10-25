@@ -255,6 +255,7 @@ const media = z
   .object({
     id,
     name: title,
+    projectId: reference.default(""),
     url: z
       .string()
       .max(500)
@@ -576,6 +577,8 @@ export function validateWorkspace(value: unknown): Workspace {
     if (note.decision) check(note.decision.ownerId, "people", "Decision owner");
   }
   const connectedError = connectedThinkingError(workspace);
+  for (const file of workspace.media)
+    check(file.projectId || "", "projects", file.name);
   if (connectedError) throw new WorkspaceError(connectedError);
   for (const board of workspace.brainstorms || []) {
     check(board.projectId, "projects", board.title);
@@ -1319,10 +1322,11 @@ export function applyMutation(
       (next.tasks.some((item) => item.projectId === deletedId) ||
         next.notes.some((item) => item.projectId === deletedId) ||
         next.canvases.some((item) => item.projectId === deletedId) ||
+        next.media.some((item) => item.projectId === deletedId) ||
         next.brainstorms.some((item) => item.projectId === deletedId))
     ) {
       throw new WorkspaceError(
-        "Move or delete this project’s tasks, notes, canvases, and brainstorming boards before deleting the project.",
+        "Move or delete this project’s tasks, notes, canvases, attachments, and brainstorming boards before deleting the project.",
       );
     }
     if (

@@ -29,12 +29,14 @@ import { moveToTrash } from "../lib/trash-actions";
 import { useDraftGuard, useDraftScope } from "./useRecoverableDraft";
 import { useWorkspaceFetch, useWorkspaceScope } from "./WorkspaceScope";
 import { useDialog } from "./useDialog";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 import "./brainstorming.css";
 
 export default function Brainstorming(props: FeatureProps) {
   const { workspace, mutate, notify, projectFilter, openNote, openTask } =
     props;
   const scope = useDraftScope();
+  const { canCreate, canEditProject } = useWorkspacePermissions(workspace);
   const { account } = useWorkspaceScope();
   const actor = account.user ? `account_${account.user.id}` : "guest";
   const boards = (workspace.brainstorms || []).filter(
@@ -42,6 +44,8 @@ export default function Brainstorming(props: FeatureProps) {
   );
   const [selectedId, setSelectedId] = useState("");
   const selected = boards.find((board) => board.id === selectedId) || boards[0];
+  const canCreateBoard = canCreate && canEditProject(projectFilter || "");
+  const canEditBoard = !!selected && canEditProject(selected.projectId);
   const [editor, setEditor] = useState<{
     board: BrainstormBoard | null;
     addIdea: boolean;
@@ -58,7 +62,7 @@ export default function Brainstorming(props: FeatureProps) {
   }, [busy, error]);
 
   async function vote(board: BrainstormBoard, ideaId: string, chosen: boolean) {
-    if (busyRef.current) return;
+    if (busyRef.current || !canEditProject(board.projectId)) return;
     busyRef.current = true;
     setBusy(ideaId);
     setError("");
@@ -80,6 +84,7 @@ export default function Brainstorming(props: FeatureProps) {
   async function removeBoard(board: BrainstormBoard) {
     if (
       busyRef.current ||
+      !canEditProject(board.projectId) ||
       !window.confirm(`Move “${board.title}” and its ideas to Trash?`)
     )
       return;
@@ -124,6 +129,7 @@ export default function Brainstorming(props: FeatureProps) {
         <button
           className="btn btn-primary"
           onClick={() => setEditor({ board: null, addIdea: false })}
+          disabled={!canCreateBoard}
         >
           <Plus size={17} />
           New board
@@ -197,7 +203,9 @@ export default function Brainstorming(props: FeatureProps) {
               <button
                 className="btn btn-primary"
                 onClick={() => setEditor({ board: selected, addIdea: true })}
-                disabled={!!busy || selected.ideas.length >= 200}
+                disabled={
+                  !canEditBoard || !!busy || selected.ideas.length >= 200
+                }
               >
                 <Plus size={16} />
                 Add idea
@@ -205,7 +213,7 @@ export default function Brainstorming(props: FeatureProps) {
               <button
                 className="btn"
                 onClick={() => setEditor({ board: selected, addIdea: false })}
-                disabled={!!busy}
+                disabled={!canEditBoard || !!busy}
               >
                 <Pencil size={16} />
                 Edit board
@@ -213,7 +221,7 @@ export default function Brainstorming(props: FeatureProps) {
               <button
                 className="btn"
                 onClick={() => void removeBoard(selected)}
-                disabled={!!busy}
+                disabled={!canEditBoard || !!busy}
               >
                 <Trash2 size={16} />
                 Trash
@@ -296,7 +304,7 @@ export default function Brainstorming(props: FeatureProps) {
                                 <button
                                   className="btn"
                                   aria-label={`Edit idea ${idea.title}`}
-                                  disabled={!!busy}
+                                  disabled={!canEditBoard || !!busy}
                                   onClick={() =>
                                     setEditor({
                                       board: selected,
@@ -311,7 +319,11 @@ export default function Brainstorming(props: FeatureProps) {
                                   className="btn"
                                   aria-pressed={voted}
                                   aria-label={`${voted ? "Remove vote from" : "Vote for"} ${idea.title}`}
-                                  disabled={!!busy || !selected.votingOpen}
+                                  disabled={
+                                    !canEditBoard ||
+                                    !!busy ||
+                                    !selected.votingOpen
+                                  }
                                   onClick={() =>
                                     void vote(selected, idea.id, !voted)
                                   }
@@ -364,6 +376,7 @@ export default function Brainstorming(props: FeatureProps) {
           <button
             className="btn btn-primary"
             onClick={() => setEditor({ board: null, addIdea: false })}
+            disabled={!canCreateBoard}
           >
             Create a board
           </button>
@@ -405,6 +418,7 @@ function BrainstormEditor({
   onSaved: (id: string) => void;
 }) {
   const scope = useDraftScope();
+  const { canCreate, canEditProject } = useWorkspacePermissions(workspace);
   const scopedFetch = useWorkspaceFetch();
   const recoveryId = original?.id || "new";
   const [initial] = useState(() => {
@@ -465,6 +479,10 @@ function BrainstormEditor({
     };
   });
   const [draft, setDraft] = useState(initial.board);
+  const writable =
+    canCreate &&
+    canEditProject(original?.projectId || projectFilter || "") &&
+    canEditProject(draft.projectId);
   const [editingIdea, setEditingIdea] = useState(initial.ideaId);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -508,7 +526,7 @@ function BrainstormEditor({
     flush: async () => !dirty.current || persist(),
   });
   function change(patch: Partial<BrainstormBoard>) {
-    if (busy.current) return;
+    if (busy.current || !writable) return;
     const board = { ...current.current, ...patch };
     current.current = board;
     dirty.current = true;
@@ -526,6 +544,12 @@ function BrainstormEditor({
   async function save(event: FormEvent) {
     event.preventDefault();
     if (busy.current) return;
+    if (!writable) {
+      setError(
+        "This board is view only. Your unfinished draft is kept; ask an administrator for editing access.",
+      );
+      return;
+    }
     const clean: BrainstormBoard = {
       ...draft,
       title: draft.title.trim(),
@@ -733,7 +757,7 @@ function BrainstormEditor({
             {error}
           </div>
         )}
-        <fieldset disabled={pending} className="brainstorm-fields">
+        <fieldset disabled={pending || !writable} className="brainstorm-fields">
           <label>
             Board title
             <input
@@ -1055,7 +1079,11 @@ function BrainstormEditor({
           >
             Close
           </button>
-          <button className="btn btn-primary" type="submit" disabled={pending}>
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={pending || !writable}
+          >
             {pending ? "Saving…" : "Save board"}
           </button>
         </footer>

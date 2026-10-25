@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const people = [...workspace.people].sort((left, right) =>
       left.id.localeCompare(right.id),
     );
-    const etag = `"${await payloadHash({ workspace: access.id, account: access.user?.id || "guest", revision: workspace.revision, people })}"`;
+    const etag = `"${await payloadHash({ workspace: access.id, account: access.user?.id || "guest", revision: workspace.revision, people, securityRevision: access.securityRevision || 0, role: access.role })}"`;
     const headers = {
       "Cache-Control": "private, no-cache",
       ETag: etag,

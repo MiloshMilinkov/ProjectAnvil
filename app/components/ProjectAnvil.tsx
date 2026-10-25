@@ -115,6 +115,10 @@ import TaskBulkDialog from "./TaskBulkDialog";
 import { projectProgress } from "../lib/planning-progress";
 import { instantiateTaskTemplate } from "../lib/personal-templates";
 import Brainstorming from "./Brainstorming";
+import ActivityCenter from "./ActivityCenter";
+import NotificationCenter from "./NotificationCenter";
+import TaskReadOnlyDialog from "./TaskReadOnlyDialog";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 
 type Page = TourPage;
 const nav = [
@@ -125,6 +129,7 @@ const nav = [
   { id: "rooms", title: "Work rooms", icon: PanelsTopLeft },
   { id: "notes", title: "Notes", icon: BookOpen },
   { id: "brainstorm", title: "Brainstorming", icon: Zap },
+  { id: "activity", title: "Activity", icon: ListChecks },
   { id: "graph", title: "Relationship graph", icon: Network },
   { id: "canvas", title: "Canvas", icon: PanelsTopLeft },
   { id: "collections", title: "Collections", icon: Database },
@@ -180,6 +185,7 @@ export default function ProjectAnvil() {
     workspace,
     load,
     loadError,
+    liveStatus,
     mutate,
     pending,
     syncError,
@@ -188,6 +194,7 @@ export default function ProjectAnvil() {
     restoreWarnings,
     clearRestoreWarnings,
   } = useWorkspaceData();
+  const permissions = useWorkspacePermissions(workspace || undefined);
   const draftScope = useDraftScope();
   const recoveryCount = useSyncExternalStore(
     subscribeDrafts,
@@ -593,6 +600,7 @@ export default function ProjectAnvil() {
                   <button
                     title="Create project"
                     aria-label="Create project"
+                    disabled={!permissions.canCreate}
                     onClick={() => {
                       setEditingProject(null);
                       setNewProject(true);
@@ -709,6 +717,12 @@ export default function ProjectAnvil() {
               currentPerson={currentPerson}
               openTask={openTask}
             />
+            <NotificationCenter
+              openTask={openTask}
+              openNote={openNote}
+              notify={notify}
+              onOpenProject={openProjectHome}
+            />
             <div data-tour="appearance">
               <AppearanceMenu />
             </div>
@@ -727,9 +741,18 @@ export default function ProjectAnvil() {
                 Show workspace
               </button>
             )}
-            <span className="live-indicator">
+            <span
+              className="live-indicator"
+              data-tour="live-updates"
+              title="Local connection checks for changes and reconnects automatically"
+              role="status"
+            >
               <span />
-              Local workspace
+              {liveStatus === "live"
+                ? "Live updates"
+                : liveStatus === "connecting"
+                  ? "Connecting…"
+                  : "Reconnecting…"}
             </span>
             <button
               className="top-search btn-icon"
@@ -841,6 +864,13 @@ export default function ProjectAnvil() {
           data-tour="workspace-content"
           className={"main-content view-" + page}
         >
+          {!permissions.canCreate && (
+            <aside className="workspace-access-notice">
+              <strong>Viewer access.</strong> You can read available work,
+              follow items, and manage your notifications. Ask an owner or admin
+              for editing access.
+            </aside>
+          )}
           {page === "overview" && (
             <Overview
               {...featureProps}
@@ -923,6 +953,7 @@ export default function ProjectAnvil() {
                   action={
                     <button
                       className="btn btn-primary"
+                      disabled={!permissions.canCreate}
                       onClick={() => {
                         setEditingProject(null);
                         setNewProject(true);
@@ -948,6 +979,7 @@ export default function ProjectAnvil() {
                   ))}
                   <button
                     className="project-add"
+                    disabled={!permissions.canCreate}
                     onClick={() => {
                       setEditingProject(null);
                       setNewProject(true);
@@ -977,6 +1009,9 @@ export default function ProjectAnvil() {
             />
           )}
           {page === "brainstorm" && <Brainstorming {...featureProps} />}
+          {page === "activity" && (
+            <ActivityCenter {...featureProps} onOpenProject={openProjectHome} />
+          )}
           {page === "canvas" && (
             <CanvasView
               {...featureProps}
@@ -1006,10 +1041,35 @@ export default function ProjectAnvil() {
           )}
         </main>
       </div>
-      {(newTask || selectedTask) && (
+      {selectedTask &&
+        w.tasks.some((task) => task.id === selectedTask) &&
+        !permissions.canEditProject(
+          w.tasks.find((task) => task.id === selectedTask)!.projectId,
+        ) && (
+          <TaskReadOnlyDialog
+            task={w.tasks.find((task) => task.id === selectedTask)!}
+            workspace={w}
+            openTask={openTask}
+            openNote={openNote}
+            notify={notify}
+            onClose={() => setSelectedTask(null)}
+          />
+        )}
+      {((newTask && permissions.canCreate) ||
+        (selectedTask &&
+          w.tasks.some(
+            (task) =>
+              task.id === selectedTask &&
+              permissions.canEditProject(task.projectId),
+          ))) && (
         <TaskDialog
           key={selectedTask || taskSeed?.id || "new-task"}
-          workspace={w}
+          workspace={{
+            ...w,
+            projects: w.projects.filter((project) =>
+              permissions.canEditProject(project.id),
+            ),
+          }}
           task={w.tasks.find((t) => t.id === selectedTask)}
           initialTask={taskSeed}
           onDuplicate={(copy) => {
@@ -1031,15 +1091,17 @@ export default function ProjectAnvil() {
           notify={notify}
         />
       )}
-      {newProject && (
-        <ProjectDialog
-          project={editingProject}
-          mutate={mutate}
-          onClose={() => setNewProject(false)}
-          notify={notify}
-        />
-      )}
-      {personModal && (
+      {newProject &&
+        permissions.canCreate &&
+        (!editingProject || permissions.canEditProject(editingProject.id)) && (
+          <ProjectDialog
+            project={editingProject}
+            mutate={mutate}
+            onClose={() => setNewProject(false)}
+            notify={notify}
+          />
+        )}
+      {personModal && permissions.canCreate && (
         <PersonDialog
           person={personModal === "new" ? null : personModal}
           mutate={mutate}
@@ -1322,6 +1384,7 @@ function Overview(
   },
 ) {
   const referenceDate = useCalendarToday();
+  const permissions = useWorkspacePermissions(props.workspace);
   const {
       workspace: w,
       currentPerson,
@@ -1371,7 +1434,11 @@ function Overview(
               <Columns3 size={15} />
               View tasks
             </button>
-            <button className="btn btn-primary" onClick={onCreate}>
+            <button
+              className="btn btn-primary"
+              onClick={onCreate}
+              disabled={!permissions.canEditProject(props.projectFilter)}
+            >
               <Plus size={16} />
               Create task
             </button>
@@ -1579,6 +1646,7 @@ function TaskTable({
   notify: FeatureProps["notify"];
   referenceDate: string;
 }) {
+  const permissions = useWorkspacePermissions(w);
   return (
     <div className="table-scroll">
       <table className="task-table">
@@ -1616,6 +1684,7 @@ function TaskTable({
                   className={"status-select status-" + t.status}
                   aria-label={"Status for " + t.key}
                   value={t.status}
+                  disabled={!permissions.canEditProject(t.projectId)}
                   onChange={(e) =>
                     mutate({
                       action: "upsert",
@@ -1678,6 +1747,7 @@ function TaskView(
   } = props;
   const phoneLayout = useMediaQuery("(max-width: 760px)");
   const referenceDate = useCalendarToday();
+  const permissions = useWorkspacePermissions(w);
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sort, setSort] = useState<TaskSort>("priority");
   const [bulkTasks, setBulkTasks] = useState<Task[] | null>(null);
@@ -1750,7 +1820,11 @@ function TaskView(
             : "Organize tasks by status, priority, project, and person."
         }
         action={
-          <button className="btn btn-primary" onClick={() => props.onCreate()}>
+          <button
+            className="btn btn-primary"
+            onClick={() => props.onCreate()}
+            disabled={!permissions.canEditProject(projectFilter)}
+          >
             <Plus size={16} />
             Create task
           </button>
@@ -1760,8 +1834,18 @@ function TaskView(
         <button
           className="btn btn-secondary"
           data-tour="bulk-edit"
-          disabled={!tasks.length}
-          onClick={() => setBulkTasks(structuredClone(tasks))}
+          disabled={
+            !tasks.some((task) => permissions.canEditProject(task.projectId))
+          }
+          onClick={() =>
+            setBulkTasks(
+              structuredClone(
+                tasks.filter((task) =>
+                  permissions.canEditProject(task.projectId),
+                ),
+              ),
+            )
+          }
         >
           <ListChecks size={16} />
           Bulk edit
@@ -1962,7 +2046,14 @@ function TaskView(
                 onDrop={(e) => {
                   e.preventDefault();
                   const id = e.dataTransfer.getData("text/plain") || dragging;
-                  if (id)
+                  if (
+                    id &&
+                    w.tasks.some(
+                      (task) =>
+                        task.id === id &&
+                        permissions.canEditProject(task.projectId),
+                    )
+                  )
                     mutate({
                       action: "upsert",
                       entity: "tasks",
@@ -1983,6 +2074,7 @@ function TaskView(
                   <span>{items.length}</span>
                   <button
                     aria-label={"Create task in " + s.label}
+                    disabled={!permissions.canEditProject(projectFilter)}
                     onClick={() => props.onCreate(s.id)}
                   >
                     <Plus size={15} />
@@ -1991,7 +2083,7 @@ function TaskView(
                 <div className="kanban-cards">
                   {items.map((t) => (
                     <button
-                      draggable
+                      draggable={permissions.canEditProject(t.projectId)}
                       onDragStart={(e) => {
                         e.dataTransfer.setData("text/plain", t.id);
                         setDragging(t.id);
@@ -2136,6 +2228,7 @@ function ProjectCard({
   onOpen: () => void;
   onEdit: () => void;
 }) {
+  const permissions = useWorkspacePermissions(w);
   const tasks = w.tasks.filter((t) => t.projectId === p.id),
     progress = projectProgress(w, p.id),
     done = progress.completed,
@@ -2150,7 +2243,12 @@ function ProjectCard({
           <FolderKanban size={23} />
         </span>
         <span className="badge">{p.status}</span>
-        <button className="btn-icon" title={"Edit " + p.name} onClick={onEdit}>
+        <button
+          className="btn-icon"
+          title={"Edit " + p.name}
+          onClick={onEdit}
+          disabled={!permissions.canEditProject(p.id)}
+        >
           <MoreHorizontal size={18} />
         </button>
       </div>
@@ -2201,6 +2299,7 @@ function SettingsView(
   },
 ) {
   const { workspace: w, mutate, notify, prefs, savePrefs } = props;
+  const permissions = useWorkspacePermissions(w);
   const [name, setName] = useState(w.name),
     [error, setError] = useState(""),
     [importing, setImporting] = useState(false);
@@ -2237,11 +2336,14 @@ function SettingsView(
             <input
               className="field"
               value={name}
+              disabled={permissions.role !== "owner"}
               onChange={(e) => setName(e.target.value)}
             />
             <button
               className="btn btn-primary"
-              disabled={renaming || !name.trim()}
+              disabled={
+                permissions.role !== "owner" || renaming || !name.trim()
+              }
               onClick={async () => {
                 if (renaming) return;
                 setRenaming(true);
@@ -2360,7 +2462,7 @@ function SettingsView(
           </button>
           <button
             className="btn"
-            disabled={importing}
+            disabled={permissions.role !== "owner" || importing}
             onClick={() => uploadRef.current?.click()}
           >
             <Upload size={15} />
@@ -2402,7 +2504,14 @@ function SettingsView(
         </div>
         {error && <p className="form-error">{error}</p>}
       </section>
-      <StorageHealth />
+      {permissions.canManage ? (
+        <StorageHealth />
+      ) : (
+        <p className="muted">
+          Workspace storage and complete recovery reports are managed by owners
+          and admins.
+        </p>
+      )}
       <section className="panel settings-section">
         <h2>Assignment labels</h2>
         <p>
@@ -2410,7 +2519,11 @@ function SettingsView(
           registered username through Teams &amp; people.
         </p>
         <div className="settings-data-actions">
-          <button className="btn" onClick={() => props.onPerson("new")}>
+          <button
+            className="btn"
+            onClick={() => props.onPerson("new")}
+            disabled={!permissions.canCreate}
+          >
             <Plus size={15} />
             Add assignment label
           </button>
@@ -2421,6 +2534,7 @@ function SettingsView(
                 className="btn"
                 key={p.id}
                 onClick={() => props.onPerson(p)}
+                disabled={!permissions.canCreate}
               >
                 {p.name}
               </button>

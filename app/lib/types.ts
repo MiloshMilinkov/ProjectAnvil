@@ -123,6 +123,7 @@ export interface Media {
   type: string;
   size: number;
   createdAt: string;
+  projectId?: string;
 }
 export interface CanvasCard {
   id: string;

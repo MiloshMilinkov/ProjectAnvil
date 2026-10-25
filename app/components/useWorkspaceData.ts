@@ -43,6 +43,9 @@ export function useWorkspaceData() {
   const [loadError, setLoadError] = useState("");
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(0);
+  const [liveStatus, setLiveStatus] = useState<
+    "connecting" | "live" | "reconnecting"
+  >("connecting");
   const [restoreWarnings, setRestoreWarnings] = useState<string[]>([]);
   const latest = useRef<Workspace | null>(null);
   const alive = useRef(true);
@@ -72,7 +75,7 @@ export function useWorkspaceData() {
       previous &&
       (incoming.revision < previous.revision ||
         (incoming.revision === previous.revision &&
-          JSON.stringify(incoming.people) === JSON.stringify(previous.people)))
+          JSON.stringify(incoming) === JSON.stringify(previous)))
     )
       return;
     latest.current = incoming;
@@ -141,6 +144,78 @@ export function useWorkspaceData() {
       // A page switch must not abort an otherwise valid save.
     };
   }, [load]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let stopped = false;
+    let cursor = "";
+    let security = "";
+    let failures = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const delay = (milliseconds: number) =>
+      new Promise<void>((resolve) => {
+        const finish = () => {
+          if (retryTimer) clearTimeout(retryTimer);
+          controller.signal.removeEventListener("abort", finish);
+          resolve();
+        };
+        retryTimer = setTimeout(finish, milliseconds);
+        controller.signal.addEventListener("abort", finish, { once: true });
+      });
+    void (async () => {
+      while (!stopped) {
+        try {
+          if (document.hidden) {
+            await delay(2_000);
+            continue;
+          }
+          const response = await scopedFetch(
+            `/api/live?since=${encodeURIComponent(cursor)}`,
+            { cache: "no-store", signal: controller.signal },
+          );
+          const data = (await response.json()) as {
+            cursor?: string;
+            securityRevision?: number;
+            role?: string;
+            error?: string;
+          };
+          if (!response.ok || typeof data.cursor !== "string") {
+            if ([401, 403, 404, 409].includes(response.status)) {
+              if (!stopped) {
+                latest.current = null;
+                setWorkspace(null);
+                await refreshAccount().catch(() => undefined);
+              }
+            }
+            throw new Error(data.error || "Live updates could not connect.");
+          }
+          if (stopped) return;
+          const permissions = `${data.securityRevision}:${data.role}`;
+          if (security && permissions !== security) {
+            etag.current = "";
+            await refreshAccount().catch(() => undefined);
+          }
+          security = permissions;
+          if (data.cursor !== cursor) {
+            cursor = data.cursor;
+            await load();
+          }
+          failures = 0;
+          setLiveStatus("live");
+        } catch {
+          if (stopped) return;
+          setLiveStatus("reconnecting");
+          failures++;
+          await delay(Math.min(15_000, 1_000 * 2 ** Math.min(failures - 1, 4)));
+        }
+      }
+    })();
+    return () => {
+      stopped = true;
+      controller.abort();
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [scopedFetch, load, refreshAccount]);
 
   const mutate = useCallback(
     (input: Mutation): Promise<Workspace> => {
@@ -332,6 +407,7 @@ export function useWorkspaceData() {
     workspace,
     load,
     loadError,
+    liveStatus,
     mutate,
     pending,
     restoreWarnings,

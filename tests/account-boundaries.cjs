@@ -272,7 +272,7 @@ module.exports = async function checkAccountBoundaries({
   });
   assert.equal(
     (await access.resolveWorkspace(req("bob", team.id))).role,
-    "member",
+    "editor",
   );
   assert.equal(
     (await access.getAccountContext(req("bob"))).invitations.length,

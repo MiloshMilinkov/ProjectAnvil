@@ -1,6 +1,13 @@
 import { database, type ResolvedWorkspace } from "./access-store";
 import { WorkspaceError } from "./workspace-model";
-import type { Entity, Note, Workspace } from "./types";
+import type { Entity, Note, Workspace, Mutation } from "./types";
+import {
+  assertMutationAccess,
+  assertWorkspaceWritable,
+  permissionsSnapshotSQL,
+} from "./permissions";
+import { prepareNoteDocumentStatements } from "./note-collaboration-reset";
+import { prepareCollaborationStatements } from "./collaboration-store";
 import type { TrashCommit } from "./trash-types";
 
 const entities: Entity[] = [
@@ -112,7 +119,18 @@ export async function commitWorkspace(
   hash: string,
   preserveReplacedContent = false,
   trash: TrashCommit = {},
+  options: {
+    mutation?: Mutation;
+    skipNoteDocumentReset?: boolean;
+    additionalStatements?: (
+      committedSQL: string,
+      guardValues: unknown[],
+    ) => D1PreparedStatement[] | Promise<D1PreparedStatement[]>;
+  } = {},
 ): Promise<boolean> {
+  assertWorkspaceWritable(access);
+  if (options.mutation)
+    assertMutationAccess(access, current, updated, options.mutation);
   const db = database();
   const token = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -155,10 +173,9 @@ export async function commitWorkspace(
     for (const item of current[entity] || [])
       if (!remaining.has(item.id)) removed.push({ entity, id: item.id });
   }
-  const authorization = access.user
-    ? " AND EXISTS (SELECT 1 FROM appmembers WHERE workspace_id = ? AND user_id = ?)"
-    : "";
-  const authorizationValues = access.user ? [access.id, access.user.id] : [];
+  const snapshot = permissionsSnapshotSQL(access);
+  const authorization = ` AND (${snapshot.sql})`;
+  const authorizationValues = snapshot.bindings;
   const restoreCondition = trash.restore
     ? " AND EXISTS (SELECT 1 FROM workspace_trash WHERE workspace_id = ? AND trash_id = ? AND deleted_at = ? AND restored_at IS NULL AND invalidated_at IS NULL)"
     : "";
@@ -325,6 +342,32 @@ export async function commitWorkspace(
           now,
           ...guardValues,
         ),
+    );
+  if (!options.skipNoteDocumentReset)
+    statements.push(
+      ...prepareNoteDocumentStatements(
+        access,
+        current,
+        updated,
+        committed,
+        guardValues,
+        preserveReplacedContent || !!options.mutation?.restoreSnapshotId,
+      ),
+    );
+  statements.push(
+    ...(await prepareCollaborationStatements(
+      access,
+      current,
+      updated,
+      committed,
+      guardValues,
+      operationId,
+      options.mutation,
+    )),
+  );
+  if (options.additionalStatements)
+    statements.push(
+      ...(await options.additionalStatements(committed, guardValues)),
     );
   // Receipts provide bounded retry recovery; expired operations fail safely through
   // normal create/update/delete guards instead of being silently replayed.

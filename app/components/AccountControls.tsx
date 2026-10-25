@@ -33,6 +33,7 @@ import { fetchWithTimeout } from "../lib/fetch-with-timeout";
 import { flushDraftGuards, hasUnpersistedDrafts } from "../lib/draft-store";
 import { useDraftScope } from "./useRecoverableDraft";
 import { useDialog } from "./useDialog";
+import TeamRoleEditor from "./TeamRoleEditor";
 
 type MaybeAsync = void | Promise<void>;
 type AccountMenuProps = {
@@ -55,16 +56,22 @@ type TeamManagerProps = {
   onSignIn?: () => void;
 };
 type TeamDetails = {
-  members: { id: string; username: string; role: "owner" | "member" }[];
-  invitations: { id: string; username: string }[];
+  members: { id: string; username: string; role: WorkspaceAccess["role"] }[];
+  invitations: {
+    id: string;
+    username: string;
+    role?: WorkspaceAccess["role"];
+  }[];
+  securityRevision?: number;
 };
 type ConfirmAction = {
-  action: "remove" | "leave" | "cancel";
+  action: "remove" | "leave" | "cancel" | "transfer";
   title: string;
   description: string;
   workspaceId: string;
   userId?: string;
   invitationId?: string;
+  expectedOwnerId?: string;
 };
 const usernamePattern = /^[A-Za-z0-9_.]{3,30}$/;
 const readableError = (error: unknown) =>
@@ -689,6 +696,10 @@ export function TeamManager({
     [error, setError] = useState(""),
     [revision, setRevision] = useState(0),
     [confirm, setConfirm] = useState<ConfirmAction | null>(null);
+  const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">(
+    "editor",
+  );
+  const [roleFocus, setRoleFocus] = useState("");
   const [detailsResult, setDetailsResult] = useState<{
     key: string;
     details: TeamDetails | null;
@@ -696,7 +707,6 @@ export function TeamManager({
   } | null>(null);
   const actionPending = useRef(false);
   const userId = account.user?.id || "";
-  const detailsKey = `${activeId}:${userId}:${revision}`;
   const active = account.workspaces.find(
       (workspace) => workspace.id === activeId,
     ),
@@ -706,7 +716,11 @@ export function TeamManager({
     ),
     teamActive = active?.kind === "team",
     owner = teamActive && active.role === "owner",
+    manager = teamActive && (owner || active.role === "admin"),
     confirmId = useId();
+  const detailsKey = `${activeId}:${userId}:${revision}:${active?.securityRevision || 0}`;
+  const effectiveInviteRole =
+    !owner && inviteRole === "admin" ? "editor" : inviteRole;
   const details =
     detailsResult?.key === detailsKey ? detailsResult.details : null;
   const detailsError =
@@ -807,7 +821,12 @@ export function TeamManager({
     }
     await action(
       "invite",
-      { action: "invite", workspaceId: activeId, username },
+      {
+        action: "invite",
+        workspaceId: activeId,
+        username,
+        role: effectiveInviteRole,
+      },
       "Invitation sent in ProjectAnvil",
       () => setInviteName(""),
     );
@@ -834,8 +853,8 @@ export function TeamManager({
             <Users size={23} />
             <h2>Team workspace</h2>
             <p>
-              Create a team or accept an invitation. Everyone in that team can
-              work on the projects and their connected content.
+              Create a team or accept an invitation. Roles and project access
+              control who can read or edit connected work.
             </p>
           </article>
         </div>
@@ -872,9 +891,9 @@ export function TeamManager({
         <ShieldCheck size={19} />
         <p>
           <strong>Workspace access is clear.</strong> Your personal workspace
-          belongs to you. Everything created inside a team workspace is shared
-          with that team, including projects, tasks, notes, canvases, and media.
-          A person label on a task does not grant access.
+          belongs to you. A team shares projects and connected work according to
+          workspace roles and project permissions. A person label on a task does
+          not grant access.
         </p>
       </div>
       {error && (
@@ -983,7 +1002,7 @@ export function TeamManager({
             <div className="account-section-heading">
               <Users size={21} />
               <span className="account-kind">
-                TEAM · {workspace.role === "owner" ? "OWNER" : "MEMBER"}
+                TEAM · {workspace.role.toUpperCase()}
               </span>
               {activeId === workspace.id && (
                 <span className="account-active-label">
@@ -993,7 +1012,9 @@ export function TeamManager({
               )}
             </div>
             <h2>{workspace.name}</h2>
-            <p>Shared projects and connected work for everyone in this team.</p>
+            <p>
+              Shared projects and connected work, with access set by your role.
+            </p>
             <button
               type="button"
               className="account-button"
@@ -1039,15 +1060,18 @@ export function TeamManager({
         </article>
       </div>
       {teamActive && (
-        <section className="account-card account-members-panel">
+        <section
+          className="account-card account-members-panel"
+          data-tour="team-roles"
+        >
           <div className="account-section-heading">
             <Users size={22} />
             <h2>{active.name} members</h2>
             {owner && <span className="account-role">You are the owner</span>}
           </div>
           <p>
-            All members can use this team workspace. The owner manages
-            invitations and membership.
+            Viewers read shared work. Editors make changes. Admins manage
+            members and project access. The owner can also transfer ownership.
           </p>
           {loading && (
             <div className="account-loading" role="status">
@@ -1083,32 +1107,84 @@ export function TeamManager({
                         )}
                       </strong>
                       <span>
-                        {member.role === "owner" ? "Owner" : "Member"}
+                        {member.role.charAt(0).toUpperCase() +
+                          member.role.slice(1)}
                       </span>
                     </span>
+                    {manager &&
+                      member.role !== "owner" &&
+                      (owner || member.role !== "admin") &&
+                      member.id !== userId && (
+                        <TeamRoleEditor
+                          key={`${member.id}:${member.role}`}
+                          username={member.username}
+                          role={member.role}
+                          allowAdmin={owner}
+                          focusRequested={roleFocus === member.id}
+                          disabled={!!busy}
+                          onSave={(role) =>
+                            void action(
+                              `role-${member.id}`,
+                              {
+                                action: "set-role",
+                                workspaceId: activeId,
+                                userId: member.id,
+                                role,
+                                expectedRole: member.role,
+                              },
+                              "Team role updated",
+                              () => setRoleFocus(member.id),
+                            )
+                          }
+                        />
+                      )}
                     {owner && member.role !== "owner" && (
                       <button
+                        className="account-button"
                         type="button"
-                        className="account-button account-subtle"
                         disabled={!!busy}
+                        data-tour="ownership-transfer"
                         onClick={() =>
                           setConfirm({
-                            action: "remove",
-                            title: "Remove " + member.username + "?",
+                            action: "transfer",
+                            title: `Transfer ownership to ${member.username}?`,
                             description:
-                              "They will lose access to this team workspace. Existing shared work stays in the workspace.",
+                              "They will become the owner of this team workspace. You will remain an admin. Only the new owner can transfer ownership again.",
                             workspaceId: activeId,
                             userId: member.id,
+                            expectedOwnerId: userId,
                           })
                         }
                       >
-                        Remove
+                        Make owner
                       </button>
                     )}
+                    {manager &&
+                      member.role !== "owner" &&
+                      (owner || member.role !== "admin") &&
+                      member.id !== userId && (
+                        <button
+                          type="button"
+                          className="account-button account-subtle"
+                          disabled={!!busy}
+                          onClick={() =>
+                            setConfirm({
+                              action: "remove",
+                              title: "Remove " + member.username + "?",
+                              description:
+                                "They will lose access to this team workspace. Existing shared work stays in the workspace.",
+                              workspaceId: activeId,
+                              userId: member.id,
+                            })
+                          }
+                        >
+                          Remove
+                        </button>
+                      )}
                   </li>
                 ))}
               </ul>
-              {owner && (
+              {manager && (
                 <>
                   <div className="account-invite-area">
                     <h3>Invite a teammate</h3>
@@ -1136,6 +1212,26 @@ export function TeamManager({
                           disabled={!!busy}
                         />
                       </label>
+                      <label className="account-field">
+                        <span>Invitation role</span>
+                        <select
+                          className="field"
+                          value={effectiveInviteRole}
+                          disabled={!!busy}
+                          onChange={(event) =>
+                            setInviteRole(
+                              event.target.value as
+                                | "admin"
+                                | "editor"
+                                | "viewer",
+                            )
+                          }
+                        >
+                          <option value="viewer">Viewer</option>
+                          <option value="editor">Editor</option>
+                          {owner && <option value="admin">Admin</option>}
+                        </select>
+                      </label>
                       <button
                         className="account-button account-primary"
                         type="submit"
@@ -1155,7 +1251,10 @@ export function TeamManager({
                         >
                           <span>
                             <strong>{invitation.username}</strong>
-                            <small>Waiting for acceptance</small>
+                            <small>
+                              {invitation.role || "editor"} · Waiting for
+                              acceptance
+                            </small>
                           </span>
                           <button
                             type="button"
@@ -1245,12 +1344,17 @@ export function TeamManager({
                     ...(confirm.invitationId
                       ? { invitationId: confirm.invitationId }
                       : {}),
+                    ...(confirm.expectedOwnerId
+                      ? { expectedOwnerId: confirm.expectedOwnerId }
+                      : {}),
                   },
                   confirm.action === "leave"
                     ? "You left the team"
                     : confirm.action === "remove"
                       ? "Team member removed"
-                      : "Invitation cancelled",
+                      : confirm.action === "transfer"
+                        ? "Workspace ownership transferred"
+                        : "Invitation cancelled",
                   confirm.action === "leave"
                     ? (next) => {
                         const fallback = next.workspaces.find(
@@ -1267,7 +1371,9 @@ export function TeamManager({
                   ? "Leave team"
                   : confirm.action === "remove"
                     ? "Remove member"
-                    : "Cancel invitation"}
+                    : confirm.action === "transfer"
+                      ? "Transfer ownership"
+                      : "Cancel invitation"}
               </Busy>
             </button>
           </div>

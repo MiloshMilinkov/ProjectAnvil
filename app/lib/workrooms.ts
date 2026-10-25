@@ -5,6 +5,7 @@ export type WorkPage =
   | "projects"
   | "notes"
   | "brainstorm"
+  | "activity"
   | "graph"
   | "canvas"
   | "collections"

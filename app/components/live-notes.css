@@ -1,0 +1,85 @@
+.live-note-status {
+  margin: var(--space-3) var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  min-width: 0;
+}
+.live-note-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--font-size-control);
+}
+.live-note-state span {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.live-note-status > p {
+  margin: var(--space-2) 0 0;
+  line-height: 1.6;
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}
+.live-note-status > p[role="alert"] {
+  color: var(--danger);
+}
+.live-note-help {
+  color: var(--text-secondary);
+}
+.live-note-earlier summary {
+  min-height: 44px;
+  padding-block: var(--space-2);
+  cursor: pointer;
+  font-size: var(--font-size-control);
+}
+.live-note-earlier > button {
+  display: flex;
+  max-width: 100%;
+  margin-top: var(--space-2);
+  white-space: normal;
+  text-align: left;
+}
+.live-note-recovery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.live-edit-button {
+  min-height: var(--control-height);
+}
+:root .knowledge .note-permission-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+:root .knowledge fieldset.note-format-tools {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+}
+:root .knowledge .note-toolbar {
+  height: auto;
+  min-height: 57px;
+  padding-block: var(--space-2);
+  flex-wrap: wrap;
+}
+:root .knowledge .note-toolbar-actions {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  .live-note-status {
+    margin-inline: var(--space-3);
+  }
+  .live-edit-button,
+  .live-note-recovery .btn {
+    min-height: 44px;
+  }
+}

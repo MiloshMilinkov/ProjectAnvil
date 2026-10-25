@@ -53,6 +53,7 @@ import {
   taskScheduleError,
 } from "./TaskPlanningFields";
 import { taskChildrenProgress } from "../lib/planning-progress";
+import WatchControl, { MentionHelp } from "./WatchControl";
 export default function TaskDialog({
   workspace: w,
   task,
@@ -571,6 +572,12 @@ export default function TaskDialog({
         </div>
         <div className="task-dialog-body">
           <div className="task-template-toolbar" data-tour="task-templates">
+            {task && (
+              <WatchControl
+                reference={{ type: "task", id: task.id }}
+                notify={notify}
+              />
+            )}
             <button
               className="btn"
               disabled={saving}
@@ -656,6 +663,7 @@ export default function TaskDialog({
             </div>
           )}
           <fieldset disabled={saving} className="dialog-fields">
+            <MentionHelp />
             <div className="task-title-input">
               <label htmlFor={`${fieldId}-title`} className="task-title-label">
                 Task title

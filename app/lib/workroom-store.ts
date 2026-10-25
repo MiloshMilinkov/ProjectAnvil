@@ -26,6 +26,7 @@ const roomLocationSchema = z
       "projects",
       "notes",
       "brainstorm",
+      "activity",
       "graph",
       "canvas",
       "collections",

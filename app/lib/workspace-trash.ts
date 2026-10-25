@@ -1,4 +1,10 @@
-import { database } from "./access-store";
+import { database, type ResolvedWorkspace } from "./access-store";
+import {
+  canReadEntity,
+  canEditEntity,
+  canManageWorkspace,
+  type PermissionEntityRef,
+} from "./permissions";
 import { validateWorkspace, WorkspaceError } from "./workspace-model";
 import { normalizeSourceExcerpt } from "./source-excerpts";
 import { canRestoreTaskLinks } from "./planning-model";
@@ -49,6 +55,52 @@ const records = (workspace: Workspace, entity: Entity) =>
 const same = (left: unknown, right: unknown) =>
   JSON.stringify(left) === JSON.stringify(right);
 const validId = (value: string) => /^[a-zA-Z0-9_-]{1,120}$/.test(value);
+
+/** Archive visibility follows the primary item's project, not list metadata alone. */
+export async function canAccessTrash(
+  access: ResolvedWorkspace,
+  workspace: Workspace,
+  trashId: string,
+  editing = false,
+): Promise<boolean> {
+  if (canManageWorkspace(access)) return !!await database().prepare("SELECT trash_id FROM workspace_trash WHERE workspace_id = ? AND trash_id = ?").bind(access.id, trashId).first();
+  const row = await database()
+    .prepare(
+      "SELECT payload FROM workspace_trash WHERE workspace_id = ? AND trash_id = ?",
+    )
+    .bind(access.id, trashId)
+    .first<{ payload: string }>();
+  if (!row) return false;
+  const snapshot = JSON.parse(row.payload) as TrashSnapshot;
+  const copied = new Map<Entity, Item[]>();
+  for (const record of [snapshot.primary, ...snapshot.removed]) {
+    const collection = copied.get(record.entity) || [...records(workspace, record.entity)];
+    copied.set(record.entity, collection);
+    if (!collection.some((item) => item.id === record.item.id))
+      collection.push(record.item);
+  }
+  const candidate = { ...workspace, ...Object.fromEntries(copied) } as Workspace;
+  const types: Record<Entity, PermissionEntityRef["type"]> = {
+    people: "person",
+    projects: "project",
+    tasks: "task",
+    notes: "note",
+    media: "media",
+    canvases: "canvas",
+    savedViews: "savedView",
+    relationships: "relationship",
+    noteTypes: "noteType",
+    relationshipPresets: "relationshipPreset",
+    brainstorms: "brainstorm",
+  };
+  const ref = {
+    type: types[snapshot.primary.entity],
+    id: snapshot.primary.item.id,
+  } as PermissionEntityRef;
+  return editing
+    ? canEditEntity(access, candidate, ref)
+    : canReadEntity(access, candidate, ref);
+}
 
 /** Only records touched by this deletion are archived, never the entire workspace. */
 export function captureDeletion(
@@ -540,6 +592,15 @@ export async function prepareTrashRestore(
       item.sort ??= "priority";
       item.layout ??= "board";
     }
+    if (
+      result.entity === "media" &&
+      item.projectId &&
+      !exists("projects", String(item.projectId))
+    )
+      throw new WorkspaceError(
+        "Restore this attachment’s project before restoring the file. Its project access must be preserved.",
+        409,
+      );
     if (result.entity === "canvases") {
       reference(item, "projectId", "projects");
       cleanCanvas(item as unknown as Canvas);

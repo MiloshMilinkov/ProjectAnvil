@@ -19,6 +19,7 @@ export type TourPage =
   | "rooms"
   | "notes"
   | "brainstorm"
+  | "activity"
   | "graph"
   | "canvas"
   | "collections"
@@ -64,7 +65,7 @@ export const tourSteps: TourStep[] = [
     id: "project-home",
     page: "projects",
     title: "Bring a project's work together",
-    body: "Open a project's title to see its home: goal, target date, progress, tasks, notes, and attached canvases. Open any item from here, or create a task directly in the project. Edit project changes its basic details.",
+    body: "Open a project's title to see its home: goal, target date, progress, tasks, notes, attached canvases, and project attachments. Open any item from here, or create a task directly in the project when you have editing access. Files uploaded from the project keep its permissions; unused files can be moved to Trash.",
     tip: "Progress counts tasks without child tasks. Parent tasks summarize that work, so their children are counted once.",
     anchors: [
       '[data-tour="project-home"]',
@@ -256,6 +257,14 @@ export const tourSteps: TourStep[] = [
       ".knowledge-empty",
       ".note-workspace",
     ],
+  },
+  {
+    id: "simultaneous-editing",
+    page: "notes",
+    title: "Write a note together",
+    body: "Open a note and choose Edit together. Each editor joins the same saved Markdown session, and concurrent text edits merge. Here now shows active participants. Other properties, such as title, project, and structured fields, keep their normal conflict checks.",
+    tip: "Shared editing is optional. Saving text through the ordinary editor, importing, or restoring a version starts a new session boundary. If an older session has unfinished text, download or review it before loading the saved version. Interrupted changes stay in this browser for the same account and workspace.",
+    anchors: ['[data-tour="simultaneous-editing"]', '.note-editor-toolbar', '.note-workspace'],
   },
   {
     id: "note-to-task",
@@ -457,13 +466,77 @@ export const tourSteps: TourStep[] = [
     id: "people",
     page: "team",
     title: "Bring your team together",
-    body: "Register with an email address, username, and a ProjectAnvil password. Your personal workspace is private. Create a team workspace, invite registered usernames, and let them accept. Projects and connected content inside that workspace are shared with the team.",
+    body: "Register with an email address, username, and a ProjectAnvil password. Your personal workspace is private. Create a team workspace, invite registered usernames with an access role, and let them accept. Team projects and their connected content follow workspace roles and project permissions.",
     tip: "Choose the team workspace before creating shared projects. Optional assignment labels live in Workspace settings.",
     anchors: [
       '[data-tour="people"]',
       ".view-team .page-heading",
       ".view-team .info-note",
     ],
+  },
+  {
+    id: "team-roles",
+    page: "team",
+    title: "Give each teammate the right access",
+    body: "Viewers read available work. Editors create and change work. Admins also manage project permissions and invite or manage Editors and Viewers. The Owner can appoint Admins, rename or replace the workspace, and transfer ownership. Change a member's role in Teams & workspaces and choose Save role.",
+    tip: "Existing team members become Editors. A task assignment label does not grant access. Viewers can still follow items, read activity, and manage their own notifications and work rooms.",
+    anchors: ['[data-tour="team-roles"]', '.account-members-panel', '[data-tour="nav-team"]'],
+  },
+  {
+    id: "project-permissions",
+    page: "projects",
+    title: "Choose who can open a project",
+    body: "In a team project's home, an Owner or Admin can open Project access. Keep Shared with the team, or choose Only selected members and assign Viewer or Editor access. Owners and Admins always retain access. A workspace Viewer cannot gain editing access through a project.",
+    tip: "Tasks, notes, canvases, boards, and project uploads follow the project's access. Unavailable items and their structured links are hidden. Changing an item between projects requires editing access to both. Text already written into another visible item is still that item's content.",
+    anchors: ['[data-tour="project-permissions"]', '[data-tour="project-home"]', '.projects-grid'],
+  },
+  {
+    id: "ownership-transfer",
+    page: "team",
+    title: "Hand over ownership with a clear result",
+    body: "The current Owner can choose Make owner beside an accepted team member. Review the confirmation before transferring. The selected member becomes Owner, and the former Owner remains an Admin. Personal workspaces cannot be transferred.",
+    tip: "Only the new Owner can transfer ownership again. Owners must transfer ownership before leaving their team. This does not move projects between workspaces.",
+    anchors: ['[data-tour="ownership-transfer"]', '[data-tour="team-roles"]', '.account-team-page'],
+  },
+  {
+    id: "activity-history",
+    page: "activity",
+    title: "See what changed and who changed it",
+    body: "Activity lists creations, updates, deletions, restores, and access changes in the active workspace. Use the project filter to focus the feed, Refresh for recent entries, or Load older activity for more history. Open an available linked item from its entry.",
+    tip: "Activity records names and changed field labels, not copies of every edit. Ordinary text autosaves are summarized; note version history remains separate. The feed follows your current access, including older entries.",
+    anchors: ['[data-tour="activity-history"]', '[data-tour="nav-activity"]'],
+  },
+  {
+    id: "mentions",
+    page: "notes",
+    title: "Bring a teammate into the conversation",
+    body: "Write @username in note Markdown, a task description, or discussion to mention a registered workspace member. A newly introduced mention creates an in-app notification if that person can open the item. Use the registered username rather than a planning label.",
+    tip: "Keeping the same mention does not repeatedly notify someone. Email addresses, escaped handles, and code examples do not send mentions. Imports do not send a batch of mention alerts.",
+    anchors: ['[data-tour="mentions"]', '[data-tour="note-editor"]', '.note-workspace'],
+  },
+  {
+    id: "watchers",
+    page: "projects",
+    title: "Follow work you want to keep up with",
+    body: "Choose Watch on a task, note, or project to receive updates in your inbox. Watching a project includes changes to its work. Choose Watching to stop. This preference belongs to your account and does not change anyone else's subscription.",
+    tip: "You receive updates from other people. Watched changes are grouped to keep the inbox useful. Deleted items stop being followed; restoring one does not subscribe you again. Following requires a signed-in account.",
+    anchors: ['[data-tour="watchers"]', '[data-tour="project-home"]', '.projects-grid'],
+  },
+  {
+    id: "notifications",
+    page: "overview",
+    title: "Keep mentions and followed updates together",
+    body: "Open Notifications in the header to see mentions and changes to watched work. Switch between unread and recent notifications, open an available item, mark an entry read, or mark all read. Your inbox follows the active workspace and current project access.",
+    tip: "Notifications are in-app; no email, push, or operating-system delivery is configured. Guest mode has activity but no personal inbox. Task reminders remain available through their separate bell control.",
+    anchors: ['[data-tour="notifications"]', '.topbar-actions'],
+  },
+  {
+    id: "live-updates",
+    page: "overview",
+    title: "Keep shared work current",
+    body: "Live updates checks for workspace and permission changes while the app is open. Other people's saved changes appear automatically. Connecting and Reconnecting explain the local connection state; returning to the app refreshes the current view.",
+    tip: "If the connection drops, keep useful drafts until they save or download a recovery copy. Local-only operation still requires this PC's server; these tools do not publish the app.",
+    anchors: ['[data-tour="live-updates"]', '.topbar-actions'],
   },
   {
     id: "search",
