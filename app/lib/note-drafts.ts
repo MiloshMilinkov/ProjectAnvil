@@ -6,24 +6,8 @@ import {
   type PersonalTemplate,
 } from "./personal-templates";
 
-export const noteTemplateIds = [
-  "blank",
-  "project-brief",
-  "weekly-plan",
-  "daily-journal",
-  "habit-tracker",
-  "workout-log",
-  "meal-plan",
-  "study-notes",
-  "personal-budget",
-  "trip-planner",
-  "worldbuilding",
-  "character",
-  "research",
-  "meeting",
-  "decision",
-] as const;
-export type NoteTemplateId = (typeof noteTemplateIds)[number];
+import { noteTemplateIds, type NoteTemplateId } from "./note-template-catalog";
+export { noteTemplateIds, type NoteTemplateId } from "./note-template-catalog";
 
 export interface NewNoteDraft {
   title: string;

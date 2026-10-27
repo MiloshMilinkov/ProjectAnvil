@@ -300,6 +300,13 @@ export function createOfflineStore(adapter: OfflineStorageAdapter) {
   ): Promise<OfflineWorkspaceCopy | null> {
     const key = scopeKey(scope);
     const identity = accountAccess(scope, account);
+    // Ordinary online reads must not serialize and validate an entire snapshot
+    // unless this workspace was explicitly selected for offline use. The write
+    // transaction below still checks again, so concurrent removal stays final.
+    if (!enable) {
+      const previous = await adapter.read(key);
+      if (previous?.kind !== "workspace") return null;
+    }
     const snapshot = snapshotCopy(workspace, scope.workspaceId);
     let saved: OfflineWorkspaceCopy | null = null;
     await adapter.mutate((current) => {

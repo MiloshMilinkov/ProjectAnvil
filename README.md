@@ -108,4 +108,12 @@ See the [agreed roadmap](docs/ROADMAP.md) for completed work, upcoming phases, a
 
 ```sh
 npm run check
+npm run test:browser
+npm run test:performance
 ```
+
+Repeatable browser checks use two separate accounts in a disposable local installation. Performance profiles populate private and shared workspaces with up to 40 projects, 1,000 tasks, and 200 notes each. See [testing and measurements](docs/TESTING.md) for browser setup, reports, and safe reruns.
+
+The [capacity review](docs/PERFORMANCE.md) records measured behavior and remaining work for larger teams. The [project structure guide](docs/ARCHITECTURE.md) explains feature ownership, data boundaries, and where new code belongs.
+
+Note browsing supports combined filters, matching counts, and **Clear note filters** without leaving the current project or note. Feature modules separate tasks, dashboard, settings, notes, graph, and canvas responsibilities; unused starter components and packages are removed.

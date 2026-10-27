@@ -10,8 +10,17 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
+import NoteDialog from "./notes/NoteDialog";
+import NoteBrowser from "./notes/NoteBrowser";
+import {
+  templates,
+  templateCategories,
+  noteKinds,
+  newNote,
+  type NoteTemplateId as TemplateId,
+  type TemplateCategory,
+} from "../lib/note-template-catalog";
 import { useDialog } from "./useDialog";
 import { useMediaQuery } from "./useMediaQuery";
 import {
@@ -42,7 +51,6 @@ import {
   Search,
   Settings2,
   Square,
-  Tag,
   Trash2,
   Users,
   X,
@@ -65,7 +73,6 @@ import {
   parseNoteCopyDraft,
   stagePersonalNoteTemplate,
   type NewNoteDraft,
-  type NoteTemplateId,
 } from "../lib/note-drafts";
 import { useDraftScope } from "./useRecoverableDraft";
 import Markdown from "./Markdown";
@@ -153,228 +160,6 @@ function restoredEdits(
   );
 }
 
-function NoteDialog({
-  children,
-  className,
-  label,
-  onClose,
-  busy = false,
-}: {
-  children: ReactNode;
-  className: string;
-  label: string;
-  onClose: () => void;
-  busy?: boolean;
-}) {
-  const ref = useRef<HTMLElement>(null);
-  useDialog(ref, onClose, busy);
-  return (
-    <section
-      ref={ref}
-      className={className}
-      onClick={(event) => event.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      aria-label={label}
-    >
-      {children}
-    </section>
-  );
-}
-type TemplateId = NoteTemplateId;
-const templateCategories = [
-  "General",
-  "Planning",
-  "Everyday",
-  "Wellbeing",
-  "Learning",
-  "Creative",
-] as const;
-type TemplateCategory = (typeof templateCategories)[number];
-const templates: {
-  id: TemplateId;
-  kind: Kind;
-  label: string;
-  description: string;
-  category: TemplateCategory;
-  folder: string;
-  body: string;
-}[] = [
-  {
-    id: "blank",
-    kind: "note",
-    label: "Blank note",
-    description: "A simple page for any idea.",
-    category: "General",
-    folder: "Notes",
-    body: "# Overview\n\n",
-  },
-  {
-    id: "project-brief",
-    kind: "note",
-    label: "Project brief",
-    description: "Define the goal, scope, and next steps.",
-    category: "Planning",
-    folder: "Projects",
-    body: "# Project overview\n\n## Goal\n\n## What success looks like\n\n## Scope\n\n### Included\n\n- \n\n### Out of scope\n\n- \n\n## Milestones\n\n| Milestone | Target date | Owner | Status |\n| --- | --- | --- | --- |\n| | | | |\n\n## Risks & open questions\n\n## Next actions\n\n- [ ] \n",
-  },
-  {
-    id: "weekly-plan",
-    kind: "note",
-    label: "Weekly plan",
-    description: "Priorities, commitments, and a weekly review.",
-    category: "Planning",
-    folder: "Planning",
-    body: "# Week of\n\n## Main priorities\n\n- [ ] \n- [ ] \n- [ ] \n\n## Weekly schedule\n\n| Day | Focus | Commitments |\n| --- | --- | --- |\n| Monday | | |\n| Tuesday | | |\n| Wednesday | | |\n| Thursday | | |\n| Friday | | |\n| Saturday | | |\n| Sunday | | |\n\n## Notes & reminders\n\n## Weekly review\n\n### What went well\n\n### What to change next week\n",
-  },
-  {
-    id: "daily-journal",
-    kind: "daily",
-    label: "Daily journal",
-    description: "Plan your day and reflect on it.",
-    category: "Everyday",
-    folder: "Journal",
-    body: "# Today’s focus\n\n- [ ] \n\n## Activity log\n\n## Ideas & discoveries\n\n## End-of-day reflection\n",
-  },
-  {
-    id: "habit-tracker",
-    kind: "note",
-    label: "Habit tracker",
-    description: "Track routines in a flexible weekly checklist.",
-    category: "Everyday",
-    folder: "Routines",
-    body: "# Routine goals\n\n## Week of\n\n| Habit | Mon | Tue | Wed | Thu | Fri | Sat | Sun |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| | | | | | | | |\n| | | | | | | | |\n| | | | | | | | |\n\n## What helps me stay consistent\n\n## Obstacles & adjustments\n\n## Weekly reflection\n",
-  },
-  {
-    id: "workout-log",
-    kind: "note",
-    label: "Workout log",
-    description: "Record your own sessions, progress, and reflections.",
-    category: "Wellbeing",
-    folder: "Fitness",
-    body: "# Session details\n\n| Property | Detail |\n| --- | --- |\n| Date | |\n| Session focus | |\n| Location | |\n\n## Activity log\n\n| Exercise or activity | Sets | Repetitions | Duration | Notes |\n| --- | --- | --- | --- | --- |\n| | | | | |\n| | | | | |\n\n## How the session felt\n\n## Progress & observations\n\n## Notes for next time\n",
-  },
-  {
-    id: "meal-plan",
-    kind: "note",
-    label: "Meal plan",
-    description: "Plan meals, groceries, and preparation.",
-    category: "Wellbeing",
-    folder: "Everyday",
-    body: "# Week of\n\n## Preferences & practical needs\n\n## Meal ideas\n\n| Day | Breakfast | Lunch | Dinner | Other |\n| --- | --- | --- | --- | --- |\n| Monday | | | | |\n| Tuesday | | | | |\n| Wednesday | | | | |\n| Thursday | | | | |\n| Friday | | | | |\n| Saturday | | | | |\n| Sunday | | | | |\n\n## Grocery list\n\n- [ ] \n\n## Preparation & leftovers\n\n## Recipes & notes\n",
-  },
-  {
-    id: "study-notes",
-    kind: "note",
-    label: "Study notes",
-    description: "Organize concepts, questions, and practice.",
-    category: "Learning",
-    folder: "Learning",
-    body: "# Topic\n\n## Learning goals\n\n- [ ] \n\n## Key concepts\n\n## Notes & examples\n\n## Questions to revisit\n\n## Practice & review\n\n- [ ] \n\n## Sources & further reading\n",
-  },
-  {
-    id: "personal-budget",
-    kind: "note",
-    label: "Personal budget",
-    description: "Keep planned and actual amounts in one place.",
-    category: "Everyday",
-    folder: "Personal",
-    body: "# Budget period\n\n## Goals & reminders\n\n## Income\n\n| Source | Planned | Actual | Notes |\n| --- | --- | --- | --- |\n| | | | |\n\n## Spending\n\n| Category | Planned | Actual | Notes |\n| --- | --- | --- | --- |\n| | | | |\n| | | | |\n\n## Savings & upcoming costs\n\n## Period review\n",
-  },
-  {
-    id: "trip-planner",
-    kind: "note",
-    label: "Trip planner",
-    description: "Bring bookings, itineraries, and packing together.",
-    category: "Everyday",
-    folder: "Travel",
-    body: "# Trip overview\n\n| Property | Detail |\n| --- | --- |\n| Destination | |\n| Dates | |\n| Travelers | |\n\n## Bookings & important details\n\n## Itinerary\n\n| Date | Place or activity | Time | Notes |\n| --- | --- | --- | --- |\n| | | | |\n\n## Packing checklist\n\n- [ ] \n\n## Costs & reminders\n\n## Useful contacts & links\n",
-  },
-  {
-    id: "worldbuilding",
-    kind: "world",
-    label: "Worldbuilding",
-    description: "Places, histories, systems, and lore.",
-    category: "Creative",
-    folder: "Worldbuilding",
-    body: "# Overview\n\n## Atmosphere\n\n## History\n\n## Locations\n\n## Rules of the world\n\n## Open questions\n\n- [ ] Explore this idea\n",
-  },
-  {
-    id: "character",
-    kind: "character",
-    label: "Character",
-    description: "Identity, motivations, and relationships.",
-    category: "Creative",
-    folder: "Characters",
-    body: "# Identity\n\n| Property | Detail |\n| --- | --- |\n| Role | |\n| Motivation | |\n| Home | |\n\n## Backstory\n\n## Personality\n\n## Relationships\n\n## Character arc\n",
-  },
-  {
-    id: "research",
-    kind: "research",
-    label: "Research",
-    description: "Sources, findings, and next steps.",
-    category: "Learning",
-    folder: "Research",
-    body: "# Question\n\n## Sources\n\n## Findings\n\n## Implications\n\n## Next steps\n\n- [ ] Review findings\n",
-  },
-  {
-    id: "meeting",
-    kind: "meeting",
-    label: "Meeting",
-    description: "Agendas, decisions, and follow-up actions.",
-    category: "Planning",
-    folder: "Meetings",
-    body: "# Agenda\n\n- \n\n## Notes\n\n## Decisions\n\n## Action items\n\n- [ ] \n",
-  },
-  {
-    id: "decision",
-    kind: "decision",
-    label: "Decision record",
-    description: "Compare options and preserve the reason behind an outcome.",
-    category: "Planning",
-    folder: "Decisions",
-    body: "# Supporting notes\n\n## Evidence and references\n\n## Follow-up actions\n\n- [ ] \n",
-  },
-];
-const noteKinds: { kind: Kind; label: string }[] = [
-  { kind: "note", label: "Note" },
-  { kind: "world", label: "Worldbuilding" },
-  { kind: "character", label: "Character" },
-  { kind: "research", label: "Research" },
-  { kind: "daily", label: "Daily journal" },
-  { kind: "meeting", label: "Meeting" },
-  { kind: "decision", label: "Decision record" },
-];
-
-function newNote(
-  templateId: TemplateId,
-  title: string,
-  projectId: string,
-): Note {
-  const template = templates.find((item) => item.id === templateId)!;
-  const kind = template.kind;
-  const now = new Date().toISOString();
-  return {
-    id: uid(),
-    title,
-    content: template.body,
-    kind,
-    folder: template.folder,
-    tags: [],
-    projectId,
-    bookmarked: false,
-    customTypeId: "",
-    propertyValues: {},
-    decision: kind === "decision" ? emptyDecision() : null,
-    properties:
-      kind === "character"
-        ? { Role: "", Faction: "", Status: "Draft" }
-        : { Status: "Draft" },
-    snapshots: [],
-    createdAt: now,
-    updatedAt: now,
-  };
-}
 const shortDate = (value: string) =>
   new Date(value).toLocaleDateString(undefined, {
     month: "short",
@@ -457,12 +242,7 @@ export default function Knowledge({
   const [view, setView] = useState<"edit" | "preview" | "split">("split");
   // Small screens show one pane while retaining Split when the window widens.
   const effectiveView = mobileLayout && view === "split" ? "preview" : view;
-  const [search, setSearch] = useState("");
-  const [folder, setFolder] = useState("all");
-  const [tag, setTag] = useState("all");
-  const [noteTypeFilter, setNoteTypeFilter] = useState("all");
   const [noteTypesOpen, setNoteTypesOpen] = useState(false);
-  const [bookmarksOnly, setBookmarksOnly] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [newTemplateId, setNewTemplateId] = useState<TemplateId>(
     newNoteDraft?.templateId || "blank",
@@ -1211,51 +991,45 @@ export default function Knowledge({
     openDaily();
   }, [mode, tourActive]);
 
-  const availableNotes = [
-    ...workspace.notes.map((note) => localNoteValues[note.id] || note),
-    ...Object.values(localNoteValues).filter(
-      (note) => !workspace.notes.some((saved) => saved.id === note.id),
-    ),
-  ].filter(noteVisible);
-  const notes = availableNotes.filter(
-    (note) =>
-      (mode !== "daily" || note.kind === "daily") &&
-      (projectFilter === "all" ||
-        !projectFilter ||
-        note.projectId === projectFilter),
-  );
-  const folders = [
-    ...new Set(notes.map((note) => note.folder || "Notes")),
-  ].sort();
-  const tags = [...new Set(notes.flatMap((note) => note.tags))].sort();
-  const visible = notes
-    .filter(
-      (note) =>
-        (folder === "all" || (note.folder || "Notes") === folder) &&
-        (tag === "all" || note.tags.includes(tag)) &&
-        (noteTypeFilter === "all" ||
-          (noteTypeFilter === "decision"
-            ? note.kind === "decision"
-            : `custom:${note.customTypeId}` === noteTypeFilter)) &&
-        (!bookmarksOnly || note.bookmarked) &&
-        `${note.title} ${note.content} ${note.tags.join(" ")} ${Object.values(note.propertyValues || {}).join(" ")} ${note.decision ? Object.values(note.decision).join(" ") : ""}`
-          .toLowerCase()
-          .includes(search.toLowerCase()),
-    )
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const linkedTasks = draft
-    ? workspace.tasks.filter((task) => task.noteIds.includes(draft.id))
-    : [];
-  const backlinks = draft
-    ? workspace.notes.filter(
+  const availableNotes = useMemo(() => {
+    const savedIds = new Set(workspace.notes.map((note) => note.id));
+    return [
+      ...workspace.notes.map((note) => localNoteValues[note.id] || note),
+      ...Object.values(localNoteValues).filter(
+        (note) => !savedIds.has(note.id),
+      ),
+    ].filter(noteVisible);
+  }, [workspace.notes, localNoteValues, noteVisible]);
+  const notes = useMemo(
+    () =>
+      availableNotes.filter(
         (note) =>
-          note.id !== draft.id &&
-          new RegExp(
-            `\\[\\[${draft.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[#|\\]])`,
-            "i",
-          ).test(note.content),
-      )
-    : [];
+          (mode !== "daily" || note.kind === "daily") &&
+          (projectFilter === "all" ||
+            !projectFilter ||
+            note.projectId === projectFilter),
+      ),
+    [availableNotes, mode, projectFilter],
+  );
+  const activeNoteId = draft?.id;
+  const activeNoteTitle = draft?.title;
+  const linkedTasks = useMemo(
+    () =>
+      activeNoteId
+        ? workspace.tasks.filter((task) => task.noteIds.includes(activeNoteId))
+        : [],
+    [workspace.tasks, activeNoteId],
+  );
+  const backlinks = useMemo(() => {
+    if (!activeNoteId || activeNoteTitle === undefined) return [];
+    const link = new RegExp(
+      `\\[\\[${activeNoteTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[#|\\]])`,
+      "i",
+    );
+    return workspace.notes.filter(
+      (note) => note.id !== activeNoteId && link.test(note.content),
+    );
+  }, [workspace.notes, activeNoteId, activeNoteTitle]);
   const wordCount =
     draft?.content.trim().split(/\s+/).filter(Boolean).length || 0;
 
@@ -1936,201 +1710,34 @@ export default function Knowledge({
     <div
       className={`knowledge ${mode === "daily" ? "daily-knowledge" : ""} ${draft && !canEditNote ? "is-readonly" : ""}`}
     >
-      <aside
-        ref={browserRef}
+      <NoteBrowser
         id={`${controlId}-browser`}
-        className={`note-browser ${mobileBrowser ? "mobile-visible" : ""}`}
-        role={browserDialogOpen ? "dialog" : undefined}
-        aria-modal={browserDialogOpen ? true : undefined}
-        aria-label="Browse notes"
-      >
-        <div className="note-browser-title">
-          <span>
-            {mode === "daily" ? (
-              <CalendarDays size={18} />
-            ) : (
-              <BookOpen size={18} />
-            )}{" "}
-            {mode === "daily" ? "Daily journal" : "Notes"}
-          </span>
-          <button
-            className="btn-icon"
-            title="New note"
-            aria-label="New note"
-            disabled={!canCreateNote}
-            onClick={openNewNote}
-          >
-            <Plus size={17} />
-          </button>
-          <button
-            className="btn-icon note-browser-close"
-            aria-label="Close notes browser"
-            onClick={() => {
-              setMobileBrowser(false);
-              browserButtonRef.current?.focus();
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <label className="note-search">
-          <Search size={15} />
-          <input
-            aria-label="Search notes"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Find a note…"
-          />
-          <kbd>⌕</kbd>
-        </label>
-        <div className="note-scope">
-          <button
-            className={bookmarksOnly ? "active" : ""}
-            aria-pressed={bookmarksOnly}
-            onClick={() => setBookmarksOnly((value) => !value)}
-          >
-            <Bookmark
-              size={13}
-              fill={bookmarksOnly ? "currentColor" : "none"}
-            />{" "}
-            Bookmarked
-          </button>
-          <span>{notes.length} notes</span>
-        </div>
-        <div className="note-filter-row">
-          <label>
-            <Folder size={13} />
-            <select
-              aria-label="Filter notes by folder"
-              value={folder}
-              onChange={(event) => setFolder(event.target.value)}
-            >
-              <option value="all">All folders</option>
-              {folders.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <Tag size={13} />
-            <select
-              aria-label="Filter notes by tag"
-              value={tag}
-              onChange={(event) => setTag(event.target.value)}
-            >
-              <option value="all">All tags</option>
-              {tags.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="note-type-filter">
-          <select
-            aria-label="Filter by note type"
-            value={noteTypeFilter}
-            onChange={(event) => setNoteTypeFilter(event.target.value)}
-          >
-            <option value="all">All note types</option>
-            <option value="decision">Decision records</option>
-            {(workspace.noteTypes || []).map((type) => (
-              <option key={type.id} value={`custom:${type.id}`}>
-                {type.name}
-                {type.archived ? " (archived)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          className="btn note-types-browser-action"
-          disabled={!permissions.canCreate}
-          onClick={() => setNoteTypesOpen(true)}
-          data-tour="custom-note-types"
-        >
-          Manage note types
-        </button>
-        <div className="note-list">
-          {visible.length ? (
-            visible.map((note) => (
-              <button
-                key={note.id}
-                className={`note-list-item ${selectedNote === note.id ? "selected" : ""}`}
-                aria-current={selectedNote === note.id ? "page" : undefined}
-                onClick={async () => {
-                  if (sharedNote.current && !(await flush())) {
-                    notify(
-                      "Your shared note still needs synchronization. Retry or download its unfinished text before leaving.",
-                    );
-                    return;
-                  }
-                  if (hasSharedNoteDraft(draftScope, note.id))
-                    setLiveNoteId(note.id);
-                  onSelectNote(note.id);
-                }}
-              >
-                <div className="note-list-item-top">
-                  <span className={`note-type-symbol kind-${note.kind}`}>
-                    {note.kind === "daily" ? (
-                      <CalendarDays size={16} />
-                    ) : (
-                      <FileText size={16} />
-                    )}
-                  </span>
-                  <span className="note-list-name">
-                    {note.title || "Untitled note"}
-                  </span>
-                  {note.bookmarked && (
-                    <Bookmark
-                      size={12}
-                      className="note-bookmarked"
-                      fill="currentColor"
-                    />
-                  )}
-                </div>
-                <p>
-                  {note.content
-                    .replace(/[#*\[\]`>_=]/g, "")
-                    .replace(/\s+/g, " ")
-                    .slice(0, 90) || "A blank page, a new possibility."}
-                </p>
-                <div className="note-list-meta">
-                  <span>
-                    {noteTypeLabel(note, workspace.noteTypes || []) ||
-                      (note.kind === "decision"
-                        ? "Decision record"
-                        : note.folder)}
-                  </span>
-                  <span>{shortDate(note.updatedAt)}</span>
-                </div>
-              </button>
-            ))
-          ) : (
-            <div className="note-list-empty">
-              <Search size={25} />
-              <p>
-                {notes.length
-                  ? "No notes match these filters. Try another search, folder, tag, type, or bookmark filter."
-                  : "No notes here yet. Create your first note to get started."}
-              </p>
-              <button className="btn" onClick={openNewNote}>
-                Create a note
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="note-browser-footer">
-          <div className="note-vault-dot" />
-          <span>Your notes</span>
-          <button
-            className="btn-icon"
-            title="New note from template"
-            disabled={!canCreateNote}
-            onClick={openNewNote}
-          >
-            <Plus size={15} />
-          </button>
-        </div>
-      </aside>
+        browserRef={browserRef}
+        mode={mode}
+        mobileVisible={mobileBrowser}
+        modalOpen={browserDialogOpen}
+        canCreate={canCreateNote}
+        canManageTypes={permissions.canCreate}
+        notes={notes}
+        noteTypes={workspace.noteTypes}
+        selectedId={selectedNote}
+        onClose={() => {
+          setMobileBrowser(false);
+          browserButtonRef.current?.focus();
+        }}
+        onCreate={openNewNote}
+        onManageTypes={() => setNoteTypesOpen(true)}
+        onSelect={async (id) => {
+          if (sharedNote.current && !(await flush())) {
+            notify(
+              "Your shared note still needs synchronization. Retry or download its unfinished text before leaving.",
+            );
+            return;
+          }
+          if (hasSharedNoteDraft(draftScope, id)) setLiveNoteId(id);
+          onSelectNote(id);
+        }}
+      />
 
       <main className="note-workspace">
         {hiddenRecovery && !noteVisible(hiddenRecovery) && (

@@ -1,46 +1,31 @@
 # Dependency security
 
-On October 21, 2026, the updated lockfile passed the production audit with **zero reported vulnerabilities**. The full audit still reports eight development dependency entries, all inherited from the unpatched `braces` advisory described below. Audit results can change as new advisories are published.
+Reviewed **2026-10-27**. The current lockfile reports **zero production vulnerabilities**. The full audit reports **three moderate entries**, all from the Satori toolchain chain below; no high or critical entries remain. Audit results can change when advisories are published. Exact versions and targeted overrides are in [package.json](../package.json) and [package-lock.json](../package-lock.json).
 
-Reviewed **2026-10-21**. Exact dependency versions and targeted overrides are recorded in [package.json](../package.json) and [package-lock.json](../package-lock.json).
+## Remaining toolchain advisory
 
-## Unpatched toolchain advisory
+`vinext@1.0.0-beta.5 → @vercel/og@0.8.6 → satori@0.16.0` inherits [GHSA-wx4j-mvgx-mqwp](https://github.com/advisories/GHSA-wx4j-mvgx-mqwp). Satori versions before **0.33.5** in the affected range improperly escape SVG values. The audit counts the affected package and two parents separately. No application route currently uses Satori or `ImageResponse` to render workspace input.
 
-`braces` through **3.0.3** can exhaust the Node.js call stack when processing deeply nested brace patterns. The [GitHub advisory GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) lists **no patched release**. The npm registry still lists 3.0.3 as the latest release on the review date.
+The audit proposes a Vinext migration to 1.3.1. This is a framework change, rather than a compatible transitive patch, and remains separate work requiring local worker, routing, installation, and data-recovery checks. Do not force a different Satori release into the existing image-generation dependency without verifying its API compatibility.
 
-It reaches this project through development tools:
+The normal launcher builds when source changes, reuses a current production build, and serves on `127.0.0.1`. Building, development, and local serving still use tooling dependencies, so a production-only audit is not the whole risk assessment. Loopback access does not prove that vulnerable tooling is harmless.
 
-- `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces`
-- `vinext → vite-plugin-commonjs → vite-plugin-dynamic-import → fast-glob → micromatch → braces`
+## Maintenance choices
 
-An audit may report the affected package and several parent packages for this single unresolved cause. The separately named `brace-expansion` package has patched overrides; those do not resolve this `braces` advisory.
+Unused starter UI packages have been removed. Existing stylesheet and Markdown type imports are now explicit dependencies. Targeted security updates include Next/ESLint **16.4.3**, `fast-uri` **3.1.9**, and Undici **7.30.1**, while retaining the current Cloudflare/Vinext integration.
 
-ProjectAnvil's default server listens on `127.0.0.1` and stores workspace data locally. It is not publicly reachable through that address. This reduces network exposure; it does **not** establish that a development tool vulnerability cannot be exploited. The normal launcher uses the development toolchain, so development dependency findings still matter. Untrusted source files, configuration, or inputs reaching these tools require care. No exploit through normal note or task input has been established by this review.
+- The legacy Drizzle loader has a targeted esbuild override. Verify schema loading when changing it; a forced Drizzle downgrade can conflict with Better Auth.
+- Markdown math plugins use patched KaTeX overrides. Check inline/display math and diagrams after updates.
+- Broad framework or local-worker upgrades need a complete backup/restore rehearsal with isolated data. Follow [local setup](LOCAL_SETUP.md); preserve ordinary application data.
 
-Keep this advisory visible and review upstream releases before making the app reachable from other devices or a public network. Do not downgrade unrelated tools or substitute an incompatible glob library simply to remove the audit warning.
-
-## Why versions are pinned
-
-The current update keeps framework changes within compatible release lines and uses targeted overrides for vulnerable transitive packages. These cover image/media processing, WebSocket and HTTP clients, mathematical rendering, parsers, and build/check tooling.
-
-Two overrides need particular attention during maintenance:
-
-- The legacy Drizzle loader requires an older esbuild range. Its targeted override moves that dependency to a patched esbuild release; verify TypeScript schema loading after changing it. An audit suggestion to downgrade Drizzle can conflict with Better Auth's supported versions.
-- The Markdown math plugins request an older KaTeX release line. Their overrides use a patched version; verify inline/display equations and diagram rendering after dependency updates.
-
-The Cloudflare plugin, Wrangler, Miniflare, and Vinext versions are retained while their vulnerable transitive dependencies receive fixes. A broad upgrade can change peer requirements, worker behavior, or local storage compatibility. Treat that as a separate migration with a complete backup and restore check, following [local setup and backups](LOCAL_SETUP.md).
-
-## Updating and checking
-
-After reviewing a dependency change, install from the lockfile and run:
+## Checking updates
 
 ```sh
 npm run install:ci
 npm run check
+npm run test:browser
 npm audit
 npm audit --omit=dev
 ```
 
-Also check local startup and a built-app startup using isolated fixture data. Review both audit outputs: the production-only report omits tools used by the normal development launcher. Do not assume `npm audit fix --force` preserves the app's supported dependency combinations.
-
-Remove an override when a reviewed upstream update includes the required fix. Recheck the unresolved advisory when a new `braces` release becomes available; this document records the review date rather than promising a permanent clean audit.
+Check both audit reports and startup with isolated fixture data. Avoid `npm audit fix --force`; its proposed major/framework changes may break the supported runtime. Remove overrides when a reviewed upstream release incorporates the fix. This document records a dated review, not a permanent clean-audit guarantee.

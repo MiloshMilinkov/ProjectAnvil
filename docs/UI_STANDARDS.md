@@ -26,6 +26,7 @@ ProjectAnvil should make work easy to read, find, and act on. These standards ap
 - Give every input and icon-only control an accessible name. Use visible labels where the field's purpose would otherwise become unclear after typing.
 - Expose state with the appropriate `aria-current`, `aria-pressed`, or `aria-expanded` attribute. Announce save and error feedback without repeatedly interrupting the user.
 - Keep a visible focus indicator, a sensible tab order, and full keyboard access. Dialogs must contain focus, close with Escape when appropriate, and return focus when dismissed.
+- Keep local editor panels below global navigation menus, and application dialogs above both. Check ordinary pointer clicks and keyboard access while competing panels are open; a visible control must also be reachable.
 - Respect reduced-motion preferences. Do not rely on animation to explain a result.
 - Keep the page usable from 320 px mobile layouts through large desktop screens and at 200% zoom. Contain deliberate horizontal scrolling inside boards, timelines, canvases, and wide tables; avoid page-level overflow.
 - Check long names, many projects, populated workspaces, and empty workspaces. Preserve readable content rather than shrinking text to make it fit.

@@ -156,7 +156,23 @@ async function storageChecks() {
     "Ordinary reads do not opt a workspace in",
   );
   assert.equal(await store.readResume(), null);
+  const invalidSnapshot = { ...workspace, notes: null };
+  assert.equal(
+    await store.update(scope, account, invalidSnapshot),
+    null,
+    "An offline-disabled read does not verify or persist an unused snapshot",
+  );
+  await assert.rejects(
+    store.enable(scope, account, invalidSnapshot),
+    /could not be verified/,
+    "Explicit opt-in still verifies every snapshot",
+  );
   let copy = await store.enable(scope, account, workspace);
+  await assert.rejects(
+    store.update(scope, account, invalidSnapshot),
+    /could not be verified/,
+    "An enabled copy never accepts invalid snapshot data",
+  );
   assert.equal(copy.workspace.notes[0].content, "Original");
   assert.equal(copy.user.email, "");
   const serialized = JSON.stringify([...adapter.metadata.values()]);
@@ -335,6 +351,34 @@ async function storageChecks() {
 
 function projectionChecks() {
   const workspace = workspaceFixture();
+  const scoped = scopedWorkspaceMedia(workspace, access.id);
+  const idle = projectOfflineMutations(scoped, [], access, user);
+  assert.equal(
+    idle.workspace,
+    scoped,
+    "An empty queue preserves the current scoped snapshot identity for stable rendering",
+  );
+  assert.deepEqual(idle.applied, []);
+  assert.deepEqual(idle.conflicts, []);
+  assert.deepEqual(idle.warnings, []);
+  const idleCanonical = projectOfflineMutations(workspace, [], access, user);
+  assert.equal(
+    idleCanonical.workspace.media[0].url,
+    `/api/media/file-a?workspace=${access.id}`,
+    "Idle canonical snapshots still normalize attachment request scope",
+  );
+  assert.equal(workspace.media[0].url, "/api/media/file-a");
+  assert.throws(
+    () =>
+      projectOfflineMutations(
+        scoped,
+        [],
+        { ...access, id: "another-team" },
+        user,
+      ),
+    /selected workspace/,
+    "The empty-queue fast path does not accept another workspace's attachment URLs",
+  );
   const first = entry(
     "op-create",
     {

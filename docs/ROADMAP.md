@@ -14,6 +14,8 @@ All phases follow the [interface standard](UI_STANDARDS.md): readable and access
 
 ## Reliability work before an online release
 
+Two-account Chromium browser regressions and repeatable populated-workspace measurements are available through the [testing commands](TESTING.md). The [capacity review](PERFORMANCE.md) records the measured limits and next improvements.
+
 - Isolate anonymous visitors or require login; the current guest workspace is intended for one local installation.
 - Add email verification, account recovery, and session management; review production origins and request limits.
 - Prepare larger-workspace storage, pagination, quotas, and retention; measure realistic loads and rehearse migrations.

@@ -9,6 +9,7 @@ import {
 import { assertMutationAccess, assertMutationInputAccess } from "./permissions";
 import {
   canonicalMediaMutation,
+  canonicalMediaAddress,
   canonicalWorkspaceMedia,
   scopedWorkspaceMedia,
 } from "./workspace-transport";
@@ -265,6 +266,24 @@ export function projectOfflineMutations(
   access: WorkspaceAccess,
   user: AccountUser | null,
 ): OfflineProjection {
+  // Server and verified device snapshots already carry scoped attachment URLs.
+  // With no pending edits, reuse that immutable snapshot to avoid unnecessary
+  // deep copies and downstream rendering. Canonical metadata still normalizes.
+  if (!entries.length) {
+    const suffix = `?workspace=${encodeURIComponent(access.id)}`;
+    const alreadyScoped = confirmed.media.every(
+      (file) =>
+        file.url === `${canonicalMediaAddress(file, access.id)}${suffix}`,
+    );
+    return {
+      workspace: alreadyScoped
+        ? confirmed
+        : scopedWorkspaceMedia(confirmed, access.id),
+      applied: [],
+      conflicts: [],
+      warnings: [],
+    };
+  }
   let workspace = scopedWorkspaceMedia(structuredClone(confirmed), access.id);
   const applied: string[] = [],
     conflicts: OfflineConflict[] = [],

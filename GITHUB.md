@@ -30,6 +30,8 @@ VS Code creates the repository in your account and connects it as the Git remote
 
 You can keep making local commits without publishing or connecting to GitHub. If Git asks for a name and email, supply the identity you want recorded on your commits. A GitHub private email address can be used if you prefer.
 
+GitHub Actions validates source changes and runs a separate two-account Chromium browser suite against disposable local data. Failed browser runs retain diagnostic reports for seven days. These checks do not host the app. See [Testing](docs/TESTING.md) for the same commands locally and for optional performance measurements.
+
 ## Keep app data backed up separately
 
 Git tracks the app code and setup files. These local files are excluded:

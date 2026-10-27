@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
-const directories = ["app", "public", "build", "scripts"];
+const directories = ["app", "public", "build", "scripts", "db", "drizzle"];
 const configuration = [
   "package.json",
   "package-lock.json",

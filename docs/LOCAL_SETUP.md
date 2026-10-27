@@ -16,7 +16,7 @@ Start the app and open the browser:
 node scripts/start-local.mjs
 ```
 
-Open **http://127.0.0.1:5173**. The launcher builds the production app on first use and after relevant source changes, prepares its offline application files, and reuses a current build on later starts. A build does not publish anything.
+Open **http://127.0.0.1:5173**. The launcher builds the production app on first use and after relevant source, configuration, dependency, or database-schema changes, prepares its offline application files, and reuses a current build on later starts. A build does not publish anything.
 
 To build and start without automatically opening a browser:
 
@@ -286,3 +286,5 @@ npm run check
 ```
 
 Checks include TypeScript, lint, backend/draft/offline/portability regressions, public-cache policy and update tests, temporary-fixture backup restoration, and a production build. Backend tests use in-memory SQLite and a fake file bucket; backup tests use temporary fixture directories. They do not modify saved workspaces. GitHub Actions runs the same checks on pushes and pull requests. Building the app does not publish it. See [GitHub setup](../GITHUB.md) for source control and [LOCAL_ONLY.md](../LOCAL_ONLY.md) for the current local-operation policy.
+
+For two-account Chromium browser checks and populated-workspace stress measurements, see [Testing](TESTING.md). Their runners create independent local databases and test accounts instead of using your saved installation.

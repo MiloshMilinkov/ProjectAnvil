@@ -237,7 +237,7 @@ export const tourSteps: TourStep[] = [
     page: "notes",
     title: "Keep useful information connected",
     body: "Notes holds research, plans, and reference material. Choose templates for projects, routines, fitness, learning, travel, meetings, or creative worldbuilding. On a phone, Browse opens the note list; Close notes returns to your writing.",
-    tip: "Templates are starting structures; every part stays editable.",
+    tip: "Search and combine folder, tag, type, and bookmark filters in the note list. The count shows how many match; Clear note filters resets the list while keeping your project and current note. Templates stay editable.",
     anchors: [
       '[data-tour="new-note"]',
       ".note-browser-title button",
