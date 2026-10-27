@@ -9,6 +9,8 @@ export interface WorkspaceScopeValue {
   onAuthChanged: () => Promise<void>;
   onChanged: (account: AccountContext) => void;
   refreshAccount: () => Promise<void>;
+  isOffline: boolean;
+  onConnectionChange: (offline: boolean) => void;
 }
 export const WorkspaceScope = createContext<WorkspaceScopeValue | null>(null);
 export function useWorkspaceScope() {

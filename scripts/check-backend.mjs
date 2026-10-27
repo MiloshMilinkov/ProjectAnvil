@@ -13,6 +13,14 @@ const output = fs.mkdtempSync(
 );
 const files = [
   "app/lib/types.ts",
+  "app/lib/offline-store.ts",
+  "app/lib/workspace-transport.ts",
+  "app/lib/response-bytes.ts",
+  "app/lib/account-refresh.ts",
+  "app/lib/offline-projection.ts",
+  "app/lib/portable-markdown.ts",
+  "app/lib/portable-store.ts",
+  "app/api/portable/route.ts",
   "app/lib/task-scheduling.ts",
   "app/lib/task-drafts.ts",
   "app/lib/planning-model.ts",
@@ -57,6 +65,7 @@ const files = [
   "app/lib/media-store.ts",
   "app/lib/request-body.ts",
   "app/lib/draft-store.ts",
+  "app/lib/queued-mutation-lock.ts",
   "app/lib/workspace-preferences.ts",
   "app/lib/editor-mutations.ts",
   "app/lib/note-drafts.ts",
@@ -125,6 +134,11 @@ try {
   );
   for (const name of [
     "phase1-trash.cjs",
+    "offline.cjs",
+    "queued-mutation-locks.cjs",
+    "response-bytes.cjs",
+    "portable-markdown.cjs",
+    "phase5-portability.cjs",
     "phase2-planning.cjs",
     "phase3-connected.cjs",
     "brainstorm-drafts.cjs",
@@ -160,6 +174,10 @@ try {
   process.exitCode = result.status ?? 1;
   for (const check of [
     { file: "drafts.cjs" },
+    { file: "offline.cjs" },
+    { file: "queued-mutation-locks.cjs" },
+    { file: "response-bytes.cjs" },
+    { file: "portable-markdown.cjs" },
     { file: "task-copy.cjs" },
     { file: "saved-views.cjs" },
     { file: "note-templates.cjs" },

@@ -11,6 +11,11 @@ import "./knowledge.css";
 import { useAppearance } from "./ThemeControls";
 import type { Note, Workspace } from "../lib/types";
 import type { Root } from "mdast";
+import {
+  OfflineAttachmentLink,
+  OfflineMediaUnavailable,
+  useOfflineMediaUrl,
+} from "./OfflineMediaProvider";
 
 export const headingSlug = (text: string) =>
   text
@@ -225,6 +230,51 @@ export interface MarkdownProps {
   onNoteClick: (id: string) => void;
 }
 
+function MarkdownAttachment({
+  src,
+  alt,
+  workspace,
+}: {
+  src: string | undefined;
+  alt: string | undefined;
+  workspace: Workspace;
+}) {
+  const resolved = useOfflineMediaUrl(src);
+  const id = src?.match(/^\/api\/media\/([A-Za-z0-9_-]{1,120})(?:[?#]|$)/)?.[1];
+  const media = workspace.media.find(
+    (item) => item.url === src || item.id === id,
+  );
+  const name = alt || media?.name || "Image";
+  if (resolved.unavailable || resolved.loading)
+    return <OfflineMediaUnavailable name={name} loading={resolved.loading} />;
+  if (media?.type.startsWith("audio/"))
+    return (
+      <audio controls preload="metadata" src={resolved.url} aria-label={name} />
+    );
+  if (media?.type.startsWith("video/"))
+    return (
+      <video controls preload="metadata" src={resolved.url} aria-label={name} />
+    );
+  if (media?.type === "application/pdf")
+    return (
+      <span className="pdf-attachment">
+        <iframe src={resolved.url} title={name} />
+        <a href={resolved.url} target="_blank" rel="noopener noreferrer">
+          Open {name} ↗
+        </a>
+      </span>
+    );
+  if (media && !media.type.startsWith("image/"))
+    return (
+      <a className="file-attachment" href={resolved.url} download={media.name}>
+        {name} ↓
+      </a>
+    );
+  // Authenticated attachment and ephemeral Blob URLs must not use a separate optimizer.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={resolved.url} alt={alt || ""} loading="lazy" />;
+}
+
 function MarkdownBody({
   content,
   workspace,
@@ -340,6 +390,20 @@ function MarkdownBody({
                   );
                 }
                 if (href?.startsWith("#")) return <a href={href}>{children}</a>;
+                if (
+                  href &&
+                  (workspace.media.some((file) => file.url === href) ||
+                    /^\/api\/media\//.test(href))
+                )
+                  return (
+                    <OfflineAttachmentLink
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {children}
+                    </OfflineAttachmentLink>
+                  );
                 return (
                   <a href={href} target="_blank" rel="noopener noreferrer">
                     {children}
@@ -394,53 +458,13 @@ function MarkdownBody({
                   );
                 return <pre>{children}</pre>;
               },
-              img: ({ src, alt }) => {
-                const media = workspace.media.find((item) => item.url === src);
-                if (media?.type.startsWith("audio/"))
-                  return (
-                    <audio
-                      controls
-                      preload="metadata"
-                      src={String(src)}
-                      aria-label={alt || media.name}
-                    />
-                  );
-                if (media?.type.startsWith("video/"))
-                  return (
-                    <video
-                      controls
-                      preload="metadata"
-                      src={String(src)}
-                      aria-label={alt || media.name}
-                    />
-                  );
-                if (media?.type === "application/pdf")
-                  return (
-                    <span className="pdf-attachment">
-                      <iframe src={String(src)} title={alt || media.name} />
-                      <a
-                        href={String(src)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Open {alt || media.name} ↗
-                      </a>
-                    </span>
-                  );
-                if (media && !media.type.startsWith("image/"))
-                  return (
-                    <a
-                      className="file-attachment"
-                      href={media.url}
-                      download={media.name}
-                    >
-                      {alt || media.name} ↓
-                    </a>
-                  );
-                // Markdown images have unknown dimensions and may use authenticated local attachment URLs.
-                // eslint-disable-next-line @next/next/no-img-element
-                return <img src={src} alt={alt || ""} loading="lazy" />;
-              },
+              img: ({ src, alt }) => (
+                <MarkdownAttachment
+                  src={typeof src === "string" ? src : undefined}
+                  alt={alt}
+                  workspace={workspace}
+                />
+              ),
               table: ({ children }) => (
                 <div className="markdown-table">
                   <table>{children}</table>

@@ -264,7 +264,11 @@ export const tourSteps: TourStep[] = [
     title: "Write a note together",
     body: "Open a note and choose Edit together. Each editor joins the same saved Markdown session, and concurrent text edits merge. Here now shows active participants. Other properties, such as title, project, and structured fields, keep their normal conflict checks.",
     tip: "Shared editing is optional. Saving text through the ordinary editor, importing, or restoring a version starts a new session boundary. If an older session has unfinished text, download or review it before loading the saved version. Interrupted changes stay in this browser for the same account and workspace.",
-    anchors: ['[data-tour="simultaneous-editing"]', '.note-editor-toolbar', '.note-workspace'],
+    anchors: [
+      '[data-tour="simultaneous-editing"]',
+      ".note-editor-toolbar",
+      ".note-workspace",
+    ],
   },
   {
     id: "note-to-task",
@@ -480,7 +484,11 @@ export const tourSteps: TourStep[] = [
     title: "Give each teammate the right access",
     body: "Viewers read available work. Editors create and change work. Admins also manage project permissions and invite or manage Editors and Viewers. The Owner can appoint Admins, rename or replace the workspace, and transfer ownership. Change a member's role in Teams & workspaces and choose Save role.",
     tip: "Existing team members become Editors. A task assignment label does not grant access. Viewers can still follow items, read activity, and manage their own notifications and work rooms.",
-    anchors: ['[data-tour="team-roles"]', '.account-members-panel', '[data-tour="nav-team"]'],
+    anchors: [
+      '[data-tour="team-roles"]',
+      ".account-members-panel",
+      '[data-tour="nav-team"]',
+    ],
   },
   {
     id: "project-permissions",
@@ -488,7 +496,11 @@ export const tourSteps: TourStep[] = [
     title: "Choose who can open a project",
     body: "In a team project's home, an Owner or Admin can open Project access. Keep Shared with the team, or choose Only selected members and assign Viewer or Editor access. Owners and Admins always retain access. A workspace Viewer cannot gain editing access through a project.",
     tip: "Tasks, notes, canvases, boards, and project uploads follow the project's access. Unavailable items and their structured links are hidden. Changing an item between projects requires editing access to both. Text already written into another visible item is still that item's content.",
-    anchors: ['[data-tour="project-permissions"]', '[data-tour="project-home"]', '.projects-grid'],
+    anchors: [
+      '[data-tour="project-permissions"]',
+      '[data-tour="project-home"]',
+      ".projects-grid",
+    ],
   },
   {
     id: "ownership-transfer",
@@ -496,7 +508,11 @@ export const tourSteps: TourStep[] = [
     title: "Hand over ownership with a clear result",
     body: "The current Owner can choose Make owner beside an accepted team member. Review the confirmation before transferring. The selected member becomes Owner, and the former Owner remains an Admin. Personal workspaces cannot be transferred.",
     tip: "Only the new Owner can transfer ownership again. Owners must transfer ownership before leaving their team. This does not move projects between workspaces.",
-    anchors: ['[data-tour="ownership-transfer"]', '[data-tour="team-roles"]', '.account-team-page'],
+    anchors: [
+      '[data-tour="ownership-transfer"]',
+      '[data-tour="team-roles"]',
+      ".account-team-page",
+    ],
   },
   {
     id: "activity-history",
@@ -512,7 +528,11 @@ export const tourSteps: TourStep[] = [
     title: "Bring a teammate into the conversation",
     body: "Write @username in note Markdown, a task description, or discussion to mention a registered workspace member. A newly introduced mention creates an in-app notification if that person can open the item. Use the registered username rather than a planning label.",
     tip: "Keeping the same mention does not repeatedly notify someone. Email addresses, escaped handles, and code examples do not send mentions. Imports do not send a batch of mention alerts.",
-    anchors: ['[data-tour="mentions"]', '[data-tour="note-editor"]', '.note-workspace'],
+    anchors: [
+      '[data-tour="mentions"]',
+      '[data-tour="note-editor"]',
+      ".note-workspace",
+    ],
   },
   {
     id: "watchers",
@@ -520,7 +540,11 @@ export const tourSteps: TourStep[] = [
     title: "Follow work you want to keep up with",
     body: "Choose Watch on a task, note, or project to receive updates in your inbox. Watching a project includes changes to its work. Choose Watching to stop. This preference belongs to your account and does not change anyone else's subscription.",
     tip: "You receive updates from other people. Watched changes are grouped to keep the inbox useful. Deleted items stop being followed; restoring one does not subscribe you again. Following requires a signed-in account.",
-    anchors: ['[data-tour="watchers"]', '[data-tour="project-home"]', '.projects-grid'],
+    anchors: [
+      '[data-tour="watchers"]',
+      '[data-tour="project-home"]',
+      ".projects-grid",
+    ],
   },
   {
     id: "notifications",
@@ -528,7 +552,7 @@ export const tourSteps: TourStep[] = [
     title: "Keep mentions and followed updates together",
     body: "Open Notifications in the header to see mentions and changes to watched work. Switch between unread and recent notifications, open an available item, mark an entry read, or mark all read. Your inbox follows the active workspace and current project access.",
     tip: "Notifications are in-app; no email, push, or operating-system delivery is configured. Guest mode has activity but no personal inbox. Task reminders remain available through their separate bell control.",
-    anchors: ['[data-tour="notifications"]', '.topbar-actions'],
+    anchors: ['[data-tour="notifications"]', ".topbar-actions"],
   },
   {
     id: "live-updates",
@@ -536,7 +560,7 @@ export const tourSteps: TourStep[] = [
     title: "Keep shared work current",
     body: "Live updates checks for workspace and permission changes while the app is open. Other people's saved changes appear automatically. Connecting and Reconnecting explain the local connection state; returning to the app refreshes the current view.",
     tip: "If the connection drops, keep useful drafts until they save or download a recovery copy. Local-only operation still requires this PC's server; these tools do not publish the app.",
-    anchors: ['[data-tour="live-updates"]', '.topbar-actions'],
+    anchors: ['[data-tour="live-updates"]', ".topbar-actions"],
   },
   {
     id: "search",
@@ -567,13 +591,79 @@ export const tourSteps: TourStep[] = [
     id: "backups",
     page: "settings",
     title: "Keep a copy of your work",
-    body: "Storage & recovery reports the active workspace allowance, archived history, and attachment problems. Export downloads confirmed records, including note types, decisions, presets, and brainstorming boards. Import replaces records after confirmation and resets relationship review markers. New imported ideas start without votes; matching ideas retain current trusted votes. JSON excludes personal rooms, archived versions, and uploaded files.",
+    body: "Storage & recovery reports the active workspace allowance, archived history, and attachment problems. Export downloads the current visible records, including note types, decisions, presets, and brainstorming boards. Import replaces records after confirmation and resets relationship review markers. New imported ideas start without votes; matching ideas retain current trusted votes. JSON excludes personal rooms, archived versions, and uploaded files.",
     tip: "Finish pending saves first. Complete backups need .wrangler/state and the matching .dev.vars file while the app is stopped. Browser drafts stay separate; download conflicted text you need to keep.",
     anchors: [
       '[data-tour="storage-health"]',
       '[data-tour="backups"]',
       ".settings-data-actions",
     ],
+  },
+  {
+    id: "install-app",
+    page: "settings",
+    title: "Keep ProjectAnvil within reach",
+    body: "Install ProjectAnvil from Workspace settings in a supported browser, or use the browser's install or Add to Home Screen command. The normal local launcher prepares the built app and its public application files for offline reopening. Installation keeps the same local server and workspace storage.",
+    tip: "Use Check for updates when needed. Finish saving and close other ProjectAnvil windows before restarting to update. Development previews do not install an offline service worker.",
+    anchors: ['[data-tour="install-app"]', ".settings-page .page-heading"],
+  },
+  {
+    id: "offline-workspace",
+    page: "settings",
+    title: "Choose what stays on this device",
+    body: "Save workspace offline keeps a private copy of the records currently available to this account. Open that saved workspace while disconnected to keep planning and writing. Offline copies are separate for each account and workspace; no offline registration or password sign-in is provided.",
+    tip: "Use a trusted device. Access changes can only be checked after reconnecting. Open Storage and privacy for persistent storage options. Browser storage can be cleared or evicted, so keep regular backups.",
+    anchors: [
+      '[data-tour="offline-workspace"]',
+      ".settings-page .page-heading",
+    ],
+  },
+  {
+    id: "offline-attachments",
+    page: "settings",
+    title: "Bring reference files with you",
+    body: "After saving the workspace, choose Save attachments offline to download its available local files. Progress and saved-file counts are shown, and Stop downloads keeps files already downloaded. Notes and canvases use these private copies while disconnected; unavailable files explain that a connection is needed.",
+    tip: "Remote webpages and external files remain online. New uploads and recordings need the local server. Remove an offline copy to remove its cached attachments from this device.",
+    anchors: [
+      '[data-tour="offline-attachments"]',
+      '[data-tour="offline-workspace"]',
+    ],
+  },
+  {
+    id: "offline-sync",
+    page: "overview",
+    title: "Keep working through an interruption",
+    body: "With an offline copy enabled, task, note, and planning edits are kept in an ordered queue on this device. On device means the change is durable here and still needs synchronization. Reconnecting checks current access and retries the original changes without silently replacing a teammate's conflicting edit.",
+    tip: "The status banner shows queued work. Synchronize now is also available in Workspace settings. Recurring follow-up tasks and server history are created after synchronization; account changes, imports, and Trash restore need a connection.",
+    anchors: ['[data-tour="offline-sync"]', '[data-tour="workspace-content"]'],
+  },
+  {
+    id: "sync-conflicts",
+    page: "overview",
+    title: "Resolve a conflict with both versions visible",
+    body: "Open Review changes to compare queued values with the last confirmed record. Apply reviewed changes only after checking both versions; a newer change asks you to review again. You can also download recovery copies or discard a pending save. Restricted work stays protected when access is checked again.",
+    tip: "Undo cancels a queued deletion that was never sent. If a deletion's server outcome is uncertain, reconnect before restoring it. Separate editor recovery drafts are retained until you save or explicitly discard them.",
+    anchors: [
+      '[data-tour="sync-conflicts"]',
+      '[data-tour="offline-sync"]',
+      '[data-tour="workspace-content"]',
+    ],
+  },
+  {
+    id: "markdown-export",
+    page: "settings",
+    title: "Take your notes as ordinary files",
+    body: "Markdown folders exports the notes visible in the selected scope as a ZIP containing folders, Markdown files, and available attachments. Relative links keep local references portable. Note properties and a ProjectAnvil manifest support richer round trips; inaccessible work is excluded.",
+    tip: "This is note portability. Keep JSON exports and complete local backups for the rest of your workspace, account, history, and collaboration records.",
+    anchors: ['[data-tour="markdown-folders"]', ".settings-page .page-heading"],
+  },
+  {
+    id: "markdown-import",
+    page: "settings",
+    title: "Review a folder before bringing it in",
+    body: "Choose a Markdown folder or ZIP, inspect the notes, attachments, and warnings, then select a project you can edit. Import adds fresh notes and files with safe names; it does not replace existing records. Links between imported notes and their attachments are adapted for this workspace.",
+    tip: "A connection is required. Oversized archives, unsafe paths, and unsupported content are reported before import. The same import attempt can be retried safely if its response is interrupted.",
+    anchors: ['[data-tour="markdown-folders"]', ".settings-page .page-heading"],
   },
   {
     id: "appearance",

@@ -1087,6 +1087,7 @@ async function main() {
     users,
   });
   await require("./phase4-boundaries.cjs")({ sql, store: rawStore, request, users });
+  await require("./phase5-portability.cjs")({ sql, store: rawStore, request, users });
   Module._load = originalLoad;
   sql.close();
   console.log(

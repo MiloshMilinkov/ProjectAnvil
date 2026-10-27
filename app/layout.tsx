@@ -5,10 +5,21 @@ import "./syntax-light-themes.css";
 import "./readability.css";
 import "./ui-foundation.css";
 import { ThemeProvider } from "./components/ThemeControls";
+import AppInstallation from "./components/AppInstallation";
 export const metadata: Metadata = {
   title: "ProjectAnvil — Your projects, connected",
   description: "Connected projects, tasks, notes, and everyday planning.",
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/icons/projectanvil-180.png",
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "ProjectAnvil",
+    statusBarStyle: "default",
+  },
 };
 export default function RootLayout({
   children,
@@ -16,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="warp" suppressHydrationWarning>
       <head>
+        <meta name="theme-color" content="#14141b" />
         <script
           dangerouslySetInnerHTML={{
             __html:
@@ -23,8 +35,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
+      <body data-projectanvil-shell="public">
+        <ThemeProvider>
+          <AppInstallation>{children}</AppInstallation>
+        </ThemeProvider>
       </body>
     </html>
   );

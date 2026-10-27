@@ -1,0 +1,94 @@
+.offline-settings h2,
+.offline-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.offline-actions {
+  flex-wrap: wrap;
+  margin-block: var(--space-4);
+}
+.offline-settings p {
+  line-height: var(--line-height-body);
+}
+:root .settings-section.offline-settings > p {
+  font-size: var(--font-size-body);
+}
+.offline-privacy,
+.offline-copy-summary {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+.offline-copy-summary {
+  display: grid;
+  gap: var(--space-2);
+}
+.offline-copy-summary span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-control);
+}
+.offline-feedback {
+  overflow-wrap: anywhere;
+}
+.offline-storage-options summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: var(--font-size-control);
+  font-weight: 600;
+}
+.offline-banner {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--control-border);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-size: var(--font-size-control);
+}
+.offline-banner > span {
+  flex: 1;
+  min-width: 0;
+}
+.sync-field-comparison {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-3);
+}
+.sync-field-comparison section {
+  min-width: 0;
+}
+.sync-field-comparison h4 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-control);
+}
+.sync-field-comparison pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow: auto;
+  background: var(--surface-subtle);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  font: inherit;
+}
+@media (min-width: 700px) {
+  .sync-field-comparison {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .offline-actions .btn,
+  .offline-banner .btn {
+    min-height: 44px;
+  }
+  .offline-banner {
+    padding-inline: var(--space-3);
+  }
+}

@@ -47,8 +47,11 @@
 | **Activity & notifications**    | Review who changed work and which fields changed. Mention registered @usernames, **Watch** tasks, notes, or projects, and open **Notifications** for unread counts and read actions. Activity and notifications respect current project access.                                                                                                                                                                                                                  |
 | **Live collaboration**          | Receive saved workspace and permission changes automatically, with reconnect status. Choose Edit together for simultaneous Markdown editing, participant names, merged text changes, and recoverable interrupted sessions. Other fields retain conflict checks.                                                                                                                                                                                                  |
 | **Workspace tools**             | Search across tasks, notes, and projects. Write beside a preview, extract or combine notes, present basic slides, open notes in another window, and use focus mode.                                                                                                                                                                                                                                                                                              |
-| **Appearance & onboarding**     | Choose Light, Dark, Warp, Focus, or Soft. Readable typography, consistent controls, visible keyboard focus, and touch-friendly layouts support desktop and mobile work. Adjust spacing, save a startup view, customize the new-task shortcut, and replay the 51-step guided tour.                                                                                                                                                                                |
-| **Portable records & backups**  | Export visible workspace records as JSON. Create and verify complete local backups of accounts, uploads, permissions, collaboration history, shared sessions, and recovery state; restore with a rollback copy.                                                                                                                                                                                                                                                  |
+| **Appearance & onboarding**     | Choose Light, Dark, Warp, Focus, or Soft. Readable typography, consistent controls, visible keyboard focus, and touch-friendly layouts support desktop and mobile work. Adjust spacing, save a startup view, customize the new-task shortcut, and replay the 58-step guided tour.                                                                                                                                                                                |
+| **Installable app**             | Open ProjectAnvil in its own desktop or home-screen window. Prepare application files for offline startup, check for updates, and restart safely after finishing work.                                                                                                                                                                                                                                                                                           |
+| **Offline work**                | Choose workspaces and attachments to keep on a trusted device. Continue editing notes, tasks, and plans through local-server interruptions; synchronize queued changes on reconnect and compare conflicts before applying reviewed changes.                                                                                                                                                                                                                      |
+| **Markdown folders**            | Export available notes and attachments as a portable ZIP, or review a folder/ZIP and import fresh notes into a writable project. Keep folders, supported note properties, and links between included notes; existing work stays in place.                                                                                                                                                                                                                        |
+| **Portable records & backups**  | Export visible workspace records as JSON. Create and verify complete local backups of accounts, uploads, permissions, collaboration history, shared sessions, and recovery state; restore with a rollback copy. Browser offline copies and unfinished drafts remain separate.                                                                                                                                                                                    |
 
 ## Templates
 
@@ -74,10 +77,10 @@ Requires **Node.js 22.13+** and npm. Clone or download the repository, open its 
 
 ```sh
 npm run install:ci
-npm run dev
+node scripts/start-local.mjs
 ```
 
-Open **http://127.0.0.1:5173**. On Windows, after installing dependencies, **Start ProjectAnvil.cmd** starts the app and opens the browser. Keep the console running; press **Ctrl+C** to stop.
+Open **http://127.0.0.1:5173**. On Windows, **Start ProjectAnvil.cmd** provides the same startup flow. The launcher builds the installable app when needed and reuses a current build. Keep the console running for account access and synchronization; press **Ctrl+C** to stop. Explicitly saved offline work can remain available while the server is stopped.
 
 **The current version runs locally on one computer.** Accounts and team workspaces do not enable remote access; mobile layouts are available when the app is served in a reachable environment. Initial dependency installation requires internet access.
 
@@ -86,15 +89,18 @@ For storage, backup, restore, and troubleshooting, see the [local setup guide](d
 ## Current limitations
 
 - Projects can have restricted access inside a team workspace. Moving projects between workspaces is not implemented.
-- Workspace changes arrive through live revision requests. Simultaneous editing applies to Markdown text after each editor chooses **Edit together**; other fields use conflict checks. Offline sync and automatic Markdown-folder sync are not implemented.
+- Simultaneous editing applies to Markdown after each editor chooses **Edit together**; other fields use conflict checks. Offline copies need an initial connection and trusted browser storage. Reconnect to verify current access and synchronize; account changes, uploads, archived recovery, and folder transfers need the local server.
+- Markdown folder transfers are manual. Automatic synchronization with an external folder is not implemented. Folder/ZIP import creates new notes; tasks, accounts, and histories use the other backup formats.
 - Notifications and mentions are in-app. Email, operating-system push, Google sign-in, email verification, password-reset mail, and invitation emails are not configured.
 - Reminders are in-app. Delivery needs the app open; snoozes and dismissals are browser preferences. Recurrence advances on completion rather than creating a backlog while the app is closed. See [planning behavior](docs/LOCAL_SETUP.md#project-planning-recurring-tasks-and-reminders) for time-zone and recovery details.
 - Brainstorm voting is visible to the workspace, with one shared guest identity in guest mode. JSON import retains current votes for matching ideas and clears votes on new imported ideas; complete local backups preserve the full vote state. See [connected thinking](docs/LOCAL_SETUP.md#connected-thinking) for details.
-- Workspace JSON excludes permissions, memberships, activity, watches, notifications, shared editing sessions, Trash, personal templates, archived note history, personal rooms, uploaded files, and accounts. Complete backups preserve confirmed local data; unsaved browser drafts must be saved or downloaded separately. Importing resets relationship review markers and invalidates older Trash restores. Trash has no automatic expiry. See [backup options and storage limits](docs/LOCAL_SETUP.md#data-and-backups).
+- Workspace JSON excludes permissions, memberships, activity, watches, notifications, shared editing sessions, Trash, personal templates, archived note history, personal rooms, uploaded files, and accounts. Complete backups preserve confirmed local data; browser offline copies and queued or unsaved edits must be synchronized or downloaded separately. Importing resets relationship review markers and invalidates older Trash restores. Trash has no automatic expiry. See [backup options and storage limits](docs/LOCAL_SETUP.md#data-and-backups).
 
 ## Development
 
 Built with **React, TypeScript, Vinext/Vite, Better Auth, Yjs, and local D1/R2 emulation**.
+
+Use `npm run dev` for development with live source updates. Installable/offline startup uses the normal launcher or `npm run build` followed by `npm start`; development mode does not register the app cache.
 
 Interface changes follow the [UI and UX standard](docs/UI_STANDARDS.md), including readability, navigation, accessibility, all five themes, and responsive review.
 

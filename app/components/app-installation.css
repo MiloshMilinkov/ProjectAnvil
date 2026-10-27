@@ -1,0 +1,44 @@
+.app-installation h2 {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+:root
+  .settings-section.app-installation
+  > p:not(.app-installation-help):not(.small-text) {
+  font-size: var(--font-size-body);
+}
+.app-installation-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  padding: var(--space-3);
+  background: var(--surface-subtle);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+}
+.app-installation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block: var(--space-4);
+}
+.app-installation-help {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+.app-installation-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .app-installation-actions .btn {
+    min-height: 44px;
+    white-space: normal;
+    text-align: left;
+  }
+}

@@ -49,6 +49,7 @@ import GraphRelationships from "./GraphRelationships";
 import { useCanvasPersistence } from "./useCanvasPersistence";
 import { useDialog } from "./useDialog";
 import { useWorkspacePermissions } from "./WorkspacePermissions";
+import { OfflineMediaUnavailable, useOfflineMediaUrl } from "./OfflineMediaProvider";
 import "./visuals.css";
 import "./project-planning.css";
 
@@ -2837,19 +2838,29 @@ export function CanvasView(props: CanvasViewProps) {
 }
 
 function MediaContent({ media }: { media: Media }) {
+  const resolved = useOfflineMediaUrl(media.url);
+  if (resolved.unavailable || resolved.loading)
+    return (
+      <OfflineMediaUnavailable name={media.name} loading={resolved.loading} />
+    );
   // Media addresses come from the authenticated upload endpoint, never from card text.
   // Local authenticated media URLs need their original response; image optimization would add a second fetch path.
   if (media.type.startsWith("image/"))
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={media.url} alt={media.name} draggable={false} loading="lazy" />
+      <img
+        src={resolved.url}
+        alt={media.name}
+        draggable={false}
+        loading="lazy"
+      />
     );
   if (media.type.startsWith("video/"))
     return (
       <video
         controls
         preload="metadata"
-        src={media.url}
+        src={resolved.url}
         onPointerDown={(e) => e.stopPropagation()}
       />
     );
@@ -2860,7 +2871,7 @@ function MediaContent({ media }: { media: Media }) {
         <audio
           controls
           preload="metadata"
-          src={media.url}
+          src={resolved.url}
           onPointerDown={(e) => e.stopPropagation()}
         />
         <small>{media.name}</small>
@@ -2868,14 +2879,14 @@ function MediaContent({ media }: { media: Media }) {
     );
   if (media.type === "application/pdf")
     return (
-      <object data={media.url} type="application/pdf">
-        <a href={media.url} target="_blank" rel="noopener noreferrer">
+      <object data={resolved.url} type="application/pdf">
+        <a href={resolved.url} target="_blank" rel="noopener noreferrer">
           Open {media.name}
         </a>
       </object>
     );
   return (
-    <a href={media.url} target="_blank" rel="noopener noreferrer">
+    <a href={resolved.url} target="_blank" rel="noopener noreferrer">
       <ArrowDownToLine size={16} /> Open {media.name}
     </a>
   );

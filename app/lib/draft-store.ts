@@ -116,6 +116,17 @@ export function readDraft<T, B = T>(
   return record;
 }
 
+/** Memory recovery is not a durable acknowledgement when browser storage failed. */
+export function isDraftPersisted(
+  scope: DraftScope,
+  entity: string,
+  id: string,
+  token: string,
+): boolean {
+  const key = keyFor(scope, entity, id);
+  return !failedWrites.has(key) && storedDraft(key)?.token === token;
+}
+
 export function writeDraft<T, B = T>(
   scope: DraftScope,
   entity: string,
@@ -302,6 +313,7 @@ export function discardDraftMutations(
   scope: DraftScope,
   entity: string,
   recordId: string,
+  options: { preserveQueuedDeletion?: boolean } = {},
 ): void {
   const pending = listDrafts<{
     action?: string;
@@ -309,6 +321,18 @@ export function discardDraftMutations(
     id?: string;
     item?: { id?: string };
   }>(scope, "mutations");
+  // A queued delete still needs the earlier create/edits in order to reach the
+  // server. Its receipt also makes an offline Undo possible.
+  if (
+    options.preserveQueuedDeletion &&
+    pending.some(
+      ({ record }) =>
+        record.value.action === "delete" &&
+        record.value.entity === entity &&
+        record.value.id === recordId,
+    )
+  )
+    return;
   for (const { id, record } of pending) {
     const mutation = record.value;
     if (

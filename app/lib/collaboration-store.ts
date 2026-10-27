@@ -423,6 +423,7 @@ export async function prepareCollaborationStatements(
   guardValues: unknown[],
   _operationId?: string,
   mutation?: Mutation,
+  suppressNotifications = false,
 ): Promise<D1PreparedStatement[]> {
   const db = database(),
     now = new Date().toISOString();
@@ -446,6 +447,8 @@ export async function prepareCollaborationStatements(
     usernames,
     mutation,
     now,
+  ).map((event) =>
+    suppressNotifications ? { ...event, mentions: [] } : event,
   );
   const events = [] as ReturnType<typeof prepareActivity>;
   for (const event of prepared) {
@@ -477,7 +480,7 @@ export async function prepareCollaborationStatements(
       )
       .bind(access.id, JSON.stringify(events), ...guardValues),
   ];
-  if (access.user && mutation?.action !== "import") {
+  if (access.user && mutation?.action !== "import" && !suppressNotifications) {
     const watchTargets = events.flatMap((event) => {
       const reference = referenceFor(event.entity, event.entityId);
       return [

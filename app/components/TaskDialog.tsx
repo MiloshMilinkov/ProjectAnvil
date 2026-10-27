@@ -502,7 +502,9 @@ export default function TaskDialog({
         scope,
       );
       removeDraft(scope, "tasks", draftId, token.current);
-      discardDraftMutations(scope, "tasks", task.id);
+      discardDraftMutations(scope, "tasks", task.id, {
+        preserveQueuedDeletion: true,
+      });
       dirty.current = false;
       onClose();
     } catch (error) {

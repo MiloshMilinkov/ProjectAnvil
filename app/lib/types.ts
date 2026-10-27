@@ -300,6 +300,7 @@ export interface Mutation {
 export type Mutate = (mutation: Mutation) => Promise<Workspace>;
 export type Notify = (message: string, options?: { undoId: string }) => void;
 export interface FeatureProps {
+  saveTarget?: "server" | "device";
   workspace: Workspace;
   mutate: Mutate;
   openTask: (id: string) => void;

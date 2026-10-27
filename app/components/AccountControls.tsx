@@ -34,6 +34,7 @@ import { flushDraftGuards, hasUnpersistedDrafts } from "../lib/draft-store";
 import { useDraftScope } from "./useRecoverableDraft";
 import { useDialog } from "./useDialog";
 import TeamRoleEditor from "./TeamRoleEditor";
+import { useWorkspaceScope } from "./WorkspaceScope";
 
 type MaybeAsync = void | Promise<void>;
 type AccountMenuProps = {
@@ -237,6 +238,7 @@ export function AccountMenu({
   onAuthChanged,
   onOpenTeams,
 }: AccountMenuProps) {
+  const { isOffline } = useWorkspaceScope();
   const scope = useDraftScope();
   const submitting = useRef(false);
   const [open, setOpen] = useState(false),
@@ -317,6 +319,12 @@ export function AccountMenu({
   }
   async function signOut() {
     if (submitting.current) return;
+    if (isOffline) {
+      setError(
+        "Connect to the local server to sign out. You can remove the offline copy from Workspace settings while disconnected.",
+      );
+      return;
+    }
     submitting.current = true;
     setBusy(true);
     setError("");

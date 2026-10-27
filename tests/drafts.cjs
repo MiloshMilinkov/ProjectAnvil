@@ -710,6 +710,11 @@ async function checkDrafts() {
       { content: "Saved text" },
     );
     assert.equal(failed.persisted, false);
+    assert.equal(
+      drafts.isDraftPersisted(scope, "notes", "note-a", failed.record.token),
+      false,
+      "An in-memory recovery value is not an offline acknowledgement",
+    );
     assert.match(failed.error, /Keep this page open/);
     assert.equal(
       drafts.readDraft(scope, "notes", "note-a").value.content,
@@ -729,6 +734,11 @@ async function checkDrafts() {
       failed.record.baseline,
     );
     assert.equal(drafts.hasUnpersistedDrafts(scope), false);
+    assert.equal(
+      drafts.isDraftPersisted(scope, "notes", "note-a", retried.record.token),
+      true,
+      "Retry must durably store the exact version before acknowledging it",
+    );
     assert.equal(
       drafts.removeDraft(scope, "notes", "note-a", retried.record.token),
       true,
@@ -1047,6 +1057,58 @@ async function checkDrafts() {
 
     await checkEverydayRetryRecovery(drafts);
     checkConfirmedTaskReplacement(drafts);
+
+    const queuedCreate = drafts.writeDraft(
+      scope,
+      "mutations",
+      "offline-create",
+      {
+        action: "upsert",
+        entity: "tasks",
+        item: { id: "offline-task", title: "Keep this creation" },
+        operationId: "offline-create",
+      },
+      null,
+    );
+    const queuedDelete = drafts.writeDraft(
+      scope,
+      "mutations",
+      "offline-delete",
+      {
+        action: "delete",
+        entity: "tasks",
+        id: "offline-task",
+        operationId: "offline-delete",
+      },
+      null,
+    );
+    drafts.discardDraftMutations(scope, "tasks", "offline-task", {
+      preserveQueuedDeletion: true,
+    });
+    assert.equal(
+      drafts.readDraft(scope, "mutations", "offline-create").token,
+      queuedCreate.record.token,
+      "Offline delete cleanup keeps the earlier creation in queue order",
+    );
+    assert.equal(
+      drafts.readDraft(scope, "mutations", "offline-delete").token,
+      queuedDelete.record.token,
+      "Offline delete cleanup keeps its Undo receipt",
+    );
+    drafts.removeDraft(
+      scope,
+      "mutations",
+      "offline-delete",
+      queuedDelete.record.token,
+    );
+    drafts.discardDraftMutations(scope, "tasks", "offline-task", {
+      preserveQueuedDeletion: true,
+    });
+    assert.equal(
+      drafts.readDraft(scope, "mutations", "offline-create"),
+      null,
+      "Confirmed deletion still clears obsolete editor intents",
+    );
 
     let dirty = true;
     const release = drafts.registerDraftGuard(scope, "recording", {

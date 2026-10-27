@@ -1,5 +1,5 @@
 "use client";
-import { useWorkspaceFetch } from "./WorkspaceScope";
+import { useWorkspaceFetch, useWorkspaceScope } from "./WorkspaceScope";
 
 import {
   useCallback,
@@ -395,8 +395,10 @@ export default function Knowledge({
   openTask,
   openNote,
   notify,
+  saveTarget = "server",
 }: Props) {
   const scopedFetch = useWorkspaceFetch();
+  const { isOffline } = useWorkspaceScope();
   const controlId = useId();
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const emptyCreateRef = useRef<HTMLButtonElement>(null);
@@ -1659,17 +1661,21 @@ export default function Knowledge({
           "Save or recover the note's unfinished changes before moving it to Trash.",
         );
       await queue.current;
-      const response = await scopedFetch("/api/state", { cache: "no-store" });
-      const result = (await response.json()) as {
-        workspace?: Workspace;
-        error?: string;
-      };
-      if (!response.ok || !result.workspace)
-        throw new Error(
-          result.error ||
-            "The latest note could not be checked before deletion.",
-        );
-      const saved = result.workspace.notes.find((note) => note.id === draft.id);
+      let saved: Note | undefined;
+      if (isOffline) saved = draftRef.current || undefined;
+      else {
+        const response = await scopedFetch("/api/state", { cache: "no-store" });
+        const result = (await response.json()) as {
+          workspace?: Workspace;
+          error?: string;
+        };
+        if (!response.ok || !result.workspace)
+          throw new Error(
+            result.error ||
+              "The latest note could not be checked before deletion.",
+          );
+        saved = result.workspace.notes.find((note) => note.id === draft.id);
+      }
       await moveToTrash(
         mutate,
         notify,
@@ -2236,6 +2242,7 @@ export default function Knowledge({
                   data-tour="simultaneous-editing"
                   aria-pressed={liveEditing}
                   disabled={
+                    (!liveEditing && isOffline) ||
                     (!liveEditing &&
                       !permissions.canEditRef({
                         type: "note",
@@ -2274,7 +2281,9 @@ export default function Knowledge({
                   )}
                   <span>
                     {noteSaveState === "saved"
-                      ? "Saved"
+                      ? saveTarget === "device"
+                        ? "On device"
+                        : "Saved"
                       : noteSaveState === "saving"
                         ? "Saving…"
                         : noteSaveState === "pending"
@@ -2605,7 +2614,7 @@ export default function Knowledge({
                       title="Attach an image, PDF, audio, or video"
                       aria-label="Attach an image, PDF, audio, or video"
                       onClick={() => fileInput.current?.click()}
-                      disabled={uploading}
+                      disabled={uploading || isOffline}
                     >
                       {uploading ? (
                         <LoaderCircle size={15} className="spin" />
@@ -2618,6 +2627,7 @@ export default function Knowledge({
                       title={recording ? "Stop recording" : "Record audio"}
                       aria-label={recording ? "Stop recording" : "Record audio"}
                       aria-pressed={recording}
+                      disabled={isOffline && !recording}
                       onClick={() => void startRecording()}
                     >
                       {recording ? (

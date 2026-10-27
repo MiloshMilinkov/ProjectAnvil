@@ -1,22 +1,54 @@
 "use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AccountContext } from "../lib/access-types";
+import type { AccountContext, WorkspaceAccess } from "../lib/access-types";
+import {
+  AccountRefreshRequests,
+  accountResponseStatus,
+} from "../lib/account-refresh";
 import ProjectAnvil from "./ProjectAnvil";
 import { WorkspaceScope } from "./WorkspaceScope";
 import { fetchWithTimeout } from "../lib/fetch-with-timeout";
 import { flushDraftGuards, hasUnpersistedDrafts } from "../lib/draft-store";
+import {
+  clearOfflineResume,
+  forgetOfflineAccount,
+  readOfflineResume,
+  readOfflineWorkspace,
+  reconcileOfflineAccount,
+} from "../lib/offline-store";
+
+function accessEpoch(access: WorkspaceAccess) {
+  return JSON.stringify([
+    access.kind,
+    access.role,
+    access.ownerId || "",
+    access.securityRevision || 0,
+    Object.entries(access.projectRoles || {}).sort(([a], [b]) =>
+      a.localeCompare(b),
+    ),
+  ]);
+}
 
 export default function AccountShell() {
   const [account, setAccount] = useState<AccountContext | null>(null),
     [activeId, setActiveId] = useState(""),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [navigationError, setNavigationError] = useState(""),
+    [isOffline, setOffline] = useState(false);
   const latest = useRef<AccountContext | null>(null),
-    requestVersion = useRef(0),
+    offline = useRef(false),
+    allowResume = useRef(true),
+    requests = useRef(new AccountRefreshRequests()),
     transitionVersion = useRef(0);
-  const apply = useCallback((next: AccountContext) => {
+  const onConnectionChange = useCallback((next: boolean) => {
+    offline.current = next;
+    setOffline(next);
+  }, []);
+  const apply = useCallback((next: AccountContext, preferredId?: string) => {
     const sameUser = latest.current?.user?.id === next.user?.id;
     latest.current = next;
-    requestVersion.current++;
+    requests.current.invalidate();
     setAccount(next);
     setActiveId((current) => {
       let saved = "";
@@ -26,68 +58,159 @@ export default function AccountShell() {
             "projectanvil-workspace-" + (next.user?.id || "guest"),
           ) || "";
       } catch {}
-      const proposed = sameUser ? current : saved;
-      return next.workspaces.some((w) => w.id === proposed)
+      const proposed = preferredId || (sameUser ? current : saved);
+      return next.workspaces.some((workspace) => workspace.id === proposed)
         ? proposed
         : next.workspaces[0]?.id || "";
     });
     setError("");
   }, []);
-  const refresh = useCallback(async () => {
-    const version = ++requestVersion.current;
-    try {
-      const response = await fetchWithTimeout("/api/account", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const result = (await response.json()) as AccountContext & {
-        account?: AccountContext;
-        error?: string;
-      };
-      if (!response.ok)
-        throw new Error(result.error || "Unable to open your account");
-      if (version === requestVersion.current) apply(result.account || result);
-    } catch (error) {
-      if (version === requestVersion.current)
-        setError((error as Error).message);
-      throw error;
-    }
-  }, [apply]);
-  const invalidateRequests = useCallback(() => {
-    requestVersion.current += 1;
-  }, []);
+  const refresh = useCallback(
+    (force = false): Promise<void> =>
+      requests.current.run(async (ticket) => {
+        let unavailable = false,
+          denied = false;
+        try {
+          let response: Response;
+          try {
+            response = await fetchWithTimeout("/api/account", {
+              cache: "no-store",
+              credentials: "same-origin",
+              signal: ticket.signal,
+            });
+          } catch (cause) {
+            unavailable = true;
+            throw cause;
+          }
+          const status = accountResponseStatus(response.status);
+          unavailable = status === "unavailable";
+          denied = status === "denied";
+          const result = (await response
+            .json()
+            .catch(() => ({}))) as AccountContext & {
+            account?: AccountContext;
+            error?: string;
+          };
+          if (!response.ok)
+            throw new Error(
+              result.error ||
+                (unavailable
+                  ? "The local server is temporarily unavailable. Your offline copy and queued changes are kept."
+                  : "Unable to open your account."),
+            );
+          const next = result.account || result;
+          if (
+            !Array.isArray(next.workspaces) ||
+            !(
+              next.user === null ||
+              (next.user && typeof next.user.id === "string")
+            )
+          )
+            throw new Error(
+              "The account response could not be read. Retry the connection.",
+            );
+          if (!ticket.isCurrent()) return;
+          const previousId = latest.current?.user?.id || "guest";
+          if (latest.current && previousId !== (next.user?.id || "guest"))
+            await forgetOfflineAccount(previousId).catch(() => undefined);
+          await reconcileOfflineAccount(next).catch(() => undefined);
+          if (!ticket.isCurrent()) return;
+          allowResume.current = true;
+          onConnectionChange(false);
+          apply(next);
+        } catch (cause) {
+          if (!ticket.isCurrent()) return;
+          if (unavailable && allowResume.current) {
+            if (latest.current) onConnectionChange(true);
+            else {
+              const saved = await readOfflineResume().catch(() => null);
+              if (saved && ticket.isCurrent()) {
+                apply(saved.account, saved.activeId);
+                onConnectionChange(true);
+                return;
+              }
+            }
+          } else if (denied) {
+            allowResume.current = false;
+            const previousId = latest.current?.user?.id;
+            // Read the last selection before blocking resume. A first-boot denial
+            // can then purge its identity's data without restoring that identity's UI.
+            const saved = previousId
+              ? Promise.resolve(null)
+              : readOfflineResume().catch(() => null);
+            const cleared = clearOfflineResume().catch(() => undefined);
+            latest.current = null;
+            setAccount(null);
+            setActiveId("");
+            onConnectionChange(false);
+            const cached = await saved;
+            await forgetOfflineAccount(
+              previousId || cached?.account.user?.id || "guest",
+            ).catch(() => undefined);
+            await cleared;
+          }
+          if (ticket.isCurrent())
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : "The account connection could not finish.",
+            );
+          throw cause;
+        }
+      }, force),
+    [apply, onConnectionChange],
+  );
   const authChanged = useCallback(async () => {
-    // The authentication request has succeeded. Do not show the previous user's
-    // private workspace while a fresh account lookup is unavailable.
-    transitionVersion.current += 1;
+    // Authentication succeeded online. Cached identity never substitutes for
+    // the fresh lookup after removing the prior UI and device copies.
+    transitionVersion.current++;
+    requests.current.invalidate();
+    allowResume.current = false;
+    const previousId = latest.current?.user?.id || "guest";
+    latest.current = null;
     setAccount(null);
     setActiveId("");
     setError("");
-    await refresh();
-  }, [refresh]);
+    setNavigationError("");
+    onConnectionChange(false);
+    await forgetOfflineAccount(previousId).catch(() => undefined);
+    await clearOfflineResume().catch(() => undefined);
+    await refresh(true);
+  }, [refresh, onConnectionChange]);
   useEffect(() => {
-    refresh().catch(() => {});
+    const activeRequests = requests.current;
+    queueMicrotask(() => {
+      void refresh().catch(() => {});
+    });
     const timer = setInterval(() => {
-      if (!document.hidden) refresh().catch(() => {});
-    }, 10000);
-    const wake = () => refresh().catch(() => {});
+      if (!document.hidden) void refresh().catch(() => {});
+    }, 10_000);
+    const wake = () => {
+      void refresh().catch(() => {});
+    };
     window.addEventListener("focus", wake);
+    window.addEventListener("online", wake);
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", wake);
-      invalidateRequests();
+      window.removeEventListener("online", wake);
+      activeRequests.invalidate();
     };
-  }, [refresh, invalidateRequests]);
+  }, [refresh]);
   const updateAccount = useCallback(
     (next: AccountContext) => {
-      if (latest.current?.user?.id === next.user?.id) apply(next);
+      if (latest.current?.user?.id === next.user?.id) {
+        void reconcileOfflineAccount(next).catch(() => undefined);
+        apply(next);
+      }
     },
     [apply],
   );
   const switchWorkspace = useCallback(
     async (id: string) => {
       const current = latest.current;
-      if (!current?.workspaces.some((w) => w.id === id)) return;
+      if (!current?.workspaces.some((workspace) => workspace.id === id)) return;
+      setNavigationError("");
       const transition = ++transitionVersion.current;
       const scope = {
         accountId: current.user?.id || "guest",
@@ -96,22 +219,49 @@ export default function AccountShell() {
       await flushDraftGuards(scope);
       if (transition !== transitionVersion.current) return;
       if (hasUnpersistedDrafts(scope)) {
-        setError(
+        setNavigationError(
           "Keep this workspace open until your recording or recovery copy can be saved.",
         );
         return;
       }
+      if (latest.current?.user?.id !== current.user?.id) return;
+      const target = latest.current?.workspaces.find(
+        (workspace) => workspace.id === id,
+      );
+      if (!target) return;
+      if (offline.current) {
+        try {
+          const cached = await readOfflineWorkspace({
+            accountId: scope.accountId,
+            workspaceId: id,
+          });
+          if (!cached?.workspace)
+            throw new Error(
+              "That workspace is not available offline. Connect and save a copy in Workspace settings first.",
+            );
+          if (accessEpoch(cached.access) !== accessEpoch(target))
+            throw new Error(
+              "This workspace's access changed. Reconnect and refresh its offline copy before opening it.",
+            );
+        } catch (cause) {
+          if (transition === transitionVersion.current)
+            setNavigationError(
+              cause instanceof Error
+                ? cause.message
+                : "This offline workspace could not be opened.",
+            );
+          return;
+        }
+      }
       if (
+        transition !== transitionVersion.current ||
         latest.current?.user?.id !== current.user?.id ||
         !latest.current?.workspaces.some((workspace) => workspace.id === id)
       )
         return;
       setActiveId(id);
       try {
-        localStorage.setItem(
-          "projectanvil-workspace-" + (current.user?.id || "guest"),
-          id,
-        );
+        localStorage.setItem("projectanvil-workspace-" + scope.accountId, id);
       } catch {}
     },
     [activeId],
@@ -122,7 +272,10 @@ export default function AccountShell() {
         <h1>ProjectAnvil</h1>
         <p>{error || "Opening your workspace…"}</p>
         {error && (
-          <button className="btn" onClick={() => refresh().catch(() => {})}>
+          <button
+            className="btn"
+            onClick={() => void refresh(true).catch(() => {})}
+          >
             Try again
           </button>
         )}
@@ -137,14 +290,20 @@ export default function AccountShell() {
         onAuthChanged: authChanged,
         onChanged: updateAccount,
         refreshAccount: refresh,
+        isOffline,
+        onConnectionChange,
       }}
     >
-      {error && (
+      {(navigationError || (error && !isOffline)) && (
         <div className="error-banner account-connection-banner" role="status">
-          {error}
-          <button onClick={() => void refresh().catch(() => {})}>
-            Retry account connection
-          </button>
+          {navigationError || error}
+          {navigationError ? (
+            <button onClick={() => setNavigationError("")}>Dismiss</button>
+          ) : (
+            <button onClick={() => void refresh(true).catch(() => {})}>
+              Retry account connection
+            </button>
+          )}
         </div>
       )}
       <ProjectAnvil key={(account.user?.id || "guest") + ":" + activeId} />

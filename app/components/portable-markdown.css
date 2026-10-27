@@ -1,0 +1,103 @@
+.portable-panel {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.portable-panel > p {
+  margin: 0;
+}
+:root .settings-section.portable-panel > p:not(.small-text) {
+  font-size: var(--font-size-body);
+}
+.portable-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+}
+.portable-actions label {
+  flex: 1 1 240px;
+  max-width: 430px;
+}
+.portable-panel .form-label {
+  display: grid;
+  gap: var(--space-2);
+}
+.portable-panel .field {
+  width: 100%;
+  min-width: 0;
+}
+.portable-review {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-subtle);
+}
+.portable-review p,
+.portable-notice p {
+  margin: 0;
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+.portable-review-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+.portable-review-heading h3 {
+  margin: 0;
+}
+.portable-file-list,
+.portable-warnings {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+.portable-file-list {
+  display: grid;
+  gap: var(--space-2);
+}
+.portable-file-list li {
+  overflow-wrap: anywhere;
+}
+.portable-file-list span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+.portable-notice {
+  padding: var(--space-4);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  overflow-wrap: anywhere;
+  line-height: var(--line-height-body);
+}
+.portable-error {
+  color: var(--danger);
+}
+.portable-notice summary {
+  min-height: var(--control-height);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  margin-top: var(--space-2);
+}
+@media (max-width: 760px) {
+  .portable-panel .field {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .portable-panel button,
+  .portable-notice summary {
+    min-height: 44px;
+  }
+  .portable-actions > button {
+    flex: 1 1 180px;
+  }
+  .portable-review {
+    padding: var(--space-3);
+  }
+}

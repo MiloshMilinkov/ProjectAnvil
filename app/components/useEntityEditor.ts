@@ -173,7 +173,9 @@ export function useEntityEditor<T extends Editable>({
       deletion.operationId ||= uid();
       await mutate(deletion);
       clearRecovery(token);
-      discardDraftMutations(scope, entity, original.id);
+      discardDraftMutations(scope, entity, original.id, {
+        preserveQueuedDeletion: true,
+      });
       return deletion.operationId;
     } catch (cause) {
       setError(

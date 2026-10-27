@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Download, X } from "lucide-react";
 import {
   listDrafts,
@@ -12,20 +18,48 @@ import {
 import type { Mutation, Workspace } from "../lib/types";
 import { useDraftScope } from "./useRecoverableDraft";
 import { useDialog } from "./useDialog";
+import { useWorkspacePermissions } from "./WorkspacePermissions";
 
 /** Recovery controls for changes that could not be acknowledged by the server. */
 export default function PendingChanges({
   workspace,
   busy,
   onClose,
+  confirmedWorkspace,
+  offline = false,
+  issues = {},
+  onRebase,
 }: {
   workspace: Workspace;
   busy: boolean;
   onClose: () => void;
+  confirmedWorkspace?: Workspace | null;
+  offline?: boolean;
+  issues?: Record<string, string>;
+  onRebase?: (
+    id: string,
+    token: string,
+    reviewed: Record<string, unknown> | null,
+  ) => Promise<void>;
 }) {
   const scope = useDraftScope();
+  const permissions = useWorkspacePermissions(confirmedWorkspace || workspace);
   const dialog = useRef<HTMLElement>(null);
-  useDialog(dialog, onClose, busy);
+  const [reviewing, setReviewing] = useState("");
+  const [error, setError] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
+  const wasWorking = useRef(false);
+  useDialog(dialog, onClose, busy || !!reviewing);
+  useLayoutEffect(() => {
+    if (
+      wasWorking.current &&
+      !busy &&
+      !reviewing &&
+      !dialog.current?.contains(document.activeElement)
+    )
+      heading.current?.focus({ preventScroll: true });
+    wasWorking.current = busy || !!reviewing;
+  }, [busy, reviewing]);
   const serialized = useSyncExternalStore(
     subscribeDrafts,
     useCallback(
@@ -102,7 +136,8 @@ export default function PendingChanges({
     <div
       className="modal-shade"
       onMouseDown={(event) => {
-        if (!busy && event.target === event.currentTarget) onClose();
+        if (!busy && !reviewing && event.target === event.currentTarget)
+          onClose();
       }}
     >
       <section
@@ -113,50 +148,184 @@ export default function PendingChanges({
         aria-label="Unsaved changes"
       >
         <div className="dialog-heading">
-          <h2>Unsaved changes</h2>
+          <h2 ref={heading} tabIndex={-1}>
+            Unsaved changes
+          </h2>
           <button
             className="btn-icon"
             aria-label="Close unsaved changes"
-            disabled={busy}
+            disabled={busy || !!reviewing}
             onClick={onClose}
           >
             <X size={18} />
           </button>
         </div>
         <p className="muted">
-          These changes need a successful save. Conflicting edits need to be
-          reviewed in their editor. Download a copy before discarding anything
-          you may need.
+          Changes kept on this device still need synchronization. Compare your
+          queued values with the last confirmed record, then apply a reviewed
+          change or keep a recovery download.
         </p>
+        {error && (
+          <p className="account-error" role="alert">
+            {error}
+          </p>
+        )}
         {!drafts.length && !copies.length && (
           <p>All queued changes have been saved or discarded.</p>
         )}
         <div className="pending-change-list">
-          {drafts.map(({ id, record }) => (
-            <article key={id}>
-              <div>
-                <strong>{title(record.value)}</strong>
-                <p className="small-text muted">
-                  {record.value.action} · {record.value.entity || "workspace"} ·{" "}
-                  {new Date(record.updatedAt).toLocaleString()}
-                </p>
-              </div>
-              <button
-                className="btn danger"
-                disabled={busy}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Discard this pending save? It will no longer be retried. Any separate editor recovery draft stays on this device.",
+          {drafts.map(({ id, record }) => {
+            const mutation = record.value;
+            const recordId = mutation.id || mutation.item?.id;
+            const confirmed =
+              mutation.entity &&
+              confirmedWorkspace?.[mutation.entity]?.find(
+                (item) => item.id === recordId,
+              );
+            const describe = (values: unknown) => {
+              if (!values || typeof values !== "object") return "Not present";
+              return Object.entries(values)
+                .filter(
+                  ([key]) =>
+                    !["id", "createdAt", "updatedAt", "snapshots"].includes(
+                      key,
+                    ),
+                )
+                .map(([key, value]) => {
+                  const label = key
+                    .replace(/([A-Z])/g, " $1")
+                    .replace(/^./, (letter) => letter.toUpperCase());
+                  const readable =
+                    key === "projectId"
+                      ? workspace.projects.find((item) => item.id === value)
+                          ?.name || "No project"
+                      : key === "assigneeId"
+                        ? workspace.people.find((item) => item.id === value)
+                            ?.name || "Unassigned"
+                        : typeof value === "object"
+                          ? JSON.stringify(value, null, 2)
+                          : String(value ?? "");
+                  return `${label}: ${readable}`;
+                })
+                .join("\n\n");
+            };
+            const reviewed = confirmed
+              ? (structuredClone(confirmed) as unknown as Record<
+                  string,
+                  unknown
+                >)
+              : null;
+            const projectId =
+              mutation.entity === "projects"
+                ? String(recordId || "")
+                : confirmed && "projectId" in confirmed
+                  ? String(confirmed.projectId || "")
+                  : "";
+            const canReview =
+              !!onRebase &&
+              !!confirmed &&
+              permissions.canEditProject(projectId || "") &&
+              mutation.base !== null &&
+              ["upsert", "delete"].includes(mutation.action);
+            return (
+              <article key={id}>
+                <div>
+                  <strong>{title(record.value)}</strong>
+                  <p className="small-text muted">
+                    {{
+                      upsert: record.value.base === null ? "Create" : "Update",
+                      delete: "Move to Trash",
+                      restore: "Restore",
+                      rename: "Rename",
+                      import: "Import backup",
+                      "review-relationship": "Review connection",
+                      "vote-idea": "Vote",
+                    }[record.value.action] || "Change"}{" "}
+                    ·{" "}
+                    {(record.value.entity || "workspace")
+                      .replace(/([A-Z])/g, " $1")
+                      .toLowerCase()}{" "}
+                    · {new Date(record.updatedAt).toLocaleString()}
+                  </p>
+                  {issues[id] && <p className="account-error">{issues[id]}</p>}
+                  <details data-tour="sync-conflicts">
+                    <summary>Compare queued and saved values</summary>
+                    <div className="sync-field-comparison">
+                      <section>
+                        <h4>Queued on this device</h4>
+                        <pre>
+                          {mutation.action === "delete"
+                            ? "Move this record to Trash"
+                            : describe(mutation.item)}
+                        </pre>
+                      </section>
+                      <section>
+                        <h4>Last confirmed on the server</h4>
+                        <pre>
+                          {describe(
+                            confirmed && mutation.item
+                              ? Object.fromEntries(
+                                  Object.keys(mutation.item).map((key) => [
+                                    key,
+                                    (
+                                      confirmed as unknown as Record<
+                                        string,
+                                        unknown
+                                      >
+                                    )[key],
+                                  ]),
+                                )
+                              : confirmed,
+                          )}
+                        </pre>
+                      </section>
+                    </div>
+                    {canReview && (
+                      <button
+                        className="btn"
+                        disabled={busy || !!reviewing || offline}
+                        onClick={async () => {
+                          setReviewing(id);
+                          setError("");
+                          try {
+                            await onRebase!(id, record.token, reviewed);
+                          } catch (cause) {
+                            setError(
+                              cause instanceof Error
+                                ? cause.message
+                                : "This change could not synchronize.",
+                            );
+                          } finally {
+                            setReviewing("");
+                          }
+                        }}
+                      >
+                        {reviewing === id
+                          ? "Applying…"
+                          : mutation.action === "delete"
+                            ? "Apply reviewed deletion"
+                            : "Apply reviewed changes"}
+                      </button>
+                    )}
+                  </details>
+                </div>
+                <button
+                  className="btn danger"
+                  disabled={busy || !!reviewing}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Discard this pending save? It will no longer be retried. Any separate editor recovery draft stays on this device.",
+                      )
                     )
-                  )
-                    removeDraft(scope, "mutations", id, record.token);
-                }}
-              >
-                Discard pending save
-              </button>
-            </article>
-          ))}
+                      removeDraft(scope, "mutations", id, record.token);
+                  }}
+                >
+                  Discard pending save
+                </button>
+              </article>
+            );
+          })}
         </div>
         {copies.length > 0 && (
           <>

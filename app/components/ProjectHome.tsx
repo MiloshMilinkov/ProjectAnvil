@@ -45,6 +45,7 @@ import WatchControl from "./WatchControl";
 import { useWorkspacePermissions } from "./WorkspacePermissions";
 import { useDraftScope } from "./useRecoverableDraft";
 import { moveToTrash } from "../lib/trash-actions";
+import { OfflineAttachmentLink } from "./OfflineMediaProvider";
 import "./project-planning.css";
 
 type Props = FeatureProps & {
@@ -773,10 +774,14 @@ export default function ProjectHome({
               .slice(0, attachmentLimit)
               .map((file) => (
                 <article key={file.id}>
-                  <a href={file.url} target="_blank" rel="noopener noreferrer">
+                  <OfflineAttachmentLink
+                    href={file.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     {file.name}
                     <ArrowUpRight size={16} />
-                  </a>
+                  </OfflineAttachmentLink>
                   <button
                     className="btn"
                     disabled={readOnly || !!pending}

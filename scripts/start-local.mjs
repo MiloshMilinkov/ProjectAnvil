@@ -1,7 +1,8 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
+import { isBuildCurrent } from "./build-fingerprint.mjs";
 
 const host = "127.0.0.1";
 const port = 5173;
@@ -88,9 +89,20 @@ if (await portIsOpen()) {
     process.exitCode = 1;
   }
 } else {
+  if (!(await isBuildCurrent(root))) {
+    console.log(
+      "Preparing the installable app. The first build can take a moment...",
+    );
+    const build = spawnSync(process.execPath, ["scripts/build-app.mjs"], {
+      cwd: root,
+      stdio: "inherit",
+    });
+    if (build.error) throw build.error;
+    if (build.status !== 0) process.exit(build.status ?? 1);
+  }
   let finished = false;
   let interrupted = false;
-  const child = spawn(process.execPath, ["scripts/run-framework.mjs", "dev"], {
+  const child = spawn(process.execPath, ["scripts/start-built.mjs"], {
     cwd: root,
     stdio: "inherit",
     env: {

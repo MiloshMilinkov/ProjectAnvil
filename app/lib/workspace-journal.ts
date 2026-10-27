@@ -121,6 +121,8 @@ export async function commitWorkspace(
   trash: TrashCommit = {},
   options: {
     mutation?: Mutation;
+    /** Trusted bulk imports keep activity without sending mass notifications. */
+    suppressNotifications?: boolean;
     skipNoteDocumentReset?: boolean;
     additionalStatements?: (
       committedSQL: string,
@@ -363,6 +365,7 @@ export async function commitWorkspace(
       guardValues,
       operationId,
       options.mutation,
+      options.suppressNotifications,
     )),
   );
   if (options.additionalStatements)
