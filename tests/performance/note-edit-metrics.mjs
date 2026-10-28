@@ -222,6 +222,13 @@ export async function runNoteEditStudy({
               .getByRole("button", { name: "Workspace settings", exact: true })
               .click();
             await page
+              .getByRole("navigation", {
+                name: "Settings sections",
+                exact: true,
+              })
+              .getByRole("button", { name: "Data & offline", exact: true })
+              .click();
+            await page
               .getByRole("button", {
                 name: "Save workspace offline",
                 exact: true,

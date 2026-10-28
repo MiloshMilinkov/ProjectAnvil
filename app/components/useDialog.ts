@@ -31,7 +31,7 @@ export function useDialog(
     const controls = () =>
       [
         ...dialog.querySelectorAll<HTMLElement>(
-          'button:enabled,input:enabled,textarea:enabled,select:enabled,a[href],[tabindex="0"]',
+          'button:enabled,input:enabled,textarea:enabled,select:enabled,a[href],summary,[tabindex="0"]',
         ),
       ].filter(
         (element) =>

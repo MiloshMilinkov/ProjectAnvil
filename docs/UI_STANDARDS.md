@@ -2,6 +2,24 @@
 
 ProjectAnvil should make work easy to read, find, and act on. These standards apply to interface fixes and future features. Preserve existing workflows and local-only operation while improving the presentation.
 
+## Product decisions
+
+Use these UX and UI pillars as acceptance criteria, including when adding future features. The goal is a useful, calm workspace whose depth appears when needed.
+
+| Pillar | ProjectAnvil rule |
+| --- | --- |
+| Usability and simplicity | Put the next action and essential fields first. Show optional planning and administration in named expandable sections. Reveal configured values and validation errors so important information stays discoverable. |
+| Usefulness and value | Every addition must support an identifiable project, task, thinking, or recovery goal. Improve an existing workflow before introducing another tool, setting, or permanent control. Removing a capability needs evidence and explicit review of existing work. |
+| Findability | Use stable navigation groups and searchable tool names. More tools contains occasional destinations; navigation, search, guides, and deep links must still reach them. Keep current workspace and project scope visible. |
+| Accessibility | Preserve keyboard, screen-reader, touch, zoom, reduced-motion, focus, and theme support. A collapsed section must be operable by keyboard, and closing/resetting controls must leave focus somewhere useful. |
+| Credibility and feedback | Place errors beside the affected action, retain entered work, and offer a next step. Distinguish saving, queued device changes, confirmed server saves, and failures. Explain replacement/import consequences before applying them. |
+| Desirability and hierarchy | Use the established typography, surfaces, spacing, and five themes. Give primary work room to breathe; optional inspectors start closed. Polish must improve readability and orientation. |
+| Consistency and user control | Reuse controls, labels, and recovery paths. Keep visible exits, cancellation, Undo, and restore. Expanding help or a settings group must never create records, save edits, or change permissions. |
+
+The first-run guide is an **eight-step Quick start**. Detailed help belongs in the **nine optional topic guides**, searchable through **All guides**. Add future feature explanations to the relevant topic instead of lengthening the default tour. Navigation and guidance must preserve the current project, avoid edits, and return users to their previous screen when dismissed.
+
+These rules apply the [visual hierarchy principles](https://www.nngroup.com/articles/principles-visual-design/) and [usability, consistency, accessibility, and user-control principles](https://www.uxdesigninstitute.com/blog/ux-design-principles-2026/) to this app. They are design requirements, not a claim of completed accessibility certification or validated user research.
+
 ## Readability and consistency
 
 - Reuse shared typography, spacing, surface, border, and control tokens. Prefer existing controls and component styles over a separate visual system.
@@ -38,6 +56,7 @@ Before an interface change is finished:
 - Review affected screens on a narrow mobile viewport and a desktop viewport, including keyboard focus and touch-size controls.
 - Check every supported theme, visible scope, active states, long content, and relevant empty, pending, and failed-save states.
 - Verify the affected workflow, including cancellation and returning from dialogs. Run the existing checks appropriate to the change.
+- Check both the simple first-use path and populated/configured work. Verify advanced sections retain values when closed, validation reveals the affected fields, search reaches occasional tools, and the short guide retains access to detailed help without writing records.
 - Update the [README](../README.md) for changed user-facing behavior and keep the in-app tour's names and instructions consistent.
 - Keep screenshots and public examples free of private workspace data, account details, and local backup locations.
 

@@ -107,8 +107,7 @@
   min-height: 38px;
 }
 :root .top-search,
-:root .appearance-trigger,
-:root .tour-trigger {
+:root .appearance-trigger {
   flex-shrink: 0;
 }
 :root .btn {
@@ -998,32 +997,6 @@
 :root .appearance-dropdown > button {
   min-height: 52px;
 }
-:root .tour-label,
-:root .tour-step-count,
-:root .tour-card > .tour-key-hint {
-  font-size: 12px;
-}
-:root .tour-card > p {
-  font-size: 14px;
-  line-height: 1.75;
-}
-:root .tour-card .tour-tip {
-  font-size: 13px;
-}
-:root .tour-navigation > button {
-  min-height: 40px;
-  font-size: 13px;
-}
-:root .tour-navigation > .tour-skip {
-  font-size: 12px;
-}
-:root .tour-close {
-  min-width: 36px;
-  min-height: 36px;
-}
-:root .tour-card {
-  width: 400px;
-}
 
 /* Compact mode changes spacing while preserving legible type. */
 :root .compact .task-table td {
@@ -1776,20 +1749,6 @@
     right: 0;
     top: 48px;
   }
-  :root .tour-card > p {
-    font-size: 14px;
-  }
-  :root .tour-navigation > button {
-    min-height: 44px;
-    font-size: 13px;
-  }
-  :root .tour-navigation > .tour-skip {
-    font-size: 12px;
-  }
-  :root .tour-close {
-    min-width: 40px;
-    min-height: 40px;
-  }
 }
 
 @media (max-width: 430px) {
@@ -1840,18 +1799,6 @@
   }
   :root .note-details {
     top: 108px;
-  }
-  :root .tour-card {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-  :root .tour-navigation {
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-  :root .tour-navigation > button {
-    padding-left: 9px;
-    padding-right: 9px;
   }
   :root .appearance-option > p {
     font-size: 12px;

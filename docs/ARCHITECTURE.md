@@ -12,6 +12,7 @@ ProjectAnvil uses React and Next-style app routes, built with Vinext and Vite. T
 | `app/components/AccountShell.tsx` | Account/session refresh and switching between accessible workspaces. |
 | `app/components/ProjectAnvil.tsx` | Application navigation, project scope, and composing feature screens. Keep detailed feature rendering outside this file. |
 | `app/components/dashboard/`, `tasks/`, `settings/`, `shell/` | Focused dashboard, task views, workspace settings, and navigation definitions. |
+| `app/components/GuidedTour.tsx`, `app/lib/guide-content.ts` | Guide presentation and positioning, separated from the eight-step Quick start and searchable topic catalogue. Keep detailed feature explanations in the relevant optional topic. |
 | `app/components/visuals/` | Graph and canvas views, their local models, canvas inspector/add dialog, media rendering, and surface sizing. |
 | `app/components/notes/`, `app/lib/note-browser.ts`, `app/lib/note-template-catalog.ts` | Note browsing and dialog presentation, pure search/filter indexing, and the single built-in template catalogue. `Knowledge.tsx` retains editor persistence and collaboration coordination. |
 | `app/components/` | Notes, projects, collections, teamwork, shared controls, dialogs, and cross-feature React hooks. Feature styles live alongside their components. |

@@ -37,7 +37,7 @@ For live source editing, use `npm run dev`. Development mode does not prepare or
 
 ## Install and update the app
 
-Open **Workspace settings → Install ProjectAnvil**. Wait for **Application files are ready for offline startup**, then choose **Install app** when the browser offers it. Browser menus may offer **Install app** or **Add to Home Screen** instead. Availability depends on the browser and a secure origin; the normal loopback address is supported by modern browsers. Installation adds a device shortcut/window and does not start the local server automatically.
+Open **Workspace settings → Data & offline → Install ProjectAnvil**. Wait for **Application files are ready for offline startup**, then choose **Install app** when the browser offers it. Browser menus may offer **Install app** or **Add to Home Screen** instead. Availability depends on the browser and a secure origin; the normal loopback address is supported by modern browsers. Installation adds a device shortcut/window and does not start the local server automatically.
 
 The app cache contains only verified public application files and a generic startup shell. Account responses, workspace records, and uploaded files are never placed in that cache. Keeping private work offline is a separate choice below.
 
@@ -47,7 +47,7 @@ Use the same browser profile and address each time. `127.0.0.1`, `localhost`, an
 
 ## Offline workspaces and synchronization
 
-1. While connected, open a workspace and choose **Workspace settings → Offline workspace → Save workspace offline**.
+1. While connected, open a workspace and choose **Workspace settings → Data & offline → Offline workspace → Save workspace offline**.
 2. Optionally choose **Save attachments offline**. Files are copied separately; **Stop downloads** keeps files already downloaded.
 3. Wait for the copy to finish. The app can reopen that saved workspace in the same browser when the local server is unavailable. **Working offline** distinguishes device changes from server-confirmed saves.
 4. Continue editing available notes, tasks, and project plans. Changes stay in an account/workspace-scoped queue. Reconnect to the same server to verify current access and synchronize; **Synchronize now** retries the queue explicitly.
@@ -66,7 +66,7 @@ New uploads, account/team changes, archived history and Trash restore, personal 
 
 ## Markdown folders and attachments
 
-Open **Workspace settings → Markdown folders** while connected to the local server.
+Open **Workspace settings → Data & offline → Markdown folders** while connected to the local server.
 
 - **Export:** choose **Export scope** (all available notes/files or one project), then **Export Markdown ZIP**. The ZIP contains UTF-8 Markdown, folders, attachments, and a ProjectAnvil manifest for supported structured note data and relationships between included notes. Only work currently available to your account is exported; a project scope includes its available files and files referenced by its notes. Missing files or changed access stop the export.
 - **Import:** choose **Choose folder** or **Choose ZIP**, review the notes, file counts, and warnings, then select **Import into project** and choose **Import as new notes**. Import adds fresh copies; existing notes stay in place. Matching titles receive distinct names. Import requires editing access to the target, and its project permissions apply to the new records. Viewers can export available work.
@@ -95,7 +95,7 @@ ProjectAnvil stores its database and uploaded files under **`.wrangler/state`**.
 
 | Backup option                              | Includes                                                                                                                                                                                                                                 | Excludes                                                                                                                                                                                                                     |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Workspace settings → Export workspace**  | Current visible notes, tasks, discussions, labels, projects, saved views, relationships, canvases, note types, decisions, presets, and brainstorming boards                                                                              | Accounts, memberships, invitations, roles/project permissions, activity, watches, notifications, shared editing sessions, Trash, personal templates, archived note history, attachment files, and personal rooms/checkpoints |
+| **Workspace settings → Data & offline → Workspace records → Export workspace**  | Current visible notes, tasks, discussions, labels, projects, saved views, relationships, canvases, note types, decisions, presets, and brainstorming boards                                                                              | Accounts, memberships, invitations, roles/project permissions, activity, watches, notifications, shared editing sessions, Trash, personal templates, archived note history, attachment files, and personal rooms/checkpoints |
 | **Markdown folders → Export Markdown ZIP** | Available Markdown notes, folders, attachments, supported properties/types, decision reasoning, and relationships between included notes                                                                                                 | Tasks, discussions, accounts/team access, archived history, Trash, personal rooms/templates, and browser queues                                                                                                              |
 | **Complete local backup**                  | Full database and uploads, including accounts, memberships, roles/project permissions, activity, watches, notifications, shared editing state, Trash, templates, note history, personal rooms, and review state; matching signing secret | Browser offline copies, cached app files, queued/unsaved browser drafts, browser preferences, and source code; preserve the matching source version too                                                                      |
 
@@ -250,7 +250,7 @@ Personal templates retain reusable decision reasoning in Markdown and begin with
 | Portable Markdown                | 200 notes, 400 files, 24 MB expanded content, 25 MB ZIP, 20 MB per attachment; normal note/workspace limits still apply                                                                 |
 | Public app cache                 | Up to 50 MB per build; the current and one earlier shell build are retained                                                                                                             |
 
-Archived note history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. Team permissions, activity, watches, Notifications, and shared editing state are stored separately too, with the limits above. Archived note versions, Trash, and unreferenced attachment files are retained without automatic deletion; complete backups preserve confirmed data. Owners and Admins can use **Workspace settings → Storage & recovery** to check active usage, retained files, and missing attachments without deleting files. Note history loads in pages of 20 versions. Change-impact markers indicate possible consequences; review connected content before acknowledging them.
+Archived note history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. Team permissions, activity, watches, Notifications, and shared editing state are stored separately too, with the limits above. Archived note versions, Trash, and unreferenced attachment files are retained without automatic deletion; complete backups preserve confirmed data. Owners and Admins can use **Workspace settings → Data & offline → Storage & recovery** to check active usage, retained files, and missing attachments without deleting files. Note history loads in pages of 20 versions. Change-impact markers indicate possible consequences; review connected content before acknowledging them.
 
 Browser storage limits can be lower than these allowances. Offline copies and application files use separate browser storage from the server's database and uploads. Complete backups restore confirmed server work; they cannot restore cleared browser copies or unsynchronized queued edits.
 

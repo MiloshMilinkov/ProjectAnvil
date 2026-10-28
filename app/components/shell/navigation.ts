@@ -31,3 +31,15 @@ export type WorkspacePage =
   | (typeof workspaceNavigation)[number]["id"]
   | "team"
   | "settings";
+
+export const navigationGroups = [
+  {
+    title: "Plan & work",
+    pages: ["overview", "my-work", "tasks", "projects", "daily"],
+  },
+  {
+    title: "Ideas & knowledge",
+    pages: ["notes", "brainstorm", "canvas", "graph"],
+  },
+  { title: "More tools", pages: ["rooms", "collections", "activity"] },
+] as const;

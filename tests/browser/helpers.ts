@@ -118,7 +118,22 @@ export async function navigate(page: Page, name: string | RegExp) {
     exact: true,
   });
   if (await menu.isVisible()) await menu.click();
-  await page.getByRole("button", { name, exact: true }).click();
+  const destination = page.getByRole("button", { name, exact: true });
+  if (!(await destination.isVisible())) {
+    const more = page.locator(".navigation-more");
+    if ((await more.getAttribute("open")) === null)
+      await more.locator("summary").click();
+  }
+  await destination.click();
+  if (name === "Workspace settings") {
+    // Operational workflows explicitly choose the optional storage section.
+    // Default disclosure state has dedicated UX regression coverage.
+    const data = page.locator('[data-settings-group="data"]');
+    if (await data.count()) {
+      if ((await data.getAttribute("open")) === null)
+        await data.locator(":scope > summary").click();
+    }
+  }
 }
 
 export async function selectWorkspace(

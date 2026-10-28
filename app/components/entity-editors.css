@@ -132,6 +132,66 @@
 :root .task-dialog .task-planning-options {
   margin-top: 20px;
 }
+:root .task-dialog .task-date-fields {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+}
+:root .task-dialog .task-date-fields .task-section-heading {
+  margin-bottom: var(--space-3);
+}
+:root .task-dialog .task-advanced-planning {
+  margin: var(--space-5) 0 0;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+:root .task-dialog .task-advanced-planning > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-control);
+  font-weight: 600;
+}
+:root .task-dialog .task-advanced-planning > summary::before {
+  content: "+";
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+:root .task-dialog .task-advanced-planning[open] > summary::before {
+  content: "−";
+}
+:root .task-dialog .task-advanced-planning > summary::-webkit-details-marker {
+  display: none;
+}
+:root .task-dialog .task-advanced-planning > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+:root .task-dialog .task-advanced-planning > summary small {
+  flex: 1 1 100%;
+  padding-left: var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  font-weight: 400;
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+:root .task-dialog .task-advanced-planning-body {
+  padding: 0 var(--space-4) var(--space-4);
+}
+:root .task-dialog .task-advanced-planning-body > .editor-field-help {
+  margin: 0 0 var(--space-4);
+}
+:root .task-dialog .task-advanced-planning-body > .task-planning-options {
+  margin-top: 0;
+}
 :root .task-section-heading {
   display: flex;
   align-items: baseline;

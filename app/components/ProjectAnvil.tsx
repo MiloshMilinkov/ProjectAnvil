@@ -1,9 +1,6 @@
 "use client";
 import {
   Anvil,
-  ArrowUpRight,
-  BookOpen,
-  CalendarDays,
   Check,
   ChevronRight,
   CircleHelp,
@@ -69,7 +66,6 @@ import { CanvasView } from "./visuals/CanvasView";
 import { GraphView } from "./visuals/GraphView";
 import WorkRooms, { WorkRoomShelf } from "./WorkRooms";
 import { useWorkspacePermissions } from "./WorkspacePermissions";
-import { StatusIcon } from "./WorkspacePrimitives";
 import { useWorkspaceScope } from "./WorkspaceScope";
 import "./guest.css";
 import "./task-scheduling.css";
@@ -80,6 +76,8 @@ import { useWorkRoomNavigation } from "./useWorkRoomNavigation";
 import { useWorkspaceData } from "./useWorkspaceData";
 import "./workspace-shell.css";
 
+import WorkspaceNavigation from "./shell/WorkspaceNavigation";
+import WorkspaceSearch from "./shell/WorkspaceSearch";
 import PageHeader from "./PageHeader";
 import ProjectCard from "./dashboard/ProjectCard";
 import WorkspaceOverview from "./dashboard/WorkspaceOverview";
@@ -95,7 +93,6 @@ export default function ProjectAnvil() {
   const phoneLayout = useMediaQuery("(max-width: 760px)");
   const navigationButton = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
-  const paletteRef = useRef<HTMLElement>(null);
   const shortcutsRef = useRef<HTMLDivElement>(null);
   const { account, activeId, onSwitch, onAuthChanged, onChanged } =
     useWorkspaceScope();
@@ -155,7 +152,6 @@ export default function ProjectAnvil() {
   const [projectHomeId, setProjectHomeId] = useState("");
   const [personModal, setPersonModal] = useState<Person | "new" | null>(null);
   const [palette, setPalette] = useState(false);
-  const [search, setSearch] = useState("");
   const [toast, setToast] = useState<{
     message: string;
     undoId?: string;
@@ -180,7 +176,6 @@ export default function ProjectAnvil() {
     false,
     !!workspace && phoneLayout && mobile,
   );
-  useDialog(paletteRef, () => setPalette(false), false, !!workspace && palette);
   useDialog(
     shortcutsRef,
     () => setShortcuts(false),
@@ -194,6 +189,7 @@ export default function ProjectAnvil() {
   const tourChecked = useRef(false);
   const tourReturnPage = useRef<Page>("overview");
   const tourReturnFocus = useRef(false);
+  const tourReturnProject = useRef({ homeId: "", filter: "" });
   const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notify: Notify = useCallback((message, options) => {
     toastSequence.current += 1;
@@ -307,7 +303,6 @@ export default function ProjectAnvil() {
         setProjectFilter(id);
         setPage("projects");
         setMobile(false);
-        setSearch("");
       })();
     },
     [beforeNavigation],
@@ -320,7 +315,6 @@ export default function ProjectAnvil() {
         if (nextPage === "projects") setProjectHomeId("");
         setPage(nextPage);
         setMobile(false);
-        setSearch("");
       })();
     },
     [page, beforeNavigation, captureRoomContext],
@@ -331,6 +325,8 @@ export default function ProjectAnvil() {
     } catch {}
     setPage(tourReturnPage.current);
     setFocus(tourReturnFocus.current);
+    setProjectHomeId(tourReturnProject.current.homeId);
+    setProjectFilter(tourReturnProject.current.filter);
     setTourOpen(false);
   }, []);
   function startTour() {
@@ -338,6 +334,10 @@ export default function ProjectAnvil() {
       if (!(await beforeNavigation())) return;
       tourReturnPage.current = page;
       tourReturnFocus.current = focus;
+      tourReturnProject.current = {
+        homeId: projectHomeId,
+        filter: projectFilter,
+      };
       setFocus(false);
       setMobile(false);
       setPalette(false);
@@ -436,6 +436,9 @@ export default function ProjectAnvil() {
           (focus ? "focus-mode" : "")
         }
       >
+        <a className="workspace-skip-link" href="#workspace-content">
+          Skip to workspace
+        </a>
         {!focus && (
           <>
             <div
@@ -486,48 +489,17 @@ export default function ProjectAnvil() {
                 <kbd>Ctrl K</kbd>
               </button>
               <div className="sidebar-scroll">
-                <div className="nav-caption">PLAN & WORK</div>
-                <nav aria-label="Main navigation">
-                  {nav.slice(0, 5).map((n) => (
-                    <button
-                      key={n.id}
-                      data-tour={"nav-" + n.id}
-                      className={"nav-item " + (page === n.id ? "active" : "")}
-                      aria-current={page === n.id ? "page" : undefined}
-                      onClick={() => go(n.id)}
-                    >
-                      <n.icon size={17} />
-                      <span>{n.title}</span>
-                      {n.id === "my-work" && (
-                        <small>
-                          {
-                            w.tasks.filter(
-                              (t) =>
-                                t.assigneeId === currentPerson &&
-                                t.status !== "done",
-                            ).length
-                          }
-                        </small>
-                      )}
-                    </button>
-                  ))}
-                  <div className="nav-caption knowledge-caption">
-                    IDEAS & KNOWLEDGE
-                  </div>
-                  {nav.slice(5).map((n) => (
-                    <button
-                      key={n.id}
-                      data-tour={"nav-" + n.id}
-                      className={"nav-item " + (page === n.id ? "active" : "")}
-                      aria-current={page === n.id ? "page" : undefined}
-                      onClick={() => go(n.id)}
-                    >
-                      <n.icon size={17} />
-                      <span>{n.title}</span>
-                      {n.id === "graph" && <span className="nav-dot" />}
-                    </button>
-                  ))}
-                </nav>
+                <WorkspaceNavigation
+                  page={page}
+                  assignedCount={
+                    w.tasks.filter(
+                      (task) =>
+                        task.assigneeId === currentPerson &&
+                        task.status !== "done",
+                    ).length
+                  }
+                  onNavigate={go}
+                />
                 <div className="sidebar-projects">
                   <div className="nav-caption">
                     YOUR PROJECTS
@@ -828,6 +800,8 @@ export default function ProjectAnvil() {
             </div>
           )}
           <main
+            id="workspace-content"
+            tabIndex={-1}
             data-tour="workspace-content"
             className={"main-content view-" + page}
           >
@@ -1079,164 +1053,20 @@ export default function ProjectAnvil() {
           />
         )}
         {palette && (
-          <div
-            className="modal-shade palette-shade"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setPalette(false);
-            }}
-          >
-            <section
-              ref={paletteRef}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Search workspace"
-              className="command-palette"
-              onKeyDown={(event) => {
-                if (
-                  (event.ctrlKey || event.metaKey) &&
-                  event.key.toLowerCase() === "k"
-                ) {
-                  event.preventDefault();
-                  setPalette(false);
-                }
-              }}
-            >
-              <div className="palette-input">
-                <Search size={20} />
-                <input
-                  data-initial-focus
-                  aria-label="Search tasks, notes, and projects"
-                  placeholder="Search tasks, notes, projects…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <button
-                  className="key-button"
-                  aria-label="Close search"
-                  onClick={() => setPalette(false)}
-                >
-                  esc
-                </button>
-              </div>
-              <div className="palette-results">
-                {!search && (
-                  <>
-                    <span className="section-label">QUICK ACTIONS</span>
-                    <button
-                      onClick={() => {
-                        setPalette(false);
-                        setSelectedTask(null);
-                        setNewTask(true);
-                      }}
-                    >
-                      <Plus size={16} />
-                      Create a task<kbd>{prefs.taskShortcut.toUpperCase()}</kbd>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPalette(false);
-                        go("daily");
-                      }}
-                    >
-                      <CalendarDays size={16} />
-                      Open today’s planner
-                    </button>
-                  </>
-                )}
-                <span className="section-label">
-                  {search ? "RESULTS" : "RECENT WORK"}
-                </span>
-                {w.tasks
-                  .filter((t) =>
-                    [t.title, t.key, t.description, ...t.tags]
-                      .join(" ")
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  )
-                  .slice(0, 7)
-                  .map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        openTask(t.id);
-                        setPalette(false);
-                      }}
-                    >
-                      <StatusIcon status={t.status} />
-                      <span className="muted">{t.key}</span>
-                      {t.title}
-                      <ArrowUpRight size={13} />
-                    </button>
-                  ))}
-                {w.notes
-                  .filter((n) =>
-                    [n.title, n.content, ...n.tags]
-                      .join(" ")
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  )
-                  .slice(0, 6)
-                  .map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => {
-                        openNote(n.id);
-                        setPalette(false);
-                      }}
-                    >
-                      <BookOpen size={15} />
-                      {n.title}
-                      <span className="badge">{n.kind}</span>
-                    </button>
-                  ))}
-                {w.projects
-                  .filter((p) =>
-                    p.name.toLowerCase().includes(search.toLowerCase()),
-                  )
-                  .slice(0, 4)
-                  .map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        setProjectFilter(p.id);
-                        go("tasks");
-                        setPalette(false);
-                      }}
-                    >
-                      <FolderKanban size={15} />
-                      {p.name}
-                      <span className="badge">Project</span>
-                    </button>
-                  ))}
-                {search &&
-                  !w.tasks.some((t) =>
-                    (t.title + t.description + t.key + t.tags.join())
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  ) &&
-                  !w.notes.some((n) =>
-                    (n.title + n.content + n.tags.join())
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  ) &&
-                  !w.projects.some((p) =>
-                    p.name.toLowerCase().includes(search.toLowerCase()),
-                  ) && (
-                    <p className="palette-empty">
-                      No matches. Try a title, tag, or task key.
-                    </p>
-                  )}
-              </div>
-              <footer>
-                <span>
-                  <Search size={12} />
-                  Searches your entire workspace
-                </span>
-                <span>Tab to choose · Enter to open</span>
-              </footer>
-            </section>
-          </div>
+          <WorkspaceSearch
+            workspace={w}
+            canCreateTask={permissions.canEditProject(projectFilter)}
+            shortcut={prefs.taskShortcut}
+            onClose={() => setPalette(false)}
+            onNavigate={go}
+            onTask={openTask}
+            onNote={openNote}
+            onProject={openProjectHome}
+            onCreateTask={() => createTask()}
+            onGuide={startTour}
+          />
         )}
+
         {shortcuts && (
           <div className="modal-shade" onClick={() => setShortcuts(false)}>
             <div

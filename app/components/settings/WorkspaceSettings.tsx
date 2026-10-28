@@ -1,6 +1,18 @@
 "use client";
-import { Command, Download, Network, Plus, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  Command,
+  Download,
+  HardDrive,
+  Network,
+  Palette,
+  Plus,
+  Settings2,
+  Upload,
+  Users,
+} from "lucide-react";
+import { useId, useRef, useState } from "react";
+import SettingsGroup from "./SettingsGroup";
+import "./workspace-settings.css";
 import {
   flushDraftGuards,
   hasUnpersistedDrafts,
@@ -36,7 +48,19 @@ export default function WorkspaceSettings(
   const settingsScope = useDraftScope();
   const permissions = useWorkspacePermissions(workspace);
   const [name, setName] = useState(workspace.name);
-  const [error, setError] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [importError, setImportError] = useState("");
+  const nameErrorId = useId();
+  const settingsRef = useRef<HTMLDivElement>(null);
+  function jumpTo(group: string) {
+    const target = settingsRef.current?.querySelector<HTMLDetailsElement>(
+      `[data-settings-group="${group}"]`,
+    );
+    if (!target) return;
+    target.open = true;
+    target.querySelector("summary")?.focus();
+    target.scrollIntoView({ block: "start" });
+  }
   const [importing, setImporting] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
   const nameBaseline = useRef(workspace.name);
@@ -53,283 +77,360 @@ export default function WorkspaceSettings(
     notify("Workspace exported");
   }
   return (
-    <div className="page settings-page">
+    <div ref={settingsRef} className="page settings-page">
       <PageHeader
         eyebrow="MAKE IT YOURS"
         title="Workspace settings"
-        description="Your workspace, your way of working."
+        description="Adjust your everyday workspace, then open other settings when you need them."
       />
-      <InstallAppPanel
-        canReload={async () => {
-          const flushed = await flushDraftGuards(settingsScope);
-          if (
-            !flushed ||
-            hasUnpersistedDrafts(settingsScope) ||
-            listDrafts(settingsScope, "mutations").length
-          ) {
-            notify(
-              "Synchronize or review queued changes before restarting to update.",
-            );
-            return false;
-          }
-          return true;
-        }}
-      />
-      <OfflineWorkspacePanel
-        copy={props.data.offlineCopy}
-        error={props.data.offlineError}
-        queued={props.data.outboxSize}
-        busy={props.data.pending > 0}
-        onEnable={props.data.enableOffline}
-        onForget={props.data.forgetOffline}
-        onSynchronize={async () => {
-          await props.data.load();
-          await props.data.retrySaves();
-        }}
-        onReview={props.onReview}
-        notify={notify}
-      />
-      <PortableMarkdownPanel
-        workspace={workspace}
-        notify={notify}
-        onImported={props.data.load}
-        connected={!props.data.isOffline}
-      />
-      <section className="panel settings-section">
-        <h2>Workspace</h2>
-        <p>
-          Your projects, knowledge, tasks, and uploaded files are stored on this
-          PC.
-        </p>
-        <label className="form-label">
-          Workspace name
-          <div className="settings-inline">
+
+      <nav className="settings-jump-nav" aria-label="Settings sections">
+        <button className="btn" onClick={() => jumpTo("workspace")}>
+          <Settings2 size={17} aria-hidden="true" />
+          Workspace
+        </button>
+        <button className="btn" onClick={() => jumpTo("appearance")}>
+          <Palette size={17} aria-hidden="true" />
+          Appearance &amp; workflow
+        </button>
+        <button className="btn" onClick={() => jumpTo("data")}>
+          <HardDrive size={17} aria-hidden="true" />
+          Data &amp; offline
+        </button>
+        <button className="btn" onClick={() => jumpTo("people")}>
+          <Users size={17} aria-hidden="true" />
+          People &amp; access
+        </button>
+      </nav>
+      <SettingsGroup
+        id="workspace"
+        title="Workspace"
+        description="Name and a quick overview of your records."
+        icon={Settings2}
+        initiallyOpen
+      >
+        <section className="panel settings-section">
+          <h2>Workspace name and totals</h2>
+          <p>
+            Your projects, knowledge, tasks, and uploaded files are stored on
+            this PC.
+          </p>
+          <label className="form-label">
+            Workspace name
+            <div className="settings-inline">
+              <input
+                className="field"
+                value={name}
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? nameErrorId : undefined}
+                disabled={permissions.role !== "owner"}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameError("");
+                }}
+              />
+              <button
+                className="btn btn-primary"
+                disabled={
+                  permissions.role !== "owner" || renaming || !name.trim()
+                }
+                onClick={async () => {
+                  if (renaming) return;
+                  setRenaming(true);
+                  setNameError("");
+                  try {
+                    const saved = await mutate({
+                      action: "rename",
+                      name: name.trim(),
+                      base: { name: nameBaseline.current },
+                    });
+                    nameBaseline.current = saved.name;
+                    setName(saved.name);
+                    notify("Workspace renamed");
+                  } catch (error) {
+                    setNameError(
+                      error instanceof Error
+                        ? error.message
+                        : "The workspace could not be renamed.",
+                    );
+                  } finally {
+                    setRenaming(false);
+                  }
+                }}
+              >
+                {renaming ? "Saving…" : "Save name"}
+              </button>
+            </div>
+          </label>
+          {nameError && (
+            <p id={nameErrorId} className="form-error" role="alert">
+              {nameError}
+            </p>
+          )}
+          <div className="settings-stats">
+            {workspace.projects.length} projects<span>·</span>
+            {workspace.tasks.length} tasks<span>·</span>
+            {workspace.notes.length} notes<span>·</span>
+            {workspace.media.length} attachments
+          </div>
+        </section>
+      </SettingsGroup>
+      <SettingsGroup
+        id="appearance"
+        title="Appearance & workflow"
+        description="Themes, spacing, shortcuts, and your startup view."
+        icon={Palette}
+        initiallyOpen
+      >
+        <section className="panel settings-section appearance-section">
+          <h2>Appearance</h2>
+          <p>
+            Choose a look for your workspace. Your choice is saved on this
+            device.
+          </p>
+          <AppearancePicker />
+        </section>
+        <section className="panel settings-section">
+          <h2>Your preferences</h2>
+          <p>These preferences are saved on this device.</p>
+          <label className="setting-toggle">
+            <span>
+              <strong>Compact workspace</strong>
+              <small>Reduce spacing to see more work at once.</small>
+            </span>
             <input
-              className="field"
-              value={name}
-              disabled={permissions.role !== "owner"}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <button
-              className="btn btn-primary"
-              disabled={
-                permissions.role !== "owner" || renaming || !name.trim()
+              type="checkbox"
+              checked={prefs.compact}
+              onChange={(e) =>
+                savePrefs({ ...prefs, compact: e.target.checked })
               }
-              onClick={async () => {
-                if (renaming) return;
-                setRenaming(true);
-                setError("");
+            />
+          </label>
+          <label className="setting-toggle">
+            <span>
+              <strong>New task keyboard shortcut</strong>
+              <small>A single letter, active when you’re not typing.</small>
+            </span>
+            <input
+              className="field shortcut-field"
+              value={prefs.taskShortcut}
+              maxLength={1}
+              onChange={(e) => {
+                const k = e.target.value.toLowerCase().replace(/[^a-z]/g, "");
+                if (k) savePrefs({ ...prefs, taskShortcut: k });
+              }}
+            />
+          </label>
+          <label className="setting-toggle">
+            <span>
+              <strong>Open this view on startup</strong>
+              <small>Save a default workspace layout.</small>
+            </span>
+            <select
+              className="field"
+              value={prefs.savedPage}
+              onChange={(e) =>
+                savePrefs(
+                  parseWorkspacePreferences({
+                    ...prefs,
+                    savedPage: e.target.value,
+                  }),
+                )
+              }
+            >
+              {nav.map((n) => (
+                <option value={n.id} key={n.id}>
+                  {n.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="btn" onClick={props.onShortcuts}>
+            <Command size={15} />
+            See keyboard shortcuts
+          </button>
+        </section>
+      </SettingsGroup>
+      <SettingsGroup
+        id="data"
+        title="Data & offline"
+        description="Installation, device copies, import, export, and recovery."
+        icon={HardDrive}
+      >
+        <InstallAppPanel
+          canReload={async () => {
+            const flushed = await flushDraftGuards(settingsScope);
+            if (
+              !flushed ||
+              hasUnpersistedDrafts(settingsScope) ||
+              listDrafts(settingsScope, "mutations").length
+            ) {
+              notify(
+                "Synchronize or review queued changes before restarting to update.",
+              );
+              return false;
+            }
+            return true;
+          }}
+        />
+        <OfflineWorkspacePanel
+          copy={props.data.offlineCopy}
+          error={props.data.offlineError}
+          queued={props.data.outboxSize}
+          busy={props.data.pending > 0}
+          onEnable={props.data.enableOffline}
+          onForget={props.data.forgetOffline}
+          onSynchronize={async () => {
+            await props.data.load();
+            await props.data.retrySaves();
+          }}
+          onReview={props.onReview}
+          notify={notify}
+        />
+        <PortableMarkdownPanel
+          workspace={workspace}
+          notify={notify}
+          onImported={props.data.load}
+          connected={!props.data.isOffline}
+        />
+        <section
+          className="panel settings-section settings-records"
+          data-tour="workspace-records"
+        >
+          <h2>Workspace records</h2>
+          <p>
+            Download your workspace records as JSON. Import workspace replaces
+            current records, so export a copy before replacing anything.
+          </p>
+          <details className="settings-format-details">
+            <summary>Export contents and backup limits</summary>
+            <p>
+              Export workspace records as JSON, including notes, tasks,
+              discussions, relationships, canvas layouts, custom note types,
+              decisions, presets, and brainstorming boards. Archived note
+              history, personal work rooms, accounts, and attachment files
+              require a complete local backup. Importing resets relationship
+              review markers against the imported content. New imported ideas
+              start without votes; matching ideas keep their current trusted
+              votes.
+            </p>
+          </details>
+          <div className="settings-data-actions">
+            <button className="btn" onClick={exportData}>
+              <Download size={15} />
+              Export workspace
+            </button>
+            <button
+              className="btn"
+              disabled={permissions.role !== "owner" || importing}
+              onClick={() => uploadRef.current?.click()}
+            >
+              <Upload size={15} />
+              {importing ? "Importing…" : "Import workspace"}
+            </button>
+            <input
+              type="file"
+              accept="application/json,.json"
+              hidden
+              ref={uploadRef}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (
+                  !window.confirm(
+                    "Replace current workspace records with this export? Download a backup first.",
+                  )
+                ) {
+                  e.target.value = "";
+                  return;
+                }
+                setImporting(true);
+                setImportError("");
                 try {
-                  const saved = await mutate({
-                    action: "rename",
-                    name: name.trim(),
-                    base: { name: nameBaseline.current },
+                  const imported = JSON.parse(await file.text());
+                  await mutate({
+                    action: "import",
+                    workspace: { ...imported, revision: workspace.revision },
                   });
-                  nameBaseline.current = saved.name;
-                  setName(saved.name);
-                  notify("Workspace renamed");
-                } catch (error) {
-                  setError(
-                    error instanceof Error
-                      ? error.message
-                      : "The workspace could not be renamed.",
-                  );
+                  notify("Workspace imported");
+                } catch (err) {
+                  setImportError((err as Error).message);
                 } finally {
-                  setRenaming(false);
+                  setImporting(false);
+                  e.target.value = "";
                 }
               }}
-            >
-              Save name
-            </button>
+            />
           </div>
-        </label>
-        <div className="settings-stats">
-          {workspace.projects.length} projects<span>·</span>
-          {workspace.tasks.length} tasks<span>·</span>
-          {workspace.notes.length} notes<span>·</span>
-          {workspace.media.length} attachments
-        </div>
-      </section>
-      <section className="panel settings-section appearance-section">
-        <h2>Appearance</h2>
-        <p>
-          Choose a look for your workspace. Your choice is saved on this device.
-        </p>
-        <AppearancePicker />
-      </section>
-      <section className="panel settings-section">
-        <h2>Your preferences</h2>
-        <p>These preferences are saved on this device.</p>
-        <label className="setting-toggle">
-          <span>
-            <strong>Compact workspace</strong>
-            <small>Reduce spacing to see more work at once.</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={prefs.compact}
-            onChange={(e) => savePrefs({ ...prefs, compact: e.target.checked })}
-          />
-        </label>
-        <label className="setting-toggle">
-          <span>
-            <strong>New task keyboard shortcut</strong>
-            <small>A single letter, active when you’re not typing.</small>
-          </span>
-          <input
-            className="field shortcut-field"
-            value={prefs.taskShortcut}
-            maxLength={1}
-            onChange={(e) => {
-              const k = e.target.value.toLowerCase().replace(/[^a-z]/g, "");
-              if (k) savePrefs({ ...prefs, taskShortcut: k });
-            }}
-          />
-        </label>
-        <label className="setting-toggle">
-          <span>
-            <strong>Open this view on startup</strong>
-            <small>Save a default workspace layout.</small>
-          </span>
-          <select
-            className="field"
-            value={prefs.savedPage}
-            onChange={(e) =>
-              savePrefs(
-                parseWorkspacePreferences({
-                  ...prefs,
-                  savedPage: e.target.value,
-                }),
-              )
-            }
-          >
-            {nav.map((n) => (
-              <option value={n.id} key={n.id}>
-                {n.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="btn" onClick={props.onShortcuts}>
-          <Command size={15} />
-          See keyboard shortcuts
-        </button>
-      </section>
-      <section className="panel settings-section">
-        <h2>Your data stays portable</h2>
-        <p>
-          Export workspace records as JSON, including notes, tasks, discussions,
-          relationships, canvas layouts, custom note types, decisions, presets,
-          and brainstorming boards. Archived note history, personal work rooms,
-          accounts, and attachment files require a complete local backup.
-          Importing resets relationship review markers against the imported
-          content. New imported ideas start without votes; matching ideas keep
-          their current trusted votes.
-        </p>
-        <div className="settings-data-actions">
-          <button className="btn" onClick={exportData}>
-            <Download size={15} />
-            Export workspace
-          </button>
-          <button
-            className="btn"
-            disabled={permissions.role !== "owner" || importing}
-            onClick={() => uploadRef.current?.click()}
-          >
-            <Upload size={15} />
-            {importing ? "Importing…" : "Import workspace"}
-          </button>
-          <input
-            type="file"
-            accept="application/json,.json"
-            hidden
-            ref={uploadRef}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              if (
-                !window.confirm(
-                  "Replace current workspace records with this export? Download a backup first.",
-                )
-              ) {
-                e.target.value = "";
-                return;
-              }
-              setImporting(true);
-              setError("");
-              try {
-                const imported = JSON.parse(await file.text());
-                await mutate({
-                  action: "import",
-                  workspace: { ...imported, revision: workspace.revision },
-                });
-                notify("Workspace imported");
-              } catch (err) {
-                setError((err as Error).message);
-              } finally {
-                setImporting(false);
-                e.target.value = "";
-              }
-            }}
-          />
-        </div>
-        {error && <p className="form-error">{error}</p>}
-      </section>
-      {permissions.canManage ? (
-        <StorageHealth />
-      ) : (
-        <p className="muted">
-          Workspace storage and complete recovery reports are managed by owners
-          and admins.
-        </p>
-      )}
-      <section className="panel settings-section">
-        <h2>Assignment labels</h2>
-        <p>
-          Optional labels for planning. To give someone access, invite their
-          registered username through Teams &amp; people.
-        </p>
-        <div className="settings-data-actions">
-          <button
-            className="btn"
-            onClick={() => props.onPerson("new")}
-            disabled={!permissions.canCreate}
-          >
-            <Plus size={15} />
-            Add assignment label
-          </button>
-          {workspace.people
-            .filter((p) => !p.userId)
-            .map((p) => (
-              <button
-                className="btn"
-                key={p.id}
-                onClick={() => props.onPerson(p)}
-                disabled={!permissions.canCreate}
-              >
-                {p.name}
-              </button>
-            ))}
-        </div>
-      </section>
-      <section className="panel settings-section">
-        <h2>Local access</h2>
-        <p>
-          ProjectAnvil runs on this PC at http://127.0.0.1:5173. Other devices
-          cannot open this local address. Accounts have private personal
-          workspaces. Team workspaces share their projects, tasks, notes, and
-          files with accepted members. Assignment labels do not grant access.
-        </p>
-        <div className="info-note">
-          <Network size={17} />
-          <p>
-            Live updates refresh saved work across open windows. Optional
-            offline copies and queued changes stay in this browser profile. Keep
-            the local server running for accounts, attachments, and
-            synchronization.
+          {importError && (
+            <p className="form-error" role="alert">
+              {importError}
+            </p>
+          )}
+        </section>
+        {permissions.canManage ? (
+          <StorageHealth />
+        ) : (
+          <p className="muted">
+            Workspace storage and complete recovery reports are managed by
+            owners and admins.
           </p>
-        </div>
-      </section>
+        )}
+      </SettingsGroup>
+      <SettingsGroup
+        id="people"
+        title="People & access"
+        description="Assignment labels and how local access works."
+        icon={Users}
+      >
+        <section className="panel settings-section">
+          <h2>Assignment labels</h2>
+          <p>
+            Optional labels for planning. To give someone access, invite their
+            registered username through Teams &amp; people.
+          </p>
+          <div className="settings-data-actions">
+            <button
+              className="btn"
+              onClick={() => props.onPerson("new")}
+              disabled={!permissions.canCreate}
+            >
+              <Plus size={15} />
+              Add assignment label
+            </button>
+            {workspace.people
+              .filter((p) => !p.userId)
+              .map((p) => (
+                <button
+                  className="btn"
+                  key={p.id}
+                  onClick={() => props.onPerson(p)}
+                  disabled={!permissions.canCreate}
+                >
+                  {p.name}
+                </button>
+              ))}
+          </div>
+        </section>
+        <section className="panel settings-section">
+          <h2>Local access</h2>
+          <p>
+            ProjectAnvil runs on this PC at http://127.0.0.1:5173. Other devices
+            cannot open this local address. Accounts have private personal
+            workspaces. Team workspaces share their projects, tasks, notes, and
+            files with accepted members. Assignment labels do not grant access.
+          </p>
+          <div className="info-note">
+            <Network size={17} />
+            <p>
+              Live updates refresh saved work across open windows. Optional
+              offline copies and queued changes stay in this browser profile.
+              Keep the local server running for accounts, attachments, and
+              synchronization.
+            </p>
+          </div>
+        </section>
+      </SettingsGroup>
     </div>
   );
 }

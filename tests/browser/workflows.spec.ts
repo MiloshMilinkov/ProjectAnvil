@@ -214,6 +214,16 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await expect(
       colleague.page.getByRole("button", { name: "Create task", exact: true }),
     ).toBeDisabled();
+    await colleague.page.keyboard.press("Control+k");
+    const viewerSearch = colleague.page.getByRole("dialog", {
+      name: "Search workspace",
+      exact: true,
+    });
+    await expect(
+      viewerSearch.getByRole("button", { name: /^Create a task/ }),
+    ).toBeDisabled();
+    await colleague.page.keyboard.press("Escape");
+    await expect(viewerSearch).toBeHidden();
     await navigate(colleague.page, "Notes");
     const viewerBrowser = colleague.page.locator(".note-browser");
     await expect(
@@ -931,10 +941,13 @@ test.describe("Separate accounts and recoverable everyday work", () => {
             `note-filters-${theme.toLowerCase()}-${width}.png`,
           );
           await owner.page.screenshot({ path: screenshot, fullPage: false });
-          await testInfo.attach(`note-filters-${theme.toLowerCase()}-${width}`, {
-            path: screenshot,
-            contentType: "image/png",
-          });
+          await testInfo.attach(
+            `note-filters-${theme.toLowerCase()}-${width}`,
+            {
+              path: screenshot,
+              contentType: "image/png",
+            },
+          );
 
           await typeFilter.selectOption("decision");
           await expect(count).toHaveText("1 of 3 notes");
@@ -950,6 +963,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
           await expect(clear).toBeFocused();
           await owner.page.keyboard.press("Enter");
           await expect(search).toHaveValue("");
+          await expect(search).toBeFocused();
           await expect(folderFilter).toHaveValue("all");
           await expect(tagFilter).toHaveValue("all");
           await expect(typeFilter).toHaveValue("all");
@@ -975,6 +989,447 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         (await workspace(owner)).notes.find((note) => note.id === noteId)
           ?.content,
       ).toBe(editorContent);
+    } finally {
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+  });
+
+  test("settings reveal optional sections on request and note details return keyboard focus", async ({}, testInfo) => {
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+    await selectWorkspace(owner, owner.personal);
+    // Select directly: the operational navigation helper intentionally opens Data.
+    await owner.page
+      .getByRole("button", { name: "Workspace settings", exact: true })
+      .click();
+    const groups = (name: string) =>
+      owner.page.locator(`[data-settings-group="${name}"]`);
+    await expect(groups("workspace")).toHaveAttribute("open", "");
+    await expect(groups("appearance")).toHaveAttribute("open", "");
+    await expect(groups("data")).not.toHaveAttribute("open");
+    await expect(groups("people")).not.toHaveAttribute("open");
+    const jump = owner.page.getByRole("navigation", {
+      name: "Settings sections",
+      exact: true,
+    });
+    for (const [name, label] of [
+      ["data", "Data & offline"],
+      ["people", "People & access"],
+    ]) {
+      await jump
+        .getByRole("button", { name: label, exact: true })
+        .press("Enter");
+      await expect(groups(name)).toHaveAttribute("open", "");
+      const summary = groups(name).locator(":scope > summary");
+      await expect(summary).toBeFocused();
+      await summary.press("Enter");
+      await expect(groups(name)).not.toHaveAttribute("open");
+    }
+    try {
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+          await owner.page
+            .getByRole("radio", { name: new RegExp(`^${theme} `) })
+            .check();
+          await expect(groups("data")).not.toHaveAttribute("open");
+          await expect(groups("people")).not.toHaveAttribute("open");
+          await jump.scrollIntoViewIfNeeded();
+          expect(
+            await owner.page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBeTruthy();
+          expect(
+            await jump
+              .getByRole("button")
+              .evaluateAll(
+                (buttons, minimum) =>
+                  buttons.every(
+                    (button) =>
+                      button.getBoundingClientRect().height >= minimum,
+                  ),
+                width === 320 ? 44 : 40,
+              ),
+          ).toBeTruthy();
+          const path = testInfo.outputPath(
+            `settings-${theme.toLowerCase()}-${width}.png`,
+          );
+          await owner.page.screenshot({ path, fullPage: false });
+          await testInfo.attach(`settings-${theme.toLowerCase()}-${width}`, {
+            path,
+            contentType: "image/png",
+          });
+        }
+      }
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+      const id = `calm_note_${fixtureId()}`;
+      await upsert(owner, owner.personal.id, "notes", {
+        id,
+        title: "A focused writing surface",
+        content: "Keep properties available without covering the writing area.",
+      });
+      await openNote(owner, id);
+      const details = owner.page.getByRole("button", {
+        name: "Toggle note details",
+        exact: true,
+      });
+      await expect(details).toHaveAttribute("aria-expanded", "false");
+      await expect(
+        owner.page.getByRole("complementary", {
+          name: "Note details",
+          exact: true,
+        }),
+      ).toBeHidden();
+      for (const width of [320, 1365]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        await details.press("Enter");
+        await expect(details).toHaveAttribute("aria-expanded", "true");
+        await owner.page
+          .getByRole("button", { name: "Close note details", exact: true })
+          .press("Enter");
+        await expect(details).toHaveAttribute("aria-expanded", "false");
+        await expect(details).toBeFocused();
+      }
+    } finally {
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+  });
+
+  test("task essentials stay visible and collapsed planning keeps saved values", async ({}, testInfo) => {
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+    await selectWorkspace(owner, owner.personal);
+    await navigate(owner.page, "Task board");
+    const newTask = owner.page.getByRole("button", {
+      name: "Create task",
+      exact: true,
+    });
+    const dialog = owner.page.getByRole("dialog", {
+      name: "Create task",
+      exact: true,
+    });
+    try {
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+          await owner.page
+            .getByRole("button", { name: /^Appearance:/ })
+            .click();
+          await owner.page
+            .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+            .click();
+          await newTask.click();
+          await expect(
+            dialog.getByLabel("Task title", { exact: true }),
+          ).toBeVisible();
+          await expect(
+            dialog.getByLabel("Planned start date", { exact: true }),
+          ).toBeVisible();
+          await expect(
+            dialog.getByLabel("Due date", { exact: true }),
+          ).toBeVisible();
+          const options = dialog.locator(".task-advanced-planning");
+          await expect(options).not.toHaveAttribute("open");
+          await expect(
+            dialog.getByLabel("Effort points", { exact: true }),
+          ).toBeHidden();
+          expect(
+            await owner.page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBeTruthy();
+          expect(
+            await dialog.evaluate(
+              (element) => element.scrollWidth <= element.clientWidth,
+            ),
+          ).toBeTruthy();
+          const path = testInfo.outputPath(
+            `task-editor-${theme.toLowerCase()}-${width}.png`,
+          );
+          await owner.page.screenshot({ path, fullPage: false });
+          await testInfo.attach(`task-editor-${theme.toLowerCase()}-${width}`, {
+            path,
+            contentType: "image/png",
+          });
+          await dialog
+            .getByRole("button", { name: "Cancel", exact: true })
+            .click();
+          await expect(dialog).toBeHidden();
+        }
+      }
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+      await newTask.click();
+      const title = `Planning stays saved ${fixtureId().slice(0, 8)}`;
+      await dialog.getByLabel("Task title", { exact: true }).fill(title);
+      await dialog
+        .getByLabel("Planned start date", { exact: true })
+        .fill("2026-11-02");
+      await dialog.getByLabel("Due date", { exact: true }).fill("2026-11-05");
+      const options = dialog.locator(".task-advanced-planning");
+      const summary = options.locator(":scope > summary");
+      await summary.press("Enter");
+      await expect(options).toHaveAttribute("open", "");
+      await dialog.getByLabel("Effort points", { exact: true }).fill("5");
+      await dialog
+        .getByRole("combobox", { name: "Type", exact: true })
+        .selectOption("story");
+      await dialog.getByLabel("Tags", { exact: true }).fill("review, weekly");
+      await summary.press("Enter");
+      await expect(options).not.toHaveAttribute("open");
+      await dialog
+        .getByRole("button", { name: "Create task", exact: true })
+        .click();
+      await expect(dialog).toBeHidden();
+      const saved = (await workspace(owner)).tasks.find(
+        (task) => task.title === title,
+      )!;
+      expect(saved).toMatchObject({
+        estimate: 5,
+        type: "story",
+        tags: ["review", "weekly"],
+        startDate: "2026-11-02",
+        dueDate: "2026-11-05",
+      });
+      await owner.page
+        .getByRole("button", { name: new RegExp(title) })
+        .first()
+        .click();
+      const editor = owner.page.getByRole("dialog", {
+        name: "Edit task",
+        exact: true,
+      });
+      const planning = editor.locator(".task-advanced-planning");
+      await expect(planning).toHaveAttribute("open", "");
+      await expect(
+        editor.getByLabel("Effort points", { exact: true }),
+      ).toHaveValue("5");
+      await expect(editor.getByLabel("Tags", { exact: true })).toHaveValue(
+        "review, weekly",
+      );
+      const repeat = editor.locator('[data-tour="recurrence"]');
+      await repeat.locator(":scope > summary").press("Enter");
+      await editor.getByLabel("Repeat this task", { exact: true }).check();
+      await editor
+        .getByLabel("Recurrence time zone", { exact: true })
+        .fill("Invalid/Zone");
+      await planning.locator(":scope > summary").press("Enter");
+      await editor
+        .getByRole("button", { name: "Save changes", exact: true })
+        .click();
+      await expect(editor.locator(".entity-editor-error")).toContainText(
+        "Choose a valid recurrence",
+      );
+      await expect(planning).toHaveAttribute("open", "");
+      await editor.getByLabel("Repeat this task", { exact: true }).uncheck();
+      await editor
+        .getByRole("button", { name: "Save changes", exact: true })
+        .click();
+      await expect(editor).toBeHidden();
+      expect(
+        (await workspace(owner)).tasks.find((task) => task.id === saved.id),
+      ).toMatchObject({
+        recurrence: null,
+        estimate: 5,
+        tags: ["review", "weekly"],
+      });
+    } finally {
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+  });
+
+  test("short guides and searchable destinations preserve orientation and keyboard control", async ({}, testInfo) => {
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+    await selectWorkspace(owner, owner.personal);
+    const more = owner.page.locator(".navigation-more");
+    await expect(more).not.toHaveAttribute("open");
+    await expect(more.getByRole("button", { includeHidden: true })).toHaveCount(
+      3,
+    );
+    const main = owner.page.getByRole("main");
+    await expect(main).toHaveCount(1);
+    const skip = owner.page.getByRole("link", {
+      name: "Skip to workspace",
+      exact: true,
+    });
+    await skip.focus();
+    await skip.press("Enter");
+    await expect(main).toBeFocused();
+    await owner.page.keyboard.press("Control+k");
+    const search = owner.page.getByRole("dialog", {
+      name: "Search workspace",
+      exact: true,
+    });
+    await search
+      .getByRole("textbox", {
+        name: "Search tasks, notes, and projects",
+        exact: true,
+      })
+      .fill("Work rooms");
+    await search.getByRole("button", { name: /^Work rooms/ }).press("Enter");
+    await expect(search).toBeHidden();
+    await expect(more).toHaveAttribute("open", "");
+    await expect(
+      more.getByRole("button", { name: "Work rooms", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(main).toHaveCount(1);
+    await expect(
+      main.getByRole("heading", { name: "Work rooms", exact: true }),
+    ).toBeVisible();
+    const trigger = owner.page.getByRole("button", {
+      name: "Start guided tour",
+      exact: true,
+    });
+    const beforeGuides = await workspace(owner);
+    await trigger.click();
+    const guide = owner.page.getByTestId("guided-tour");
+    await expect(guide).toContainText("Step 1 of 8");
+    for (let step = 2; step <= 8; step++) {
+      await guide
+        .getByRole("button", { name: "Next", exact: true })
+        .press("Enter");
+      await expect(guide).toContainText(`Step ${step} of 8`);
+    }
+    await guide
+      .getByRole("button", { name: "Finish", exact: true })
+      .press("Enter");
+    await expect(guide).toBeHidden();
+    await expect(
+      main.getByRole("heading", { name: "Work rooms", exact: true }),
+    ).toBeVisible();
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await guide
+      .getByRole("button", { name: "All guides", exact: true })
+      .press("Enter");
+    await expect(
+      guide.getByRole("heading", { name: "Choose a guide", exact: true }),
+    ).toBeVisible();
+    await expect(guide.locator(".tour-guide-option")).toHaveCount(10);
+    const guideSearch = guide.getByRole("textbox", {
+      name: "Search guides",
+      exact: true,
+    });
+    await guideSearch.fill("unmatched feature name");
+    await expect(guide.locator(".tour-guide-option")).toHaveCount(0);
+    await guide
+      .getByRole("button", { name: "Clear search", exact: true })
+      .press("Enter");
+    await expect(guideSearch).toBeFocused();
+    await guideSearch.fill("import");
+    await guide
+      .getByRole("button", { name: /^Markdown portability/ })
+      .press("Enter");
+    await expect(guide).toContainText("Step 1 of 2");
+    await owner.page.keyboard.press("Escape");
+    await expect(guide).toBeHidden();
+    await expect(
+      main.getByRole("heading", { name: "Work rooms", exact: true }),
+    ).toBeVisible();
+    await expect(trigger).toBeFocused();
+    await navigate(owner.page, "Projects");
+    const project = beforeGuides.projects[0];
+    expect(project).toBeDefined();
+    await owner.page
+      .locator(".projects-grid")
+      .getByRole("button", { name: project.name, exact: true })
+      .click();
+    const home = owner.page.locator('[data-tour="project-home"]');
+    const scopedProject = owner.page
+      .locator(".sidebar-projects")
+      .getByRole("button", {
+        name: project.name,
+        exact: true,
+      });
+    await expect(
+      home.getByRole("heading", { name: project.name, exact: true }),
+    ).toBeVisible();
+    await expect(scopedProject).toHaveAttribute("aria-pressed", "true");
+    await trigger.click();
+    await guide
+      .getByRole("button", { name: "Next", exact: true })
+      .press("Enter");
+    await expect(guide).toContainText("Step 2 of 8");
+    await owner.page.keyboard.press("Escape");
+    await expect(guide).toBeHidden();
+    await expect(
+      home.getByRole("heading", { name: project.name, exact: true }),
+    ).toBeVisible();
+    await expect(scopedProject).toHaveAttribute("aria-pressed", "true");
+    await expect(trigger).toBeFocused();
+    expect(await workspace(owner)).toEqual(beforeGuides);
+    try {
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+          await owner.page
+            .getByRole("button", { name: /^Appearance:/ })
+            .click();
+          await owner.page
+            .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+            .click();
+          await trigger.click();
+          await guide
+            .getByRole("button", { name: "All guides", exact: true })
+            .press("Enter");
+          const card = guide.getByRole("dialog");
+          const input = guide.getByRole("textbox", {
+            name: "Search guides",
+            exact: true,
+          });
+          await expect(guide.locator(".tour-guide-option")).toHaveCount(10);
+          await input.fill("milestones");
+          await input.press("ArrowLeft");
+          await expect(
+            guide.getByRole("heading", { name: "Choose a guide", exact: true }),
+          ).toBeVisible();
+          await expect(input).toHaveValue("milestones");
+          await input.fill("");
+          await expect(guide.locator(".tour-guide-option")).toHaveCount(10);
+          const bounds = await card.boundingBox();
+          expect(bounds).not.toBeNull();
+          expect(bounds!.x).toBeGreaterThanOrEqual(0);
+          expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+          expect(bounds!.y).toBeGreaterThanOrEqual(0);
+          expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(900);
+          expect(
+            await card.evaluate(
+              (element) => element.scrollWidth <= element.clientWidth,
+            ),
+          ).toBeTruthy();
+          expect(
+            await owner.page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBeTruthy();
+          if (width === 320) {
+            expect(
+              await input.evaluate((element) =>
+                Number.parseFloat(getComputedStyle(element).fontSize),
+              ),
+            ).toBeGreaterThanOrEqual(16);
+            expect(
+              await guide
+                .locator(".tour-guide-option")
+                .evaluateAll((buttons) =>
+                  buttons.every(
+                    (button) => button.getBoundingClientRect().height >= 44,
+                  ),
+                ),
+            ).toBeTruthy();
+          }
+          const path = testInfo.outputPath(
+            `guide-library-${theme.toLowerCase()}-${width}.png`,
+          );
+          await owner.page.screenshot({ path, fullPage: false });
+          await testInfo.attach(
+            `guide-library-${theme.toLowerCase()}-${width}`,
+            { path, contentType: "image/png" },
+          );
+          await owner.page.keyboard.press("Escape");
+          await expect(guide).toBeHidden();
+          await expect(trigger).toBeFocused();
+        }
+      }
+      expect(await workspace(owner)).toEqual(beforeGuides);
     } finally {
       await owner.page.setViewportSize({ width: 1365, height: 900 });
     }

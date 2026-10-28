@@ -30,7 +30,7 @@ interface PlanningProps {
   onOpenTask?: (id: string) => void;
 }
 
-/** Task hierarchy stays visible beside the project and assignment essentials. */
+/** Parent, milestone, and child progress fields share one planning group. */
 export function TaskHierarchyFields({
   task,
   workspace,

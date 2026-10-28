@@ -141,6 +141,20 @@ export default function TaskDialog({
     [closePrompt, setClosePrompt] = useState(false),
     [preview, setPreview] = useState(false),
     [tab, setTab] = useState("details");
+  const [planningOpen, setPlanningOpen] = useState(() => {
+    const initial = initialRecovery?.value || freshForm;
+    return !!(
+      initial.task.parentId ||
+      initial.task.milestoneId ||
+      initial.task.estimate ||
+      initial.task.type !== "task" ||
+      initial.tagText.trim() ||
+      initial.task.recurrence ||
+      initial.task.reminder ||
+      initial.task.recurrenceNextId ||
+      w.tasks.some((item) => item.parentId === initial.task.id)
+    );
+  });
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [copyPending, setCopyPending] = useState(
     !!initialTask && !!initialRecovery,
@@ -320,6 +334,7 @@ export default function TaskDialog({
         children.completed < children.total)
     ) {
       setTab("details");
+      setPlanningOpen(true);
       setError(
         planningError ||
           "Finish the child tasks before completing this parent.",
@@ -532,6 +547,23 @@ export default function TaskDialog({
   const blocked = draft.blockedBy.filter(
     (id) => w.tasks.find((t) => t.id === id)?.status !== "done",
   );
+  const configuredPlanning = [
+    draft.parentId && "Parent task",
+    draft.milestoneId && "Milestone",
+    draft.estimate > 0 && "Effort",
+    draft.type !== "task" && "Type",
+    tagText.trim() && "Tags",
+    draft.recurrence && "Repeat",
+    draft.reminder && "Reminder",
+  ].filter(Boolean);
+  const childCount = w.tasks.filter(
+    (item) => item.parentId === draft.id,
+  ).length;
+  const planningSummary = configuredPlanning.length
+    ? configuredPlanning.join(" · ")
+    : childCount
+      ? `${childCount} child ${childCount === 1 ? "task" : "tasks"}`
+      : "Parent, milestone, effort, tags, repeat & reminder";
   const fieldId = useId();
   const invalidDateRange = !!(
     draft.startDate &&
@@ -573,36 +605,6 @@ export default function TaskDialog({
           </button>
         </div>
         <div className="task-dialog-body">
-          <div className="task-template-toolbar" data-tour="task-templates">
-            {task && (
-              <WatchControl
-                reference={{ type: "task", id: task.id }}
-                notify={notify}
-              />
-            )}
-            <button
-              className="btn"
-              disabled={saving}
-              onClick={() => setTemplatesOpen(true)}
-            >
-              <Copy size={15} />
-              My task templates
-            </button>
-            {task && onDuplicate && (
-              <button
-                className="btn"
-                disabled={saving}
-                data-tour="duplicate-task"
-                onClick={async () => {
-                  if (dirty.current && !(await save(false))) return;
-                  onDuplicate(duplicateTask(originalTask.current || task, w));
-                }}
-              >
-                <Copy size={15} />
-                Duplicate task
-              </button>
-            )}
-          </div>
           {copyPending && (
             <div
               className="warning-box duplicate-recovery-choice"
@@ -665,7 +667,6 @@ export default function TaskDialog({
             </div>
           )}
           <fieldset disabled={saving} className="dialog-fields">
-            <MentionHelp />
             <div className="task-title-input">
               <label htmlFor={`${fieldId}-title`} className="task-title-label">
                 Task title
@@ -675,6 +676,8 @@ export default function TaskDialog({
                 autoFocus
                 placeholder="What needs to happen?"
                 maxLength={300}
+                required
+                aria-invalid={(!!error && !draft.title.trim()) || undefined}
                 value={draft.title}
                 onChange={(e) => set("title", e.target.value)}
               />
@@ -749,16 +752,84 @@ export default function TaskDialog({
                 </select>
               </label>
             </div>
-            <TaskHierarchyFields
-              task={draft}
-              workspace={w}
-              onChange={(patch) =>
-                change({ task: { ...latestForm.current.task, ...patch } })
-              }
-              onOpenTask={
-                openTask ? (id) => void openRelatedTask(id) : undefined
-              }
-            />
+            <section
+              className="task-planning task-date-fields"
+              aria-label="Task dates"
+            >
+              <div className="task-section-heading">
+                <h3>
+                  Dates <span className="editor-optional">Optional</span>
+                </h3>
+              </div>
+              <p id={`${fieldId}-schedule-help`} className="task-schedule-help">
+                Set either date or both. Planned start and due date can be the
+                same day.
+              </p>
+              <div className="task-meta-grid">
+                <label>
+                  Planned start date
+                  <input
+                    type="date"
+                    value={draft.startDate}
+                    max={draft.dueDate || undefined}
+                    aria-invalid={invalidDateRange || undefined}
+                    aria-describedby={`${fieldId}-schedule-help${invalidDateRange ? ` ${fieldId}-schedule-error` : ""}`}
+                    onChange={(e) => set("startDate", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Due date
+                  <input
+                    type="date"
+                    value={draft.dueDate}
+                    min={draft.startDate || undefined}
+                    aria-invalid={invalidDateRange || undefined}
+                    aria-describedby={`${fieldId}-schedule-help${invalidDateRange ? ` ${fieldId}-schedule-error` : ""}`}
+                    onChange={(e) => set("dueDate", e.target.value)}
+                  />
+                </label>
+              </div>
+              {invalidDateRange && (
+                <p
+                  id={`${fieldId}-schedule-error`}
+                  className="task-schedule-error"
+                  role="alert"
+                >
+                  Planned start date must be on or before the due date.
+                </p>
+              )}
+            </section>
+            <div className="task-template-toolbar" data-tour="task-templates">
+              {task && (
+                <WatchControl
+                  reference={{ type: "task", id: task.id }}
+                  notify={notify}
+                />
+              )}
+              <button
+                className="btn"
+                disabled={saving}
+                onClick={() => setTemplatesOpen(true)}
+              >
+                <Copy size={15} />
+                My task templates
+              </button>
+              {task && onDuplicate && (
+                <button
+                  className="btn"
+                  disabled={saving}
+                  data-tour="duplicate-task"
+                  onClick={async () => {
+                    if (dirty.current && !(await save(false))) return;
+                    onDuplicate(duplicateTask(originalTask.current || task, w));
+                  }}
+                >
+                  <Copy size={15} />
+                  Duplicate task
+                </button>
+              )}
+            </div>
+
             {blocked.length > 0 && (
               <div className="warning-box">
                 <Link2 size={15} />
@@ -836,102 +907,6 @@ export default function TaskDialog({
                     onChange={(e) => set("description", e.target.value)}
                   />
                 )}
-                <section
-                  className="task-planning"
-                  aria-labelledby={`${fieldId}-planning`}
-                >
-                  <div className="task-section-heading">
-                    <h3 id={`${fieldId}-planning`}>Planning</h3>
-                    <span>Optional details</span>
-                  </div>
-                  <p
-                    id={`${fieldId}-schedule-help`}
-                    className="task-schedule-help"
-                  >
-                    Set either date or both. Planned start and due date can be
-                    the same day.
-                  </p>
-                  <div className="task-meta-grid">
-                    <label>
-                      Planned start date
-                      <input
-                        type="date"
-                        value={draft.startDate}
-                        max={draft.dueDate || undefined}
-                        aria-invalid={invalidDateRange || undefined}
-                        aria-describedby={`${fieldId}-schedule-help${invalidDateRange ? ` ${fieldId}-schedule-error` : ""}`}
-                        onChange={(e) => set("startDate", e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Due date
-                      <input
-                        type="date"
-                        value={draft.dueDate}
-                        min={draft.startDate || undefined}
-                        aria-invalid={invalidDateRange || undefined}
-                        aria-describedby={`${fieldId}-schedule-help${invalidDateRange ? ` ${fieldId}-schedule-error` : ""}`}
-                        onChange={(e) => set("dueDate", e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  {invalidDateRange && (
-                    <p
-                      id={`${fieldId}-schedule-error`}
-                      className="task-schedule-error"
-                      role="alert"
-                    >
-                      Planned start date must be on or before the due date.
-                    </p>
-                  )}
-                  <div className="task-meta-grid task-planning-options">
-                    <label>
-                      Effort points
-                      <input
-                        type="number"
-                        min="0"
-                        max="999"
-                        value={draft.estimate}
-                        onChange={(e) =>
-                          set("estimate", Number(e.target.value))
-                        }
-                      />
-                    </label>
-                    <label>
-                      Type
-                      <select
-                        value={draft.type}
-                        onChange={(e) =>
-                          set("type", e.target.value as Task["type"])
-                        }
-                      >
-                        {["task", "story", "bug", "epic"].map((t) => (
-                          <option key={t} value={t}>
-                            {t.charAt(0).toUpperCase() + t.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Tags
-                      <input
-                        placeholder="planning, research"
-                        value={tagText}
-                        onChange={(e) => change({ tagText: e.target.value })}
-                      />
-                    </label>
-                  </div>
-                  <TaskScheduleOptions
-                    task={draft}
-                    workspace={w}
-                    onChange={(patch) =>
-                      change({ task: { ...latestForm.current.task, ...patch } })
-                    }
-                    onOpenTask={
-                      openTask ? (id) => void openRelatedTask(id) : undefined
-                    }
-                  />
-                </section>
                 <div className="field-heading">
                   <label htmlFor={`${fieldId}-subtask`}>
                     Subtasks{" "}
@@ -1000,6 +975,86 @@ export default function TaskDialog({
                     Add
                   </button>
                 </div>
+                <details
+                  className="task-advanced-planning"
+                  open={planningOpen}
+                  onToggle={(event) =>
+                    setPlanningOpen(event.currentTarget.open)
+                  }
+                  data-tour="task-planning-options"
+                >
+                  <summary>
+                    <span>More planning options</span>
+                    <small>{planningSummary}</small>
+                  </summary>
+                  <div className="task-advanced-planning-body">
+                    <p className="editor-field-help">
+                      Add structure when you need it. These options stay with
+                      the task when this section is closed.
+                    </p>
+                    <div className="task-meta-grid task-planning-options">
+                      <label>
+                        Effort points
+                        <input
+                          type="number"
+                          min="0"
+                          max="999"
+                          value={draft.estimate}
+                          onChange={(e) =>
+                            set("estimate", Number(e.target.value))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Type
+                        <select
+                          value={draft.type}
+                          onChange={(e) =>
+                            set("type", e.target.value as Task["type"])
+                          }
+                        >
+                          {["task", "story", "bug", "epic"].map((t) => (
+                            <option key={t} value={t}>
+                              {t.charAt(0).toUpperCase() + t.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Tags
+                        <input
+                          placeholder="planning, research"
+                          value={tagText}
+                          onChange={(e) => change({ tagText: e.target.value })}
+                        />
+                      </label>
+                    </div>
+                    <TaskHierarchyFields
+                      task={draft}
+                      workspace={w}
+                      onChange={(patch) =>
+                        change({
+                          task: { ...latestForm.current.task, ...patch },
+                        })
+                      }
+                      onOpenTask={
+                        openTask ? (id) => void openRelatedTask(id) : undefined
+                      }
+                    />
+                    <TaskScheduleOptions
+                      task={draft}
+                      workspace={w}
+                      onChange={(patch) =>
+                        change({
+                          task: { ...latestForm.current.task, ...patch },
+                        })
+                      }
+                      onOpenTask={
+                        openTask ? (id) => void openRelatedTask(id) : undefined
+                      }
+                    />
+                  </div>
+                </details>
               </>
             )}
             {tab === "connections" && (
@@ -1126,6 +1181,7 @@ export default function TaskDialog({
                 >
                   Add an update
                 </label>
+                <MentionHelp />
                 <textarea
                   id={`${fieldId}-comment`}
                   className="field"

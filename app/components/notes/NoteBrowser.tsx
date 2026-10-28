@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, type RefObject } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 import {
   BookOpen,
   Bookmark,
@@ -48,6 +48,7 @@ export default function NoteBrowser({
   onSelect,
 }: Props) {
   const [search, setSearch] = useState("");
+  const searchInput = useRef<HTMLInputElement>(null);
   const [folder, setFolder] = useState("all");
   const [tag, setTag] = useState("all");
   const [noteTypeFilter, setNoteTypeFilter] = useState("all");
@@ -84,6 +85,7 @@ export default function NoteBrowser({
     setTag("all");
     setNoteTypeFilter("all");
     setBookmarksOnly(false);
+    searchInput.current?.focus();
   }
   return (
     <aside
@@ -123,6 +125,7 @@ export default function NoteBrowser({
       <label className="note-search">
         <Search size={15} />
         <input
+          ref={searchInput}
           aria-label="Search notes"
           value={search}
           onChange={(event) => setSearch(event.target.value)}

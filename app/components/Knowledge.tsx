@@ -186,6 +186,7 @@ export default function Knowledge({
   const { isOffline } = useWorkspaceScope();
   const controlId = useId();
   const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const detailsButtonRef = useRef<HTMLButtonElement>(null);
   const emptyCreateRef = useRef<HTMLButtonElement>(null);
   const browserButtonRef = useRef<HTMLButtonElement>(null);
   const browserRef = useRef<HTMLElement>(null);
@@ -256,7 +257,7 @@ export default function Knowledge({
   const [saveState, setSaveState] = useState<
     "saved" | "saving" | "pending" | "error"
   >("saved");
-  const [details, setDetails] = useState(true);
+  const [details, setDetails] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -1739,7 +1740,7 @@ export default function Knowledge({
         }}
       />
 
-      <main className="note-workspace">
+      <section className="note-workspace" aria-label="Note workspace">
         {hiddenRecovery && !noteVisible(hiddenRecovery) && (
           <div className="note-recovery-message" role="status">
             <span>
@@ -1914,6 +1915,7 @@ export default function Knowledge({
                   />
                 </button>
                 <button
+                  ref={detailsButtonRef}
                   className={`btn note-details-toggle ${details ? "is-active" : ""}`}
                   aria-label="Toggle note details"
                   title="Note details"
@@ -2398,7 +2400,10 @@ export default function Knowledge({
                     <button
                       className="btn-icon"
                       aria-label="Close note details"
-                      onClick={() => setDetails(false)}
+                      onClick={() => {
+                        setDetails(false);
+                        detailsButtonRef.current?.focus();
+                      }}
                     >
                       <X size={13} />
                     </button>
@@ -2644,7 +2649,7 @@ export default function Knowledge({
             </button>
           </div>
         )}
-      </main>
+      </section>
       <input
         ref={fileInput}
         type="file"
