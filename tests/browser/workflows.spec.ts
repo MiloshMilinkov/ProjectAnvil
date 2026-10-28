@@ -1239,6 +1239,15 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   test("short guides and searchable destinations preserve orientation and keyboard control", async ({}, testInfo) => {
     await owner.page.setViewportSize({ width: 1365, height: 900 });
     await selectWorkspace(owner, owner.personal);
+    const guideProjectId = `guide_scope_${fixtureId()}`;
+    await upsert(owner, owner.personal.id, "projects", {
+      id: guideProjectId,
+      name: `Guide return project ${fixtureId().slice(0, 8)}`,
+      key: "GUIDE",
+    });
+    await expect(
+      owner.page.locator(".sidebar-projects .project-nav"),
+    ).not.toHaveCount(0);
     const more = owner.page.locator(".navigation-more");
     await expect(more).not.toHaveAttribute("open");
     await expect(more.getByRole("button", { includeHidden: true })).toHaveCount(
@@ -1326,7 +1335,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     ).toBeVisible();
     await expect(trigger).toBeFocused();
     await navigate(owner.page, "Projects");
-    const project = beforeGuides.projects[0];
+    const project = beforeGuides.projects.find(
+      (item) => item.id === guideProjectId,
+    )!;
     expect(project).toBeDefined();
     await owner.page
       .locator(".projects-grid")
@@ -1499,5 +1510,612 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     } finally {
       await owner.page.setViewportSize({ width: 1365, height: 900 });
     }
+  });
+
+  test("collections retain scoped grouping, four layouts, and edited properties", async ({}, testInfo) => {
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+    await selectWorkspace(owner, owner.personal);
+    const suffix = fixtureId().slice(0, 8);
+    const projectId = `collection_project_${suffix}`;
+    const outsideId = `collection_outside_${suffix}`;
+    const typeId = `collection_type_${suffix}`;
+    const archivedTypeId = `collection_archived_${suffix}`;
+    const projectName = `Collection review ${suffix}`;
+    const title = (name: string) => `Collection ${name} ${suffix}`;
+    await upsert(owner, owner.personal.id, "projects", {
+      id: projectId,
+      name: projectName,
+      key: "CLX",
+    });
+    await upsert(owner, owner.personal.id, "projects", {
+      id: outsideId,
+      name: `Outside collection ${suffix}`,
+      key: "CLY",
+    });
+    const field = {
+      id: "confidence",
+      name: "Confidence",
+      type: "number",
+      required: false,
+      options: [],
+    };
+    await upsert(owner, owner.personal.id, "noteTypes", {
+      id: typeId,
+      name: "Research",
+      fields: [field],
+    });
+    await upsert(owner, owner.personal.id, "noteTypes", {
+      id: archivedTypeId,
+      name: "Archived reference",
+      archived: false,
+      fields: [field],
+    });
+    const rows = [
+      {
+        id: `collection_alpha_${suffix}`,
+        title: title("Alpha"),
+        projectId,
+        folder: "Planning",
+        tags: [suffix],
+        properties: { Status: "Draft", Category: "Alpha", Effort: "10" },
+        customTypeId: typeId,
+        propertyValues: { confidence: "2" },
+        content: "A scoped planning reference and its next steps.",
+      },
+      {
+        id: `collection_beta_${suffix}`,
+        title: title("Beta"),
+        projectId,
+        folder: "Research",
+        tags: [suffix],
+        properties: { Status: "Review", Category: "Beta", Effort: "2" },
+        content: "Another useful reference.",
+      },
+      {
+        id: `collection_empty_${suffix}`,
+        title: title("Empty"),
+        projectId,
+        folder: "",
+        tags: [suffix],
+        properties: { Status: "Draft", Category: "", Effort: "30" },
+        customTypeId: archivedTypeId,
+        propertyValues: { confidence: "8" },
+        content: "An archived type keeps its values.",
+      },
+      {
+        id: `collection_literal_${suffix}`,
+        title: title("Literal"),
+        projectId,
+        folder: "Planning",
+        tags: [suffix],
+        properties: { Status: "Draft", Category: "Unspecified", Effort: "1" },
+        content: "A literal empty-group label remains in the same bucket.",
+      },
+      {
+        id: `collection_private_${suffix}`,
+        title: title("Outside"),
+        projectId: outsideId,
+        folder: "Planning",
+        tags: [suffix],
+        properties: { Status: "Draft", Category: "Alpha", Effort: "1" },
+        content: "A scoped planning reference and its next steps.",
+      },
+    ];
+    for (const note of rows)
+      await upsert(owner, owner.personal.id, "notes", note);
+    await upsert(owner, owner.personal.id, "noteTypes", {
+      id: archivedTypeId,
+      name: "Archived reference",
+      archived: true,
+      fields: [field],
+    });
+    await owner.page.reload();
+    await appReady(owner.page);
+    await owner.page
+      .locator(".sidebar-projects")
+      .getByRole("button", { name: projectName, exact: true })
+      .click();
+    await navigate(owner.page, "Collections");
+    const collection = owner.page.locator(".bases-page");
+    const layout = collection.getByRole("group", {
+      name: "Collection layout",
+      exact: true,
+    });
+    const count = collection.locator(".base-result-count");
+    await expect(count).toHaveText("4 notes");
+    await expect(
+      collection.getByRole("combobox", {
+        name: "Filter collection by project",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(collection).not.toContainText(title("Outside"));
+    await collection
+      .getByRole("combobox", { name: "Sort collection", exact: true })
+      .selectOption("prop:Effort");
+    await collection
+      .getByRole("combobox", { name: "Group collection", exact: true })
+      .selectOption("prop:Category");
+    await expect(collection.locator(".base-group-heading h2")).toHaveText([
+      "Alpha",
+      "Beta",
+      "Unspecified",
+    ]);
+    const unspecified = collection.locator(".base-group").filter({
+      has: owner.page.getByRole("heading", {
+        name: "Unspecified",
+        exact: true,
+      }),
+    });
+    await expect(unspecified.locator(".base-note-link strong")).toHaveText([
+      title("Literal"),
+      title("Empty"),
+    ]);
+    for (const name of ["Table", "List", "Gallery", "Board"]) {
+      await layout.getByRole("button", { name, exact: true }).click();
+      await expect(count).toHaveText("4 notes");
+      await expect(collection).toContainText(title("Alpha"));
+      await expect(collection).not.toContainText(title("Outside"));
+    }
+    const betaCard = collection
+      .locator(".base-board-card")
+      .filter({ hasText: title("Beta") });
+    await betaCard
+      .getByRole("combobox", {
+        name: `Status of ${title("Beta")}`,
+        exact: true,
+      })
+      .selectOption("Complete");
+    await expect
+      .poll(
+        async () =>
+          (await workspace(owner)).notes.find((note) => note.id === rows[1].id)
+            ?.properties.Status,
+      )
+      .toBe("Complete");
+    const complete = collection.locator(".base-board-column").filter({
+      has: owner.page.getByRole("heading", { name: "Complete", exact: true }),
+    });
+    await expect(complete).toContainText(title("Beta"));
+    await layout.getByRole("button", { name: "Table", exact: true }).click();
+    await collection
+      .getByRole("button", { name: "Properties", exact: true })
+      .click();
+    await collection
+      .getByRole("checkbox", {
+        name: "Research (custom) · Confidence",
+        exact: true,
+      })
+      .check();
+    await collection
+      .getByRole("button", { name: "Close collection properties", exact: true })
+      .click();
+    await collection
+      .getByRole("button", {
+        name: `Edit Research (custom) · Confidence for ${title("Alpha")}`,
+        exact: true,
+      })
+      .click();
+    const details = owner.page.getByRole("button", {
+      name: "Toggle note details",
+      exact: true,
+    });
+    if ((await details.getAttribute("aria-expanded")) !== "true")
+      await details.click();
+    await owner.page.getByLabel("Confidence", { exact: true }).fill("7");
+    await expect
+      .poll(
+        async () =>
+          (await workspace(owner)).notes.find((note) => note.id === rows[0].id)
+            ?.propertyValues?.confidence,
+      )
+      .toBe("7");
+    await navigate(owner.page, "Collections");
+    await expect(
+      collection.getByRole("button", {
+        name: `Edit Research (custom) · Confidence for ${title("Alpha")}`,
+        exact: true,
+      }),
+    ).toHaveText("7");
+    const effort = collection.getByRole("textbox", {
+      name: `Effort for ${title("Alpha")}`,
+      exact: true,
+    });
+    await effort.fill("11");
+    await effort.press("Enter");
+    await expect
+      .poll(
+        async () =>
+          (await workspace(owner)).notes.find((note) => note.id === rows[0].id)
+            ?.properties.Effort,
+      )
+      .toBe("11");
+    await expect(collection.locator(".base-saving")).toHaveText(
+      "All changes saved",
+    );
+    const search = collection.getByRole("textbox", {
+      name: "Search collection",
+      exact: true,
+    });
+    await collection
+      .getByRole("combobox", { name: "Filter collection by type", exact: true })
+      .selectOption(`custom:${typeId}`);
+    await search.fill("Research (custom)");
+    await expect(count).toHaveText("1 note");
+    await expect(collection).toContainText(title("Alpha"));
+    await search.fill("");
+    await collection
+      .getByRole("combobox", { name: "Filter collection by type", exact: true })
+      .selectOption(`custom:${archivedTypeId}`);
+    await expect(count).toHaveText("1 note");
+    await expect(collection).toContainText(title("Empty"));
+    await collection
+      .getByRole("button", { name: "Clear filters", exact: true })
+      .click();
+    await expect(count).toHaveText("4 notes");
+    await expect(
+      collection.getByRole("combobox", {
+        name: "Filter collection by project",
+        exact: true,
+      }),
+    ).toHaveValue(projectId);
+    await layout.getByRole("button", { name: "Gallery", exact: true }).click();
+    try {
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+          await owner.page
+            .getByRole("button", { name: /^Appearance:/ })
+            .click();
+          await owner.page
+            .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+            .click();
+          expect(
+            await owner.page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBeTruthy();
+          await expect(count).toHaveText("4 notes");
+          const path = testInfo.outputPath(
+            `collections-${theme.toLowerCase()}-${width}.png`,
+          );
+          await owner.page.screenshot({ path, fullPage: false });
+          await testInfo.attach(`collections-${theme.toLowerCase()}-${width}`, {
+            path,
+            contentType: "image/png",
+          });
+        }
+      }
+    } finally {
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+    const saved = (await workspace(owner)).notes.find(
+      (note) => note.id === rows[0].id,
+    )!;
+    expect(saved.propertyValues?.confidence).toBe("7");
+    expect(saved.properties).toMatchObject({
+      Category: "Alpha",
+      Effort: "11",
+      Status: "Draft",
+    });
+    expect(saved.content).toBe(rows[0].content);
+    expect(
+      (await workspace(colleague)).notes.some((note) => note.id === rows[0].id),
+    ).toBeFalsy();
+  });
+
+  test("a failed deferred feature can be retried without signing out or reloading", async ({
+    browser,
+  }, testInfo) => {
+    // Reuse the same account with no existing service worker/cache interception.
+    const context = await browser.newContext({
+      baseURL: base,
+      storageState: await owner.context.storageState(),
+      serviceWorkers: "block",
+      viewport: { width: 1365, height: 900 },
+      reducedMotion: "reduce",
+    });
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const chunk = /\/Collections-[^/]+\.js(?:\?.*)?$/;
+    let blocked = 0;
+    const blockChunk = async (route: import("@playwright/test").Route) => {
+      // Module preload and its subsequent import can request the same chunk.
+      // Keep the connection unavailable until the failure is visible.
+      blocked++;
+      await route.abort("failed");
+    };
+    await page.route(chunk, blockChunk);
+    try {
+      await page.goto("/");
+      await appReady(page);
+      await page.evaluate(() => {
+        (
+          window as unknown as { __deferredPageIdentity: string }
+        ).__deferredPageIdentity = "same-page";
+      });
+      await navigate(page, "Collections");
+      const failure = page
+        .getByRole("alert")
+        .filter({ hasText: "Could not open collections" });
+      await expect(
+        failure.getByRole("heading", {
+          name: "Could not open collections",
+          exact: true,
+        }),
+      ).toBeVisible();
+      expect(blocked).toBeGreaterThanOrEqual(1);
+      await expect(
+        page.getByRole("button", {
+          name: `Account: ${owner.username}`,
+          exact: true,
+        }),
+      ).toBeVisible();
+      await page.unroute(chunk, blockChunk);
+      await failure
+        .getByRole("button", { name: "Retry opening", exact: true })
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Collections", exact: true }),
+      ).toBeVisible();
+      await expect(failure).toBeHidden();
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as { __deferredPageIdentity: string })
+              .__deferredPageIdentity,
+        ),
+      ).toBe("same-page");
+      expect(errors).toEqual([]);
+    } catch (error) {
+      await testInfo.attach("deferred-failure-page", {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+      await testInfo.attach("deferred-failure-details", {
+        body: JSON.stringify({
+          blocked,
+          headings: await page.getByRole("heading").allTextContents(),
+          errors,
+        }),
+        contentType: "application/json",
+      });
+      throw error;
+    } finally {
+      await context.close();
+    }
+  });
+  test("technical Markdown loads formatting on demand and remains portable offline", async ({}, testInfo) => {
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+    await selectWorkspace(owner, owner.personal);
+    const suffix = fixtureId();
+    const plainId = `render_plain_${suffix}`;
+    const technicalId = `render_technical_${suffix}`;
+    const technical = [
+      "# Technical reference",
+      "",
+      "Inline math: $a^2 + b^2 = c^2$.",
+      "",
+      "$$",
+      "\\frac{1}{2} + \\frac{1}{2} = 1",
+      "$$",
+      "",
+      "```math",
+      "\\sqrt{16} = 4",
+      "```",
+      "",
+      "```javascript",
+      "const total = 2 + 3;",
+      "```",
+      "",
+      "```ino",
+      "void setup() { pinMode(13, OUTPUT); }",
+      "```",
+      "",
+      "```projectanvil-unknown",
+      "<mark>Keep me literal</mark>",
+      "```",
+      "",
+      "```mermaid",
+      "flowchart LR",
+      '  A["$$x^2 + y^2$$"] --> B["Review"]',
+      "```",
+      "",
+      '<img data-unsafe="true" src="missing-image" onerror="window.__markdownUnsafe=true">',
+    ].join("\n");
+    await upsert(owner, owner.personal.id, "notes", {
+      id: plainId,
+      title: "Plain rendering reference",
+      content:
+        "# Plain reference\n\nOrdinary prose and a [safe link](https://example.test).",
+    });
+    await upsert(owner, owner.personal.id, "notes", {
+      id: technicalId,
+      title: "Technical rendering reference",
+      content: technical,
+    });
+
+    // Inspect actual script responses, excluding service-worker precache fetches.
+    // Package signatures avoid depending on generated chunk names or hashes.
+    const trackedPage = owner.page;
+    const inspections: Promise<void>[] = [];
+    const formatterScripts: { phase: string; kind: string; url: string }[] = [];
+    let phase = "plain";
+    const inspectScript = (response: import("@playwright/test").Response) => {
+      if (response.request().resourceType() !== "script") return;
+      const startedIn = phase;
+      inspections.push(
+        response
+          .text()
+          .then((body) => {
+            if (body.includes("KaTeX parse error"))
+              formatterScripts.push({
+                phase: startedIn,
+                kind: "math",
+                url: response.url(),
+              });
+            if (
+              body.includes("highlightAll") &&
+              body.includes("registerLanguage")
+            )
+              formatterScripts.push({
+                phase: startedIn,
+                kind: "syntax",
+                url: response.url(),
+              });
+          })
+          .catch(() => undefined),
+      );
+    };
+    trackedPage.on("response", inspectScript);
+    try {
+      await openNote(owner, plainId);
+      const preview = () => owner.page.locator(".note-preview-pane .markdown");
+      await expect(
+        preview().getByRole("heading", {
+          name: "Plain reference",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await Promise.all([...inspections]);
+      expect(
+        formatterScripts.filter((entry) => entry.phase === "plain"),
+        "Ordinary prose must not fetch math or syntax engines as executable modules",
+      ).toEqual([]);
+
+      phase = "technical";
+      await openNote(owner, technicalId);
+      const assertFormatting = async () => {
+        await expect(preview().locator(".markdown-math .katex")).toHaveCount(3);
+        await expect(
+          preview().locator(".markdown-math .katex-display"),
+        ).toHaveCount(2);
+        await expect(
+          preview().locator("code.language-javascript.hljs .hljs-keyword"),
+        ).toHaveCount(1);
+        await expect(preview().locator("code.language-ino.hljs")).toContainText(
+          "pinMode",
+        );
+        expect(
+          await preview().locator("code.language-ino.hljs span").count(),
+        ).toBeGreaterThan(0);
+        const unknown = preview().locator("code.language-projectanvil-unknown");
+        await expect(unknown).toHaveText("<mark>Keep me literal</mark>\n");
+        await expect(unknown).not.toHaveClass(/hljs/);
+        await expect(preview().locator(".mermaid-diagram svg")).toBeVisible();
+        await expect(
+          preview().locator(".mermaid-diagram svg .katex"),
+        ).toHaveCount(1);
+        await expect(preview().locator(".mermaid-diagram")).toContainText(
+          "Review",
+        );
+        await expect(
+          preview().locator("script, img[data-unsafe], mark"),
+        ).toHaveCount(0);
+        expect(
+          await owner.page.evaluate(() => "__markdownUnsafe" in window),
+        ).toBeFalsy();
+      };
+      await assertFormatting();
+      await Promise.all([...inspections]);
+      expect(
+        new Set(
+          formatterScripts
+            .filter((entry) => entry.phase === "technical")
+            .map((entry) => entry.kind),
+        ),
+      ).toEqual(new Set(["math", "syntax"]));
+      await testInfo.attach("on-demand-formatters", {
+        body: JSON.stringify(
+          formatterScripts.map((entry) => ({
+            ...entry,
+            url: new URL(entry.url).pathname,
+          })),
+          null,
+          2,
+        ),
+        contentType: "application/json",
+      });
+      trackedPage.off("response", inspectScript);
+      await owner.page
+        .getByRole("group", { name: "Note view", exact: true })
+        .getByRole("button", { name: "Read", exact: true })
+        .click();
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+          const beforeTheme = await owner.page
+            .locator("html")
+            .getAttribute("data-theme");
+          const beforeDiagram = await preview()
+            .locator(".mermaid-diagram svg")
+            .getAttribute("id");
+          await owner.page
+            .getByRole("button", { name: /^Appearance:/ })
+            .click();
+          await owner.page
+            .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+            .click();
+          if (beforeTheme !== theme.toLowerCase())
+            await expect
+              .poll(() =>
+                preview().locator(".mermaid-diagram svg").getAttribute("id"),
+              )
+              .not.toBe(beforeDiagram);
+          await assertFormatting();
+          expect(
+            await owner.page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBeTruthy();
+          const path = testInfo.outputPath(
+            `technical-markdown-${theme.toLowerCase()}-${width}.png`,
+          );
+          await owner.page.screenshot({ path, fullPage: false });
+          await testInfo.attach(
+            `technical-markdown-${theme.toLowerCase()}-${width}`,
+            { path, contentType: "image/png" },
+          );
+        }
+      }
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+      await navigate(owner.page, "Workspace settings");
+      await expect(
+        owner.page.getByText(
+          "Application files are ready for offline startup.",
+          { exact: true },
+        ),
+      ).toBeVisible({ timeout: 30_000 });
+      await owner.page
+        .getByRole("button", {
+          name: /^(Save workspace offline|Refresh offline copy)$/,
+        })
+        .click();
+      await expect(
+        owner.page.getByText("Offline workspace copy saved", { exact: true }),
+      ).toBeVisible();
+      await openNote(owner, technicalId);
+      await assertFormatting();
+      await owner.context.setOffline(true);
+      await owner.page.close();
+      owner.page = await owner.context.newPage();
+      await owner.page.goto(`${base}/?note=${technicalId}`);
+      await expect(
+        owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+      ).toHaveValue(technical);
+      await assertFormatting();
+      await expect(owner.page.locator(".offline-banner")).toContainText(
+        "Working offline",
+      );
+    } finally {
+      trackedPage.off("response", inspectScript);
+      await owner.context.setOffline(false);
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+    expect(
+      (await workspace(owner)).notes.find((note) => note.id === technicalId)
+        ?.content,
+    ).toBe(technical);
   });
 });

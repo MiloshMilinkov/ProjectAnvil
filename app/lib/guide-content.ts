@@ -29,7 +29,7 @@ export const tourSteps: TourStep[] = [
     page: "overview",
     title: "Your ideas and your work, together",
     body: "Overview puts project progress, upcoming tasks, and recent notes first. Create a task from the top of the page or resume your latest work room. Use Notes to capture information and turn next steps into tasks.",
-    tip: "The sidebar groups planning and ideas. More tools holds work rooms, collections, and activity. Teams & workspaces and Workspace settings stay at the bottom; the project strip shows and clears your scope.",
+    tip: "More tools holds work rooms, collections, and activity. Teams & people and Workspace settings stay below; the project strip clears your scope. If a screen cannot open, reconnect and choose Retry opening. Your saved work stays available.",
     anchors: [
       '[data-tour="overview"]',
       ".view-overview .page-heading",
@@ -236,7 +236,7 @@ export const tourSteps: TourStep[] = [
     id: "markdown",
     page: "notes",
     title: "Write with Markdown",
-    body: "Write headings, lists, checkboxes, tables, quotes, highlighted text, footnotes, and code. Write, Split, and Read switch between editing and preview. Equations and Mermaid diagrams also render in notes.",
+    body: "Write headings, lists, checkboxes, tables, quotes, highlights, footnotes, and code. Write, Split, and Read switch views. Equations, Mermaid diagrams, and syntax colors prepare automatically when used. If formatting is unavailable, its source stays readable; reconnect or reopen the note to retry.",
     tip: "Drafts recover in this browser for the same account and workspace. Review unsaved changes lets you inspect and retry failed saves, or download displaced drafts from other windows for manual merging. Same-field conflicts keep your text for review.",
     anchors: [
       '[data-tour="note-editor"]',

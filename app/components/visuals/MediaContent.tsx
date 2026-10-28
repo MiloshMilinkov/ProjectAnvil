@@ -16,7 +16,6 @@ export function MediaContent({ media }: { media: Media }) {
   // Local authenticated media URLs need their original response; image optimization would add a second fetch path.
   if (media.type.startsWith("image/"))
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={resolved.url}
         alt={media.name}

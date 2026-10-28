@@ -21,6 +21,7 @@ jobs:
       - run: npm run install:ci
       - run: npm run security:audit
       - run: npm run check
+      - run: npm run size:report -- --check
 
   browser:
     name: Two-account browser regression checks

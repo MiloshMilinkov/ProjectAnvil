@@ -39,6 +39,7 @@ import { useDraftScope } from "./useRecoverableDraft";
 import { useWorkspacePermissions } from "./WorkspacePermissions";
 import {
   collectionTypeName,
+  groupCollectionItems,
   normalizeCollectionKeys,
   storedCollectionColumns,
   structuredPropertyKey,
@@ -99,12 +100,12 @@ const kindIcons: Record<string, typeof BookOpen> = {
   meeting: Users,
 };
 const label = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-const words = (note: Note) =>
+const countWords = (note: Note) =>
   note.content.trim().split(/\s+/).filter(Boolean).length;
-const excerpt = (content: string) =>
+const textExcerpt = (content: string) =>
   content
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/[#*`\[\]>_=]/g, "")
+    .replace(/[#*`[\]>_=]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 const numeric = (text: string) =>
@@ -298,7 +299,7 @@ export default function Collections({
             id: noteId,
             properties: { ...current.properties, [key]: value },
           },
-          base: { properties: current.properties },
+          base: { id: noteId, properties: current.properties },
         });
         if (next.revision >= workspaceRef.current.revision)
           workspaceRef.current = next;
@@ -339,169 +340,255 @@ export default function Collections({
       ),
     [workspace.notes, optimistic],
   );
-  const structuredColumns = new Map<
-    string,
-    { type: NoteType; field: NotePropertyField }
-  >(
-    (workspace.noteTypes || []).flatMap((type) =>
-      type.fields.map(
-        (field) =>
-          [structuredPropertyKey(type.id, field.id), { type, field }] as const,
-      ),
-    ),
-  );
-  const propertyLabel = (key: string) => {
-    const column = structuredColumns.get(key);
-    return column
-      ? `${collectionTypeName(column.type.name, kinds)} · ${column.field.name}`
-      : key;
-  };
-  const propertyValue = (note: Note, key: string) => {
-    const column = structuredColumns.get(key);
-    if (!column) return note.properties[key] || "";
-    if (note.customTypeId !== column.type.id) return "";
-    const value = note.propertyValues?.[column.field.id] || "";
-    return column.field.type === "checkbox" && value
-      ? value === "true"
-        ? "Yes"
-        : "No"
-      : value;
-  };
-  const typeLabel = (note: Note) => {
-    const type = (workspace.noteTypes || []).find(
-      (type) => type.id === note.customTypeId,
-    );
-    return type ? collectionTypeName(type.name, kinds) : label(note.kind);
-  };
-  const properties = [
-    ...new Set([
-      ...allNotes.flatMap((note) => Object.keys(note.properties)),
-      ...prefs.extraColumns,
-      ...[...structuredColumns.keys()].filter((key) =>
-        allNotes.some(
-          (note) => note.customTypeId === structuredColumns.get(key)?.type.id,
+  // Only snapshot changes rebuild text, type, and project lookups. Menu and drag
+  // state can reuse this model without repeatedly parsing every note body.
+  const {
+    structuredColumns,
+    typeLabel,
+    projectName,
+    usedTypes,
+    searchText,
+    words,
+    excerpt,
+  } = useMemo(() => {
+    const structuredColumns = new Map<
+      string,
+      { type: NoteType; field: NotePropertyField }
+    >(
+      (workspace.noteTypes || []).flatMap((type) =>
+        type.fields.map(
+          (field) =>
+            [
+              structuredPropertyKey(type.id, field.id),
+              { type, field },
+            ] as const,
         ),
       ),
-    ]),
-  ].sort();
-  const visibleColumns = (
-    prefs.columnsConfigured ? prefs.columns : properties.slice(0, 4)
-  ).filter((key) => properties.includes(key));
-  const tags = [...new Set(allNotes.flatMap((note) => note.tags))].sort();
-  const scopedToProject = !!projectFilter && projectFilter !== "all";
-  const activeProject = scopedToProject ? projectFilter : prefs.project;
-  const projectName = (id: string) =>
-    workspace.projects.find((project) => project.id === id)?.name ||
-    "No project";
-  const fieldValue = (note: Note, field: string): string =>
-    field.startsWith("prop:")
-      ? propertyValue(note, field.slice(5))
-      : field === "project"
-        ? projectName(note.projectId)
-        : field === "folder"
-          ? note.folder || "Unfiled"
-          : field === "kind"
-            ? typeLabel(note)
-            : field === "updated"
-              ? note.updatedAt
-              : note.title;
-  const query = prefs.query.trim().toLowerCase();
-  const filtered = allNotes
-    .filter(
-      (note) =>
-        (!activeProject || note.projectId === activeProject) &&
-        (!prefs.kind ||
-          (prefs.kind.startsWith("custom:")
-            ? note.customTypeId === prefs.kind.slice(7)
-            : note.kind === prefs.kind)) &&
-        (!prefs.tag || note.tags.includes(prefs.tag)) &&
-        (!query ||
-          [
-            note.title,
-            note.content,
-            note.folder,
-            ...note.tags,
-            ...Object.values(note.properties),
-            ...Object.values(note.propertyValues || {}),
-            typeLabel(note),
-            ...Object.values(note.decision || {}),
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(query)),
-    )
-    .sort((a, b) => {
-      const av = fieldValue(a, prefs.sort),
-        bv = fieldValue(b, prefs.sort);
-      const result =
-        numeric(av) && numeric(bv)
-          ? Number(av) - Number(bv)
-          : av.localeCompare(bv, undefined, {
-              numeric: true,
-              sensitivity: "base",
-            });
-      return (prefs.descending ? -1 : 1) * result;
-    });
-  const groups =
-    prefs.group === "none"
-      ? [{ name: "All notes", notes: filtered }]
-      : [
-          ...new Set(
-            filtered.map(
-              (note) => fieldValue(note, prefs.group) || "Unspecified",
-            ),
-          ),
+    );
+
+    const types = new Map(
+      (workspace.noteTypes || []).map((type) => [type.id, type]),
+    );
+    const projects = new Map(
+      workspace.projects.map((project) => [project.id, project.name]),
+    );
+    const usedTypes = new Set(allNotes.map((note) => note.customTypeId));
+    const typeLabel = (note: Note) => {
+      const type = types.get(note.customTypeId || "");
+      return type ? collectionTypeName(type.name, kinds) : label(note.kind);
+    };
+    const projectName = (id: string) => projects.get(id) || "No project";
+    const searchText = new Map<string, string>();
+    const text = new Map<string, { words: number; excerpt: string }>();
+    for (const note of allNotes) {
+      searchText.set(
+        note.id,
+        [
+          note.title,
+          note.content,
+          note.folder,
+          ...note.tags,
+          ...Object.values(note.properties),
+          ...Object.values(note.propertyValues || {}),
+          typeLabel(note),
+          ...Object.values(note.decision || {}),
         ]
-          .sort((a, b) => a.localeCompare(b))
-          .map((name) => ({
-            name,
-            notes: filtered.filter(
-              (note) =>
-                (fieldValue(note, prefs.group) || "Unspecified") === name,
-            ),
-          }));
-  const statusKey =
-    properties.find((key) => key.toLowerCase() === "status") || "Status";
-  const statuses = [
-    ...new Set([
-      "Draft",
-      "In progress",
-      "Review",
-      "Complete",
-      ...allNotes.map((note) => note.properties[statusKey]).filter(Boolean),
-    ]),
-  ];
-  const status = (note: Note) => note.properties[statusKey] || "Draft";
-  const numericProperties = properties.filter((key) => {
-    const values = filtered
-      .map((note) => propertyValue(note, key))
+          .join(" ")
+          .toLowerCase(),
+      );
+      if (!text.has(note.content))
+        text.set(note.content, {
+          words: countWords(note),
+          excerpt: textExcerpt(note.content).slice(0, 140),
+        });
+    }
+    return {
+      structuredColumns,
+      typeLabel,
+      projectName,
+      usedTypes,
+      searchText,
+      words: (note: Note) => text.get(note.content)?.words || 0,
+      excerpt: (content: string) => text.get(content)?.excerpt || "",
+    };
+  }, [allNotes, workspace.noteTypes, workspace.projects]);
+  const {
+    propertyLabel,
+    propertyValue,
+    properties,
+    visibleColumns,
+    tags,
+    filtered,
+    filteredById,
+    notesByStatus,
+    groups,
+    statusKey,
+    statuses,
+    status,
+    numericProperties,
+    summaryKey,
+    calculated,
+    hasFilters,
+    totalWords,
+    scopedToProject,
+    activeProject,
+  } = useMemo(() => {
+    const propertyLabel = (key: string) => {
+      const column = structuredColumns.get(key);
+      return column
+        ? `${collectionTypeName(column.type.name, kinds)} · ${column.field.name}`
+        : key;
+    };
+    const propertyValue = (note: Note, key: string) => {
+      const column = structuredColumns.get(key);
+      if (!column) return note.properties[key] || "";
+      if (note.customTypeId !== column.type.id) return "";
+      const value = note.propertyValues?.[column.field.id] || "";
+      return column.field.type === "checkbox" && value
+        ? value === "true"
+          ? "Yes"
+          : "No"
+        : value;
+    };
+    const properties = [
+      ...new Set([
+        ...allNotes.flatMap((note) => Object.keys(note.properties)),
+        ...prefs.extraColumns,
+        ...[...structuredColumns]
+          .filter(([, column]) => usedTypes.has(column.type.id))
+          .map(([key]) => key),
+      ]),
+    ].sort();
+    const visibleColumns = (
+      prefs.columnsConfigured ? prefs.columns : properties.slice(0, 4)
+    ).filter((key) => properties.includes(key));
+    const tags = [...new Set(allNotes.flatMap((note) => note.tags))].sort();
+    const scopedToProject = !!projectFilter && projectFilter !== "all";
+    const activeProject = scopedToProject ? projectFilter : prefs.project;
+    const fieldValue = (note: Note, field: string): string =>
+      field.startsWith("prop:")
+        ? propertyValue(note, field.slice(5))
+        : field === "project"
+          ? projectName(note.projectId)
+          : field === "folder"
+            ? note.folder || "Unfiled"
+            : field === "kind"
+              ? typeLabel(note)
+              : field === "updated"
+                ? note.updatedAt
+                : note.title;
+    const query = prefs.query.trim().toLowerCase();
+    const filtered = allNotes
+      .filter(
+        (note) =>
+          (!activeProject || note.projectId === activeProject) &&
+          (!prefs.kind ||
+            (prefs.kind.startsWith("custom:")
+              ? note.customTypeId === prefs.kind.slice(7)
+              : note.kind === prefs.kind)) &&
+          (!prefs.tag || note.tags.includes(prefs.tag)) &&
+          (!query || searchText.get(note.id)?.includes(query)),
+      )
+      .sort((a, b) => {
+        const av = fieldValue(a, prefs.sort),
+          bv = fieldValue(b, prefs.sort);
+        const result =
+          numeric(av) && numeric(bv)
+            ? Number(av) - Number(bv)
+            : av.localeCompare(bv, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              });
+        return (prefs.descending ? -1 : 1) * result;
+      });
+    const groups =
+      prefs.group === "none"
+        ? [{ name: "All notes", notes: filtered }]
+        : groupCollectionItems(filtered, (note) =>
+            fieldValue(note, prefs.group),
+          );
+    const statusKey =
+      properties.find((key) => key.toLowerCase() === "status") || "Status";
+    const statuses = [
+      ...new Set([
+        "Draft",
+        "In progress",
+        "Review",
+        "Complete",
+        ...allNotes.map((note) => note.properties[statusKey]).filter(Boolean),
+      ]),
+    ];
+    const status = (note: Note) => note.properties[statusKey] || "Draft";
+    const filteredById = new Map(filtered.map((note) => [note.id, note]));
+    const notesByStatus = new Map(
+      groupCollectionItems(filtered, status).map((group) => [
+        group.name,
+        group.notes,
+      ]),
+    );
+    const numericProperties = properties.filter((key) => {
+      const values = filtered
+        .map((note) => propertyValue(note, key))
+        .filter((value) => value.trim());
+      return values.length > 0 && values.every(numeric);
+    });
+    const summaryKey =
+      prefs.summaryProperty && properties.includes(prefs.summaryProperty)
+        ? prefs.summaryProperty
+        : numericProperties[0] || properties[0] || "";
+    const summaryValues = filtered
+      .map((note) => propertyValue(note, summaryKey))
       .filter((value) => value.trim());
-    return values.length > 0 && values.every(numeric);
-  });
-  const summaryKey =
-    prefs.summaryProperty && properties.includes(prefs.summaryProperty)
-      ? prefs.summaryProperty
-      : numericProperties[0] || properties[0] || "";
-  const summaryValues = filtered
-    .map((note) => propertyValue(note, summaryKey))
-    .filter((value) => value.trim());
-  const summaryNumbers = summaryValues.filter(numeric).map(Number);
-  const sum = summaryNumbers.reduce((total, value) => total + value, 0);
-  const calculated =
-    prefs.summaryOperation === "count"
-      ? summaryValues.length
-      : prefs.summaryOperation === "average"
-        ? summaryNumbers.length
-          ? sum / summaryNumbers.length
-          : 0
-        : sum;
-  const hasFilters = !!(
-    prefs.query ||
-    (!scopedToProject && prefs.project) ||
-    prefs.kind ||
-    prefs.tag
-  );
-  const totalWords = filtered.reduce((sum, note) => sum + words(note), 0);
+    const summaryNumbers = summaryValues.filter(numeric).map(Number);
+    const sum = summaryNumbers.reduce((total, value) => total + value, 0);
+    const calculated =
+      prefs.summaryOperation === "count"
+        ? summaryValues.length
+        : prefs.summaryOperation === "average"
+          ? summaryNumbers.length
+            ? sum / summaryNumbers.length
+            : 0
+          : sum;
+    const hasFilters = !!(
+      prefs.query ||
+      (!scopedToProject && prefs.project) ||
+      prefs.kind ||
+      prefs.tag
+    );
+    const totalWords = filtered.reduce((sum, note) => sum + words(note), 0);
+
+    return {
+      propertyLabel,
+      propertyValue,
+      properties,
+      visibleColumns,
+      tags,
+      filtered,
+      filteredById,
+      notesByStatus,
+      groups,
+      statusKey,
+      statuses,
+      status,
+      numericProperties,
+      summaryKey,
+      calculated,
+      hasFilters,
+      totalWords,
+      scopedToProject,
+      activeProject,
+    };
+  }, [
+    allNotes,
+    structuredColumns,
+    typeLabel,
+    projectName,
+    usedTypes,
+    searchText,
+    words,
+    prefs,
+    projectFilter,
+  ]);
   const groupingOptions = (
     <>
       <option value="none">No grouping</option>
@@ -1064,22 +1151,17 @@ export default function Collections({
               tabIndex={0}
             >
               {statuses.map((column, index) => {
-                const notes = filtered.filter(
-                  (note) => status(note) === column,
-                );
+                const notes = notesByStatus.get(column) || [];
                 return (
                   <section
                     className={`base-board-column ${dragColumn === column ? "drop-active" : ""}`}
                     key={column}
                     onDragOver={(event) => {
+                      const dragged = filteredById.get(dragging);
                       if (
                         !canCreate ||
-                        !dragging ||
-                        !filtered.some(
-                          (note) =>
-                            note.id === dragging &&
-                            canEditProject(note.projectId),
-                        )
+                        !dragged ||
+                        !canEditProject(dragged.projectId)
                       )
                         return;
                       event.preventDefault();
@@ -1102,7 +1184,7 @@ export default function Collections({
                         ) || dragging;
                       setDragging("");
                       setDragColumn("");
-                      if (filtered.some((note) => note.id === id))
+                      if (filteredById.has(id))
                         saveProperty(id, statusKey, column);
                     }}
                   >

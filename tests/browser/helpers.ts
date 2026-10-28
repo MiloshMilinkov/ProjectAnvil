@@ -129,10 +129,9 @@ export async function navigate(page: Page, name: string | RegExp) {
     // Operational workflows explicitly choose the optional storage section.
     // Default disclosure state has dedicated UX regression coverage.
     const data = page.locator('[data-settings-group="data"]');
-    if (await data.count()) {
-      if ((await data.getAttribute("open")) === null)
-        await data.locator(":scope > summary").click();
-    }
+    await expect(data).toBeVisible();
+    if ((await data.getAttribute("open")) === null)
+      await data.locator(":scope > summary").click();
   }
 }
 

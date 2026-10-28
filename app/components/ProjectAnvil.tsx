@@ -47,23 +47,17 @@ import {
 } from "../lib/workspace-preferences";
 import { AccountMenu, TeamManager, WorkspaceSwitcher } from "./AccountControls";
 import ActivityCenter from "./ActivityCenter";
-import Brainstorming from "./Brainstorming";
-import Collections from "./Collections";
 import GuidedTour from "./GuidedTour";
-import Knowledge from "./Knowledge";
 import NotificationCenter from "./NotificationCenter";
 import { OfflineMediaProvider } from "./OfflineMediaProvider";
 import PendingChanges from "./PendingChanges";
 import PersonDialog from "./PersonDialog";
 import ProjectDialog from "./ProjectDialog";
-import ProjectHome from "./ProjectHome";
 import RemindersCenter from "./RemindersCenter";
 import TaskDialog from "./TaskDialog";
 import TaskReadOnlyDialog from "./TaskReadOnlyDialog";
 import { AppearanceMenu } from "./ThemeControls";
 import TrashDialog from "./TrashDialog";
-import { CanvasView } from "./visuals/CanvasView";
-import { GraphView } from "./visuals/GraphView";
 import WorkRooms, { WorkRoomShelf } from "./WorkRooms";
 import { useWorkspacePermissions } from "./WorkspacePermissions";
 import { useWorkspaceScope } from "./WorkspaceScope";
@@ -81,14 +75,48 @@ import WorkspaceSearch from "./shell/WorkspaceSearch";
 import PageHeader from "./PageHeader";
 import ProjectCard from "./dashboard/ProjectCard";
 import WorkspaceOverview from "./dashboard/WorkspaceOverview";
-import WorkspaceSettings from "./settings/WorkspaceSettings";
+import { deferredFeature } from "./shell/DeferredFeature";
 import {
   workspaceNavigation as nav,
   type WorkspacePage,
 } from "./shell/navigation";
 import TaskWorkspace from "./tasks/TaskWorkspace";
+import type { CanvasViewProps } from "./visuals/canvas-model";
 
 type Page = WorkspacePage;
+const Knowledge = deferredFeature(() => import("./Knowledge"), "notes");
+const Collections = deferredFeature(
+  () => import("./Collections"),
+  "collections",
+);
+const Brainstorming = deferredFeature(
+  () => import("./Brainstorming"),
+  "brainstorming",
+);
+const ProjectHome = deferredFeature(
+  () => import("./ProjectHome"),
+  "project home",
+);
+const WorkspaceSettings = deferredFeature(
+  () => import("./settings/WorkspaceSettings"),
+  "workspace settings",
+);
+const CanvasView = deferredFeature<CanvasViewProps>(
+  () =>
+    import("./visuals/CanvasView").then((module) => ({
+      default: module.CanvasView,
+    })),
+  "canvas",
+);
+const GraphView = deferredFeature<
+  FeatureProps & { onClearProjectFilter?: () => void }
+>(
+  () =>
+    import("./visuals/GraphView").then((module) => ({
+      default: module.GraphView,
+    })),
+  "relationship graph",
+);
 export default function ProjectAnvil() {
   const phoneLayout = useMediaQuery("(max-width: 760px)");
   const navigationButton = useRef<HTMLButtonElement>(null);

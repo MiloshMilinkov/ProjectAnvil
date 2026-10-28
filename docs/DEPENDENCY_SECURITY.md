@@ -1,6 +1,6 @@
 # Dependency security
 
-Reviewed **2026-10-27**. The current lockfile reports **zero production vulnerabilities**. The full audit reports **three moderate entries**, all from the Satori toolchain chain below; no high or critical entries remain. Audit results can change when advisories are published. Exact versions and targeted overrides are in [package.json](../package.json) and [package-lock.json](../package-lock.json).
+Reviewed **2026-10-28**. The current lockfile reports **zero production vulnerabilities**. The full audit reports **three moderate entries**, all from the Satori toolchain chain below; no high or critical entries remain. Audit results can change when advisories are published. Exact versions and targeted overrides are in [package.json](../package.json) and [package-lock.json](../package-lock.json).
 
 ## Remaining toolchain advisory
 
@@ -12,10 +12,10 @@ The normal launcher builds when source changes, reuses a current production buil
 
 ## Maintenance choices
 
-Unused starter UI packages have been removed. Existing stylesheet and Markdown type imports are now explicit dependencies. Targeted security updates include Next/ESLint **16.4.3**, `fast-uri` **3.1.9**, and Undici **7.30.1**, while retaining the current Cloudflare/Vinext integration.
+Unused starter UI packages, connector-preview support, the redundant Next.js package, and two formatting wrappers have been removed. Vinext supplies the existing runtime and compatibility types. Standalone JavaScript, TypeScript, React, Hooks, and accessibility lint rules replace the Next-dependent lint parser. `fast-uri` **3.1.9** and Undici **7.30.1** remain pinned, while the Cloudflare/Vinext integration is retained.
 
 - The legacy Drizzle loader has a targeted esbuild override. Verify schema loading when changing it; a forced Drizzle downgrade can conflict with Better Auth.
-- Markdown math plugins use patched KaTeX overrides. Check inline/display math and diagrams after updates.
+- Notes, math parsing, and Mermaid use one pinned KaTeX **0.19.0** installation. Check inline/display/fenced equations and diagram math labels after updates. Code highlighting retains the former common languages and aliases, including Arduino/ino.
 - Broad framework or local-worker upgrades need a complete backup/restore rehearsal with isolated data. Follow [local setup](LOCAL_SETUP.md); preserve ordinary application data.
 
 ## Checking updates

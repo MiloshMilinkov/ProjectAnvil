@@ -4,10 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeHighlight from "rehype-highlight";
-import "katex/dist/katex.min.css";
-import "./knowledge.css";
+import "./markdown.css";
 import { useAppearance } from "./ThemeControls";
 import type { Note, Workspace } from "../lib/types";
 import type { Root } from "mdast";
@@ -33,6 +30,155 @@ const textOf = (children: React.ReactNode): string =>
           : "",
     )
     .join("");
+
+type MarkupKind = "code" | "inline-math" | "display-math";
+
+/** Heavy formatters load for actual parsed code/math nodes, not ordinary notes. */
+async function renderMarkup(
+  source: string,
+  kind: MarkupKind,
+  language: string,
+) {
+  if (kind !== "code") {
+    const [{ default: katex }] = await Promise.all([
+      import("katex"),
+      import("katex/dist/katex.min.css"),
+    ]);
+    return katex.renderToString(source, {
+      displayMode: kind === "display-math",
+      throwOnError: false,
+      strict: "ignore",
+      trust: false,
+    });
+  }
+  const { default: highlighter } = await import("highlight.js/lib/common");
+  // lowlight's former common registry included Arduino in addition to these 36.
+  if (
+    ["arduino", "ino"].includes(language.toLowerCase()) &&
+    !highlighter.getLanguage("arduino")
+  ) {
+    const { default: arduino } = await import(
+      "highlight.js/lib/languages/arduino"
+    );
+    highlighter.registerLanguage("arduino", arduino);
+  }
+  return highlighter.getLanguage(language)
+    ? highlighter.highlight(source, { language, ignoreIllegals: true }).value
+    : null;
+}
+
+function useRenderedMarkup(source: string, kind: MarkupKind, language = "") {
+  const [result, setResult] = useState<{
+    source: string;
+    kind: MarkupKind;
+    language: string;
+    html: string | null;
+    failed: boolean;
+  } | null>(null);
+  const enabled = kind !== "code" || !!language;
+  useEffect(() => {
+    if (!enabled) return;
+    let active = true;
+    let pending = false;
+    let failed = false;
+    const render = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const html = await renderMarkup(source, kind, language);
+        failed = false;
+        if (active) setResult({ source, kind, language, html, failed: false });
+      } catch {
+        failed = true;
+        if (active)
+          setResult({ source, kind, language, html: null, failed: true });
+      } finally {
+        pending = false;
+      }
+    };
+    const retry = () => {
+      if (failed) void render();
+    };
+    void render();
+    window.addEventListener("online", retry);
+    return () => {
+      active = false;
+      window.removeEventListener("online", retry);
+    };
+  }, [source, kind, language, enabled]);
+  const current =
+    result?.source === source &&
+    result.kind === kind &&
+    result.language === language
+      ? result
+      : null;
+  return {
+    html: current?.html,
+    failed: current?.failed,
+    pending: enabled && !current,
+  };
+}
+
+function MathExpression({
+  source,
+  display = false,
+}: {
+  source: string;
+  display?: boolean;
+}) {
+  const { html, failed, pending } = useRenderedMarkup(
+    source,
+    display ? "display-math" : "inline-math",
+  );
+  const Element = display ? "div" : "span";
+  return (
+    <Element
+      className="markdown-math"
+      aria-busy={pending || undefined}
+      title={
+        failed
+          ? "Math rendering is unavailable. Reconnect to retry; the source remains readable."
+          : undefined
+      }
+    >
+      {html ? (
+        <span dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <code>{source}</code>
+      )}
+    </Element>
+  );
+}
+
+function SyntaxCode({
+  className,
+  children,
+}: {
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const source = textOf(children);
+  const language = className?.match(/\blanguage-([^\s]+)/)?.[1] || "";
+  const { html, failed, pending } = useRenderedMarkup(source, "code", language);
+  return html ? (
+    <code
+      className={`hljs ${className || ""}`}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  ) : (
+    <code
+      className={className}
+      aria-busy={pending || undefined}
+      title={
+        failed
+          ? "Syntax colors are unavailable. Reconnect to retry; the code remains readable."
+          : undefined
+      }
+    >
+      {children}
+    </code>
+  );
+}
 
 // Build highlight nodes directly in the Markdown tree, without accepting raw HTML.
 interface MarkdownSyntaxNode {
@@ -217,7 +363,7 @@ function wikiLinks(content: string, workspace: Workspace) {
             const title = hash < 0 ? target : target.slice(0, hash);
             const anchor = hash < 0 ? "" : target.slice(hash + 1);
             const note = resolveNote(workspace, title);
-            const label = (alias || target).replace(/[\[\]]/g, "");
+            const label = (alias || target).replace(/\[|\]/g, "");
             return `[${label}](#note:${encodeURIComponent(note?.id || title)}:${encodeURIComponent(anchor)})`;
           }),
     )
@@ -271,7 +417,6 @@ function MarkdownAttachment({
       </a>
     );
   // Authenticated attachment and ephemeral Blob URLs must not use a separate optimizer.
-  // eslint-disable-next-line @next/next/no-img-element
   return <img src={resolved.url} alt={alt || ""} loading="lazy" />;
 }
 
@@ -351,10 +496,6 @@ function MarkdownBody({
           <ReactMarkdown
             key={partIndex}
             remarkPlugins={[remarkGfm, remarkMath, remarkHighlights]}
-            rehypePlugins={[
-              rehypeKatex,
-              [rehypeHighlight, { ignoreMissing: true }],
-            ]}
             components={{
               a: ({ href, children }) => {
                 if (href?.startsWith("#note:")) {
@@ -451,13 +592,29 @@ function MarkdownBody({
                     className?: string;
                     children?: React.ReactNode;
                   }>(child) &&
-                  child.props.className?.includes("language-mermaid")
-                )
-                  return (
-                    <Mermaid source={textOf(child.props.children).trim()} />
-                  );
+                  child.props.className
+                ) {
+                  const classes = child.props.className.split(/\s+/);
+                  if (classes.includes("language-mermaid"))
+                    return (
+                      <Mermaid source={textOf(child.props.children).trim()} />
+                    );
+                  if (classes.includes("language-math"))
+                    return (
+                      <MathExpression
+                        source={textOf(child.props.children)}
+                        display
+                      />
+                    );
+                }
                 return <pre>{children}</pre>;
               },
+              code: ({ className, children }) =>
+                className?.split(/\s+/).includes("math-inline") ? (
+                  <MathExpression source={textOf(children)} />
+                ) : (
+                  <SyntaxCode className={className}>{children}</SyntaxCode>
+                ),
               img: ({ src, alt }) => (
                 <MarkdownAttachment
                   src={typeof src === "string" ? src : undefined}

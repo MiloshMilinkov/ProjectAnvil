@@ -186,6 +186,59 @@ test("SQLite corruption is rejected even when file hashes were recomputed", asyn
   await assert.rejects(() => verifyBackup(backup), /SQLite|database|malformed/);
 });
 
+test("verification preserves the primary error when owned scratch cleanup also fails", async (t) => {
+  const f = await fixture(t);
+  const backup = await createBackup({ projectRoot: f.project, port: f.port });
+  const originalBytes = await fs.readFile(f.sqlite);
+  const temporaryRoot = path.resolve(os.tmpdir());
+  const primary = new Error("Injected verification copy failure");
+  const cleanup = new Error("Injected scratch cleanup failure");
+  const copyFile = fs.copyFile;
+  const remove = fs.rm;
+  let scratch;
+  let cleanupAttempted = false;
+  fs.copyFile = async (source, destination, ...options) => {
+    const directory = path.dirname(path.resolve(destination));
+    if (path.basename(directory).startsWith("projectanvil-backup-verify-")) {
+      assert.equal(path.dirname(directory), temporaryRoot);
+      scratch = directory;
+      throw primary;
+    }
+    return copyFile(source, destination, ...options);
+  };
+  fs.rm = async (target, ...options) => {
+    if (scratch && path.resolve(target) === scratch) {
+      assert.equal(path.dirname(scratch), temporaryRoot);
+      assert(path.basename(scratch).startsWith("projectanvil-backup-verify-"));
+      cleanupAttempted = true;
+      throw cleanup;
+    }
+    return remove(target, ...options);
+  };
+  try {
+    await assert.rejects(
+      () => verifyBackup(backup),
+      (error) => {
+        assert(error instanceof AggregateError);
+        assert.deepEqual(error.errors, [primary, cleanup]);
+        return true;
+      },
+    );
+    assert(cleanupAttempted);
+    assert.equal((await fs.readFile(f.sqlite)).compare(originalBytes), 0);
+  } finally {
+    fs.copyFile = copyFile;
+    fs.rm = remove;
+    if (scratch) {
+      assert.equal(path.dirname(path.resolve(scratch)), temporaryRoot);
+      assert(path.basename(scratch).startsWith("projectanvil-backup-verify-"));
+      assert.equal((await fs.lstat(scratch)).isSymbolicLink(), false);
+      await fs.rm(scratch, { recursive: true, force: true });
+    }
+  }
+  await verifyBackup(backup);
+});
+
 test("an invalid signing secret cannot be mistaken for a complete account backup", async (t) => {
   const f = await fixture(t);
   await fs.writeFile(

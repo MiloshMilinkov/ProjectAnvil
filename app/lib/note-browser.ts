@@ -28,7 +28,7 @@ export function indexNotes(
       `${note.title} ${note.content} ${note.tags.join(" ")} ${Object.values(note.propertyValues || {}).join(" ")} ${note.decision ? Object.values(note.decision).join(" ") : ""}`.toLowerCase(),
     excerpt:
       note.content
-        .replace(/[#*\[\]`>_=]/g, "")
+        .replace(/[#*[\]`>_=]/g, "")
         .replace(/\s+/g, " ")
         .slice(0, 90) || "A blank page, a new possibility.",
     typeLabel:

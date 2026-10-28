@@ -135,6 +135,7 @@ function validRelative(relative, directory = false) {
         !component ||
         component === "." ||
         component === ".." ||
+        // eslint-disable-next-line no-control-regex -- Backup paths intentionally reject unsafe C0 filename controls.
         /[<>:"|?*\u0000-\u001f]/u.test(component) ||
         /[. ]$/u.test(component) ||
         /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/iu.test(component),
@@ -302,6 +303,7 @@ async function sqliteFiles(payload, files) {
   const scratch = await fs.mkdtemp(
     path.join(temporaryRoot, "projectanvil-backup-verify-"),
   );
+  const failures = [];
   try {
     for (let index = 0; index < databases.length; index++) {
       const relative = databases[index];
@@ -325,8 +327,10 @@ async function sqliteFiles(payload, files) {
         database.close();
       }
     }
-    return databases;
-  } finally {
+  } catch (error) {
+    failures.push(error);
+  }
+  try {
     const difference = path.relative(temporaryRoot, path.resolve(scratch));
     if (
       !difference ||
@@ -337,7 +341,16 @@ async function sqliteFiles(payload, files) {
       throw new Error("Refusing to clean an unexpected verification folder.");
     await noLinks(scratch);
     await fs.rm(scratch, { recursive: true, force: true });
+  } catch (error) {
+    failures.push(error);
   }
+  if (failures.length > 1)
+    throw new AggregateError(
+      failures,
+      "Backup verification and cleanup both failed.",
+    );
+  if (failures.length) throw failures[0];
+  return databases;
 }
 
 async function buildManifest(payload, projectRoot) {

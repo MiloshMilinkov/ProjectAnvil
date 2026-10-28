@@ -58,6 +58,7 @@ export function portablePath(value: string): string {
         !segment ||
         segment === "." ||
         segment === ".." ||
+        // eslint-disable-next-line no-control-regex -- Portable paths reject C0 controls and DEL.
         /[\\:*?"<>|\x00-\x1f\x7f]/.test(segment) ||
         /[. ]$/.test(segment) ||
         dangerous.has(segment.toLowerCase()) ||
@@ -479,6 +480,7 @@ export function readPortableBundle(files: PortableFile[]): PortableBundle {
         typeof value.name !== "string" ||
         !value.name ||
         value.name.length > 240 ||
+        // eslint-disable-next-line no-control-regex -- Untrusted attachment names must not contain control bytes.
         /[\x00-\x1f\x7f]/.test(value.name) ||
         typeof value.type !== "string" ||
         !/^[A-Za-z0-9.+_-]+\/[A-Za-z0-9.+_-]+$/.test(value.type) ||
@@ -514,6 +516,7 @@ function safeSegment(value: string) {
   const cleaned =
     value
       .normalize("NFC")
+      // eslint-disable-next-line no-control-regex -- Export filenames deliberately replace C0 controls and DEL.
       .replace(/[\\/:*?"<>|#^()[\]!\x00-\x1f\x7f]/g, "_")
       .replace(/[. ]+$/g, "")
       .trim()

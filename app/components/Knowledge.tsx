@@ -90,9 +90,6 @@ import {
 import { noteTemplateContent } from "../lib/personal-templates";
 import { moveToTrash } from "../lib/trash-actions";
 import "./knowledge.css";
-import "./templates.css";
-import "./note-recovery.css";
-import "./knowledge-ux.css";
 import { useNoteCollaboration } from "./useNoteCollaboration";
 import LiveNoteStatus from "./LiveNoteStatus";
 import { hasSharedNoteDraft } from "../lib/note-collaboration-draft-keys";
@@ -1175,7 +1172,7 @@ export default function Knowledge({
       // The upload route stores media in the shared workspace; upsert also refreshes clients.
       if (!updatedWorkspace)
         await mutate({ action: "upsert", entity: "media", item: media });
-      const syntax = `\n![${file.name.replace(/[\[\]]/g, "")}](${media.url})\n`;
+      const syntax = `\n![${file.name.replace(/\[|\]/g, "")}](${media.url})\n`;
       if (draftRef.current?.id === target) insert(syntax);
       else {
         const note =

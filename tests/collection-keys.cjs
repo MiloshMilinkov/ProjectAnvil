@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const {
   collectionTypeName,
+  groupCollectionItems,
   normalizeCollectionKeys,
   storedCollectionColumns,
   structuredPropertyKey,
@@ -85,6 +86,53 @@ assert.equal(
   collectionTypeName("My research", ["note", "research"]),
   "My research",
 );
+const rows = [
+  { id: "later-b", group: "Beta" },
+  { id: "first-a", group: "Alpha" },
+  { id: "empty", group: "" },
+  { id: "second-a", group: "Alpha" },
+  { id: "literal-empty", group: "Unspecified" },
+];
+let groupReads = 0;
+const original = JSON.stringify(rows);
+assert.deepEqual(
+  groupCollectionItems(rows, (row) => {
+    groupReads++;
+    return row.group;
+  }),
+  [
+    { name: "Alpha", notes: [rows[1], rows[3]] },
+    { name: "Beta", notes: [rows[0]] },
+    { name: "Unspecified", notes: [rows[2], rows[4]] },
+  ],
+);
+assert.equal(
+  groupReads,
+  rows.length,
+  "Grouping reads each value once, including distinct-group workloads",
+);
+assert.equal(
+  JSON.stringify(rows),
+  original,
+  "Grouping preserves original records and their order",
+);
+assert.deepEqual(
+  groupCollectionItems([], () => "never"),
+  [],
+);
+const manyGroups = Array.from({ length: 1000 }, (_, index) => ({
+  id: index,
+  group: `group-${index}`,
+}));
+groupReads = 0;
+assert.equal(
+  groupCollectionItems(manyGroups, (row) => {
+    groupReads++;
+    return row.group;
+  }).length,
+  1000,
+);
+assert.equal(groupReads, 1000);
 console.log(
-  "PASS: structured collection key bounds, UUID persistence, collision isolation, legacy selections, and distinct custom type labels.",
+  "PASS: structured collection keys, legacy selections, distinct type labels, stable groups, and linear group lookups.",
 );

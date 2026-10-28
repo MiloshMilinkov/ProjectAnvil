@@ -59,7 +59,32 @@ The same three-profile workload passed after separating the task, dashboard, set
 
 The expanded browser suite passed **nine workflows**, including combined note filters, clear/reset counts, preserved project/editor scope, viewer controls, and ten theme/viewport screenshots. Type, lint, model/API, backup, offline-cache, migration-fingerprint, and production-build checks passed. Production audit findings remain zero; the outstanding development-tool advisory is recorded in [Dependency security](DEPENDENCY_SECURITY.md).
 
-The earlier reports are preserved in ignored `outputs/performance/before-structure-cleanup/`; the latest `optimized.json` identifies build `f36206324109b908b691` and its source fingerprint.
+The earlier reports are preserved in ignored `outputs/performance/before-structure-cleanup/`. The structure-cleanup report, build `f36206324109b908b691`, is also retained in `outputs/performance/before-debloat/optimized.json` before the latest rerun.
+
+## Size and maintenance review
+
+The 28 October 2026 review separates Git source, installed development dependencies, and generated browser files. The original checkout had **330 source/configuration/test/documentation files** totaling **3,406,588 bytes**. Dependencies occupied **1,100,175,437 bytes** across **51,862 files**; these are ignored by Git. Existing private data, backups, and debugging records were preserved.
+
+The cleanup removes unused connector integration and orphan helpers, consolidates note styles while separating renderer-only CSS, and replaces redundant framework/formatting packages with the existing Vinext runtime and direct formatters. Optional screens have one loading/retry boundary; syntax and math load only for parsed content that needs them. WOFF2 retains all math font families while avoiding two obsolete copies of each font.
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| Reviewable source/configuration/test/documentation files | 330 | 317 |
+| Installed dependency files | 51,862 | 40,986 |
+| Installed dependency bytes | 1,100,175,437 | 776,930,197 |
+| Startup JavaScript, raw | 1,762,940 | 1,047,317 |
+| Startup JavaScript, gzip | 518,544 | 314,732 |
+| Complete offline app bytes | 8,505,175 | 7,436,909 |
+| Math font files | 60 | 20 |
+| Generated offline app files | 185 | 198 |
+
+Installed dependency bytes decreased **29.4%**, raw startup JavaScript **40.6%**, and complete offline bytes **12.6%**. Generated file count increased because optional screens now have independent chunks; reviewed source file count decreased by 13. Useful slides, pop-out notes, structured properties, and workspace tools remain because their removal would save little or complicate existing work. Reports are retained under ignored `outputs/size/`; the initial source count is from the clean Git checkout, while the baseline runtime report was captured before rebuilding.
+
+Collections now builds groups in one pass and caches snapshot-derived indexes. A regression with 1,000 distinct groups checks 1,000 group-value reads instead of the former 1,001,000. Its property writer also includes the required record ID in revision comparisons, fixing rejected property saves. Backup verification retains both the original failure and a cleanup failure rather than losing one error.
+
+Use `npm run size:report -- --disk --out outputs/size/review.json` after a current production build. Reports include raw/gzip bytes for the browser entry and static dependency closure of AccountShell, ThemeControls, and AppInstallation. They exclude optional dynamic imports; this is a build footprint measure, not a network timing or browser-memory benchmark. Offline bytes include optional features so prepared offline work retains them. Code splitting may increase generated JavaScript file counts even when source files and byte totals decrease.
+
+The finished build passed type/lint/API/model checks, 29 Node regressions, 15 two-account browser workflows, the new size budgets, and all three existing capacity profiles. At the large profile, all ten distinct-task writes succeeded, full owner reads measured 67 ms median, and task opening measured 816 ms for both account observations. Search measured 269–279 ms; it did not show a consistent improvement over the prior 224–259 ms. Access, conflict, retry, and quota assertions passed with no browser JavaScript exceptions. These local results support capacity preservation; the demonstrated improvement is payload size, not a general latency guarantee.
 
 ## Remaining capacity work
 

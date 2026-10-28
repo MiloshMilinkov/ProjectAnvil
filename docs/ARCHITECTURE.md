@@ -4,6 +4,8 @@
 
 ProjectAnvil uses React and Next-style app routes, built with Vinext and Vite. The local worker supplies the API, database binding, and file bucket. The browser calls the same API for guest, personal, and team workspaces.
 
+Vinext supplies the runtime and [compatibility types](https://github.com/cloudflare/vinext#faq); a separate Next.js installation is unnecessary. ESLint uses standalone JavaScript, TypeScript, React, Hooks, and accessibility rules. The worker delegates directly to Vinext; unused external-app connector scaffolding is removed.
+
 ## Where code belongs
 
 | Location | Responsibility |
@@ -12,6 +14,7 @@ ProjectAnvil uses React and Next-style app routes, built with Vinext and Vite. T
 | `app/components/AccountShell.tsx` | Account/session refresh and switching between accessible workspaces. |
 | `app/components/ProjectAnvil.tsx` | Application navigation, project scope, and composing feature screens. Keep detailed feature rendering outside this file. |
 | `app/components/dashboard/`, `tasks/`, `settings/`, `shell/` | Focused dashboard, task views, workspace settings, and navigation definitions. |
+| `app/components/shell/DeferredFeature.tsx` | Shared loading/retry boundary for optional screens; failures retain the surrounding workspace and retry without a reload. |
 | `app/components/GuidedTour.tsx`, `app/lib/guide-content.ts` | Guide presentation and positioning, separated from the eight-step Quick start and searchable topic catalogue. Keep detailed feature explanations in the relevant optional topic. |
 | `app/components/visuals/` | Graph and canvas views, their local models, canvas inspector/add dialog, media rendering, and surface sizing. |
 | `app/components/notes/`, `app/lib/note-browser.ts`, `app/lib/note-template-catalog.ts` | Note browsing and dialog presentation, pure search/filter indexing, and the single built-in template catalogue. `Knowledge.tsx` retains editor persistence and collaboration coordination. |
@@ -20,6 +23,7 @@ ProjectAnvil uses React and Next-style app routes, built with Vinext and Vite. T
 | `app/api/` | Request handlers for workspaces, accounts, teams, media, collaboration, and portability. Delegate business rules and persistence to `app/lib/`. |
 | `db/`, `drizzle/` | Database schemas and checked-in SQL migrations; preserve existing data when changing them. |
 | `public/` | Static icons, install manifest, and service worker. Private workspace content does not belong here. |
+| `app/components/markdown.css`, `knowledge.css` | Renderer-only styles and the consolidated note editor styles. Math and syntax-formatting modules load only for actual parsed content. |
 | `scripts/`, `build/` | Maintained startup, build, backup, test-runner, and local worker integration code. `build/` contains source; `dist/` contains generated output. |
 | `tests/` | Model/API regression checks, isolated browser workflows, and synthetic performance workloads. |
 | `docs/` | Maintained contributor and operating guides; the README remains the public feature overview. |
@@ -29,6 +33,7 @@ ProjectAnvil uses React and Next-style app routes, built with Vinext and Vite. T
 - Put rendering and interaction state in the relevant feature component. Extract a cohesive dialog, panel, or view when it has a clear responsibility; avoid splitting solely to shorten a file.
 - Keep React lifecycle work in hooks. `useWorkspaceData` owns workspace reads, acknowledged writes, queued changes, and offline reconciliation. Editor hooks own recoverable drafts; `useCanvasPersistence` owns canvas draft/save recovery. Reuse these paths instead of adding another save queue.
 - Keep domain rules and transformations independent of React and network requests. Shared examples include `workspace-model`, `task-scheduling`, `relationships`, and `portable-markdown`. A pure helper used only by one feature may stay beside that feature, as the graph and canvas models do.
+- Cache derived indexes from immutable workspace snapshots; avoid repeated full-list scans for every group or menu render. Keep heavy optional screens behind the shared boundary. Use `npm run size:report` to check source count, startup dependency closure, fonts, and the complete offline package before claiming a size improvement.
 - Server modules such as `access-store`, `workspace-store`, `workspace-journal`, and `media-store` resolve access and persist data. Client components must not import their runtime code. Browser modules such as `draft-store`, `offline-store`, and `browser-preferences` serve a different purpose; a `store` suffix alone does not mean a module is server-only.
 - Import shared types with `import type`. Keep dependencies flowing from screens to hooks/models and from API handlers to server stores/models. Models must not import components, and feature folders must not import the application shell. Move genuinely shared logic downward rather than creating circular imports or compatibility barrels.
 

@@ -73,3 +73,20 @@ export function collectionTypeName(
     ? `${name} (custom)`
     : name;
 }
+
+/** Keep row order within alphabetically ordered groups with one lookup per row. */
+export function groupCollectionItems<T>(
+  items: readonly T[],
+  readGroup: (item: T) => string,
+): { name: string; notes: T[] }[] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const name = readGroup(item) || "Unspecified";
+    const group = groups.get(name);
+    if (group) group.push(item);
+    else groups.set(name, [item]);
+  }
+  return [...groups]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, notes]) => ({ name, notes }));
+}

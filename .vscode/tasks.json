@@ -39,7 +39,7 @@
       "label": "Build ProjectAnvil",
       "type": "process",
       "command": "node",
-      "args": ["scripts/run-framework.mjs", "build"],
+      "args": ["scripts/build-app.mjs"],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "group": { "kind": "build", "isDefault": true }

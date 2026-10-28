@@ -8,7 +8,7 @@ Use Git to review and save the app's source, then publish or push it to your Git
 2. Open **Source Control** in the left sidebar, or press **Ctrl+Shift+G**. VS Code should recognize the repository automatically; do not initialize it again.
 3. Review the changes listed here before committing them. The current app source has a local checkpoint commit.
 
-To run the app from VS Code, choose **Terminal → Run Task → Run ProjectAnvil**. It builds the production app when needed and opens the normal local address, including installation and offline startup support. Keep its terminal open for account access and synchronization; press **Ctrl+C** there to stop it. Use `npm run dev` in a terminal for live source editing; development mode does not update the installable app cache. The other included tasks check types, test storage behavior, and build the app. Node.js must be installed and available in VS Code's terminal; restart VS Code after installing Node.
+To run the app from VS Code, choose **Terminal → Run Task → Run ProjectAnvil**. It builds the production app when needed and opens the normal local address, including installation and offline startup support. Keep its terminal open for account access and synchronization; press **Ctrl+C** there to stop it. Use `npm run dev` in a terminal for live source editing; development mode does not update the installable app cache. The other tasks check types, test storage behavior, and build the app. **Build ProjectAnvil** includes offline assets and the source fingerprint, matching `npm run build`. Node.js must be installed and available in VS Code's terminal; restart VS Code after installing Node.
 
 ## Publish the source to your GitHub account
 
@@ -45,3 +45,9 @@ Git tracks the app code and setup files. These local files are excluded:
 Git commits and GitHub pushes do not back up your notes, tasks, uploaded media, personal work rooms, browser offline copies, or queued edits. Synchronize or download unfinished browser work before backing up. Stop ProjectAnvil and copy `.wrangler/state` together with the matching private `.dev.vars` file. The [local setup guide](docs/LOCAL_SETUP.md#data-and-backups) explains complete backup and restore steps.
 
 Avoid **Discard Changes**, deleting `.wrangler`, or Git reset/clean commands as troubleshooting steps unless you intend to remove the affected work.
+
+## Check project size
+
+After building, run `npm run size:report`. Add `-- --disk --out outputs/size/review.json` to include local folder totals and save an ignored report. Source counts exclude generated/private files and include new source plus pending deletions. Build metrics describe the existing output; compare only reports marked `current: true`. Installed dependencies, saved work, backups, and test diagnostics are separate from Git source size. Never remove `.wrangler` or backups to make the repository look smaller.
+
+CI also runs `npm run size:report -- --check`: startup JavaScript stays within 1.25 MB, the complete offline app within 8 MB, and math fonts use WOFF2. Review intentional additions before changing a budget; source file count is reported rather than limited so useful feature boundaries can remain clear.

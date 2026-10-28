@@ -65,6 +65,7 @@ export async function POST(request: Request) {
     if (!file.size) throw new WorkspaceError("The selected file is empty.");
     const id = crypto.randomUUID();
     const name =
+      // eslint-disable-next-line no-control-regex -- Strip intentional C0 controls from uploaded filenames.
       file.name.replace(/[\r\n\x00-\x1f]/g, "").slice(0, 240) ||
       "Untitled file";
     const type = file.type.slice(0, 150) || "application/octet-stream";

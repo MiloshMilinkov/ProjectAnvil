@@ -3,7 +3,6 @@ import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
-import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 import { fileURLToPath } from "node:url";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -37,7 +36,7 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async ({ command }) => {
+export default defineConfig(async () => {
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
   process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= "false";
   process.env.WRANGLER_SEND_METRICS ??= "false";
@@ -53,6 +52,25 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    environments: {
+      client: {
+        build: {
+          rolldownOptions: {
+            output: {
+              codeSplitting: {
+                groups: [
+                  {
+                    name: "syntax-highlighting",
+                    test: /[\\/]node_modules[\\/]highlight\.js[\\/]/,
+                    includeDependenciesRecursively: false,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
@@ -78,39 +96,28 @@ export default defineConfig(async ({ command }) => {
       },
     },
     plugins: [
+      {
+        name: "projectanvil-modern-math-fonts",
+        enforce: "pre",
+        transform(source: string, id: string) {
+          if (!/[\\/]katex[\\/]dist[\\/]katex(?:\.min)?\.css(?:\?|$)/.test(id))
+            return;
+          // Trim legacy font fallbacks before Vite discovers/emits their assets.
+          // All supported browsers use WOFF2; families, weights and glyphs stay intact.
+          return source.replace(/src:[^;}]+/g, (declaration) => {
+            const modern = declaration.match(
+              /url\([^)]*\.woff2[^)]*\)\s*format\(['"]?woff2['"]?\)/,
+            );
+            return modern ? `src:${modern[0]}` : declaration;
+          });
+        },
+      },
       vinext(),
       sites({ mockAuth: !managedLinux }),
-      connectorPreview(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
-        config: {
-          ...localBindingConfig,
-          ...(command === "serve"
-            ? {
-                services: [
-                  {
-                    binding: "CONNECTORS",
-                    service: "sites-connector-preview",
-                    entrypoint: "ConnectorPreview",
-                  },
-                ],
-              }
-            : {}),
-        },
-        ...(command === "serve"
-          ? {
-              auxiliaryWorkers: [
-                {
-                  config: {
-                    name: "sites-connector-preview",
-                    main: "./build/connector-preview-worker.mjs",
-                    compatibility_date: "2026-05-15",
-                  },
-                },
-              ],
-            }
-          : {}),
+        config: localBindingConfig,
       }),
     ],
   };

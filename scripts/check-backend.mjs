@@ -89,6 +89,7 @@ const files = [
   "app/api/watch/route.ts",
   "app/api/notifications/route.ts",
 ];
+const failures = [];
 try {
   fs.writeFileSync(
     path.join(output, "package.json"),
@@ -218,7 +219,10 @@ try {
     if (draftResult.error) throw draftResult.error;
     process.exitCode = draftResult.status ?? 1;
   }
-} finally {
+} catch (error) {
+  failures.push(error);
+}
+try {
   const relative = path.relative(
     path.resolve(os.tmpdir()),
     path.resolve(output),
@@ -231,4 +235,9 @@ try {
   )
     throw new Error("Refusing to clean an unexpected test output path.");
   fs.rmSync(output, { recursive: true, force: true });
+} catch (error) {
+  failures.push(error);
 }
+if (failures.length > 1)
+  throw new AggregateError(failures, "Backend checks and cleanup both failed.");
+if (failures.length) throw failures[0];

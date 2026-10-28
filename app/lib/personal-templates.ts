@@ -34,7 +34,7 @@ export type PersonalTemplate = TemplateInput & {
 export function omitPrivateAttachments(text: string): string {
   return text
     .replace(
-      /!?\[[^\]\n]*\]\([^\)\n]*\/api\/media\/[^\)\n]*\)/gi,
+      /!?\[[^\]\n]*\]\([^)\n]*\/api\/media\/[^)\n]*\)/gi,
       "[Attachment omitted]",
     )
     .replace(
