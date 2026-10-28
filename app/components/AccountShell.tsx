@@ -9,6 +9,11 @@ import {
 import ProjectAnvil from "./ProjectAnvil";
 import { WorkspaceScope } from "./WorkspaceScope";
 import { fetchWithTimeout } from "../lib/fetch-with-timeout";
+import {
+  AccountAccess,
+  clearAccountCallback,
+  readAccountCallback,
+} from "./AccountAccess";
 import { flushDraftGuards, hasUnpersistedDrafts } from "../lib/draft-store";
 import {
   clearOfflineResume,
@@ -31,6 +36,9 @@ function accessEpoch(access: WorkspaceAccess) {
 }
 
 export default function AccountShell() {
+  const [sessionGeneration, setSessionGeneration] = useState(0);
+  const [callback, setCallback] =
+    useState<ReturnType<typeof readAccountCallback>>(null);
   const [account, setAccount] = useState<AccountContext | null>(null),
     [activeId, setActiveId] = useState(""),
     [error, setError] = useState(""),
@@ -41,6 +49,7 @@ export default function AccountShell() {
     allowResume = useRef(true),
     requests = useRef(new AccountRefreshRequests()),
     transitionVersion = useRef(0);
+  const sessionChannel = useRef<BroadcastChannel | null>(null);
   const onConnectionChange = useCallback((next: boolean) => {
     offline.current = next;
     setOffline(next);
@@ -177,6 +186,47 @@ export default function AccountShell() {
     await clearOfflineResume().catch(() => undefined);
     await refresh(true);
   }, [refresh, onConnectionChange]);
+  const refreshSession = useCallback(async () => {
+    // Password changes rotate this cookie. Retire reads/live polls carrying the
+    // previous session without replacing the unchanged account or its workspace.
+    requests.current.invalidate();
+    setSessionGeneration((generation) => generation + 1);
+    await refresh(true);
+  }, [refresh]);
+  const sessionChanged = useCallback(async () => {
+    // Cookies are shared by tabs in this browser; only public identity metadata
+    // is broadcast, never a password, session token, or recovery link.
+    sessionChannel.current?.postMessage({
+      accountId: latest.current?.user?.id,
+    });
+    await refreshSession();
+  }, [refreshSession]);
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    let channel: BroadcastChannel;
+    try {
+      channel = new BroadcastChannel("projectanvil-session-change");
+    } catch {
+      return;
+    } // Browser privacy settings can disable cross-tab messaging.
+    sessionChannel.current = channel;
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      const value = event.data as { accountId?: unknown } | null;
+      if (value?.accountId && value.accountId === latest.current?.user?.id)
+        void refreshSession().catch(() => {});
+    };
+    return () => {
+      sessionChannel.current = null;
+      channel.close();
+    };
+  }, [refreshSession]);
+  useEffect(() => {
+    const next = readAccountCallback();
+    if (next) {
+      clearAccountCallback();
+      queueMicrotask(() => setCallback(next));
+    }
+  }, []);
   useEffect(() => {
     const activeRequests = requests.current;
     queueMicrotask(() => {
@@ -266,6 +316,35 @@ export default function AccountShell() {
     },
     [activeId],
   );
+  if (account && callback)
+    return (
+      <AccountAccess
+        {...callback}
+        account={account}
+        policy={account.policy}
+        onAuthenticated={async () => {
+          setCallback(null);
+          await authChanged();
+        }}
+        onPasswordReset={async () => {
+          setCallback({
+            initialMode: "login",
+            recoveryMessage:
+              "Password changed. Sign in with your new password.",
+          });
+          await authChanged();
+        }}
+        onClose={() => setCallback(null)}
+      />
+    );
+  if (account?.policy?.mode === "online" && !account.user)
+    return (
+      <AccountAccess
+        policy={account.policy}
+        account={account}
+        onAuthenticated={authChanged}
+      />
+    );
   if (!account || !activeId)
     return (
       <main className="loading-page">
@@ -288,6 +367,8 @@ export default function AccountShell() {
         activeId,
         onSwitch: switchWorkspace,
         onAuthChanged: authChanged,
+        onSessionChanged: sessionChanged,
+        sessionGeneration,
         onChanged: updateAccount,
         refreshAccount: refresh,
         isOffline,

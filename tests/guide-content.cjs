@@ -57,6 +57,8 @@ assert.ok(
   "Feature text is searchable even when it is not the topic title",
 );
 assert.ok(findGuides("conflict").some((guide) => guide.id === "offline"));
+assert.ok(findGuides("Account security").length > 0);
+assert.ok(findGuides("Forgot password").length > 0);
 assert.deepEqual(findGuides("nonexistent-feature-97f732"), []);
 assert.deepEqual(
   guideCatalog.map((guide) => guide.id),

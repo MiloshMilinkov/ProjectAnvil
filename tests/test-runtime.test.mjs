@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import ts from "typescript";
 import {
   projectRoot,
   validateDisposableTarget,
@@ -14,6 +15,71 @@ import {
   ownedProcessStopper,
   runNode,
 } from "../scripts/test-runtime.mjs";
+
+const securitySource = await fs.readFile(
+  new URL("../app/lib/http-security.ts", import.meta.url),
+  "utf8",
+);
+const { secureResponse } = await import(
+  "data:text/javascript;base64," +
+    Buffer.from(
+      ts.transpileModule(securitySource, {
+        compilerOptions: { module: ts.ModuleKind.ESNext },
+      }).outputText,
+    ).toString("base64")
+);
+
+test("security headers preserve private responses, cookies and streamed bodies", async () => {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode("streamed content"));
+      controller.close();
+    },
+  });
+  const original = new Response(stream, {
+    status: 201,
+    headers: {
+      "Content-Type": "application/json",
+      "Set-Cookie": "session=test; HttpOnly; SameSite=Lax",
+      ETag: '"workspace-4"',
+      "Cache-Control": "public, max-age=600",
+    },
+  });
+  const response = secureResponse(
+    new Request("https://projectanvil.test/api/state"),
+    original,
+  );
+  assert.equal(response.status, 201);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000");
+  assert.match(response.headers.get("permissions-policy"), /microphone=\(self\)/);
+  assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'self'/);
+  assert.equal(response.headers.get("etag"), '"workspace-4"');
+  assert.equal(response.headers.get("set-cookie"), "session=test; HttpOnly; SameSite=Lax");
+  assert.equal(response.body, original.body, "The wrapper must not buffer the stream.");
+  assert.equal(await response.text(), "streamed content");
+});
+
+test("local responses retain cache rules and stricter attachment sandbox policies", async () => {
+  const local = new Request("http://127.0.0.1:5173/offline.html");
+  const response = secureResponse(local, new Response("public shell", {
+    headers: { "Cache-Control": "public, max-age=3600" },
+  }));
+  assert.equal(response.headers.get("strict-transport-security"), null);
+  assert.equal(response.headers.get("cache-control"), "public, max-age=3600");
+  assert.equal(response.headers.get("cross-origin-resource-policy"), null);
+  const policy = "sandbox; default-src 'none'";
+  const media = secureResponse(
+    new Request("https://projectanvil.test/api/media/attachment"),
+    new Response("attachment", { headers: { "Content-Security-Policy": policy } }),
+  );
+  assert.equal(media.headers.get("content-security-policy"), policy);
+  assert.equal(await media.text(), "attachment");
+});
 
 test("stress targets require an owned marker and cannot select an everyday server", async () => {
   const parent = path.join(projectRoot, "work", "qa");

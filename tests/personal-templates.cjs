@@ -189,7 +189,7 @@ module.exports = async function checkPersonalTemplates({
   assert.equal(
     (
       await route.POST(
-        new Request("https://projectanvil.example/api/templates", {
+        new Request("http://127.0.0.1:5173/api/templates", {
           method: "POST",
           body: "{",
         }),
@@ -200,7 +200,7 @@ module.exports = async function checkPersonalTemplates({
   assert.equal(
     (
       await route.POST(
-        new Request("https://projectanvil.example/api/templates", {
+        new Request("http://127.0.0.1:5173/api/templates", {
           method: "POST",
           body: " ".repeat(180001),
         }),
@@ -272,7 +272,7 @@ module.exports = async function checkPersonalTemplates({
   const noteContent = {
     title: "Research",
     content:
-      "![Private image](/api/media/private-file?workspace=team_old)\n[Document](https://projectanvil.example/api/media/private-pdf?workspace=old)\nhttps://example.com/public.pdf",
+      "![Private image](/api/media/private-file?workspace=team_old)\n[Document](http://127.0.0.1:5173/api/media/private-pdf?workspace=old)\nhttps://example.com/public.pdf",
     kind: "research",
     folder: "Reference",
     tags: ["research"],

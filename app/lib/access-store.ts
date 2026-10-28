@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { getSessionUser } from "./auth";
+import { accountPolicy } from "./account-policy";
 import { createSeedWorkspace } from "./seed";
 import { WorkspaceError } from "./workspace-model";
 import type {
@@ -321,6 +322,11 @@ export async function resolveWorkspace(
   if (selected && !identifier.safeParse(selected).success)
     throw new WorkspaceError("Choose a valid workspace.", 400);
   if (!user) {
+    if (accountPolicy(env, request.url).public.mode === "online")
+      throw new WorkspaceError(
+        "Sign in with an approved account to open your workspace.",
+        401,
+      );
     if (selected && selected !== "main")
       throw new WorkspaceError("Sign in to open this workspace.", 401);
     return {
@@ -341,6 +347,9 @@ export async function getAccountContext(
   const user = await sessionUser(request),
     db = database();
   if (!user) {
+    const policy = accountPolicy(env, request.url).public;
+    if (policy.mode === "online")
+      return { user: null, workspaces: [], invitations: [], policy };
     const row = await db
       .prepare("SELECT data FROM workspaces WHERE id = ?")
       .bind("main")
@@ -357,6 +366,7 @@ export async function getAccountContext(
         { id: "main", name, kind: "guest", role: "owner", securityRevision: 0 },
       ],
       invitations: [],
+      policy,
     };
   }
   await ensurePersonalWorkspace(user);
@@ -426,6 +436,7 @@ export async function getAccountContext(
   return {
     user,
     workspaces,
+    policy: accountPolicy(env, request.url).public,
     invitations: invites.results.map((row) => ({
       id: row.id,
       workspaceId: row.workspace_id,

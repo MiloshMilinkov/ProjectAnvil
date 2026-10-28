@@ -3,6 +3,13 @@ export interface AccountUser {
   username: string;
   name: string;
   email: string;
+  emailVerified?: boolean;
+}
+export interface AccountPolicy {
+  mode: "local" | "online";
+  registration: "open" | "invite-only";
+  emailDelivery: "local" | "external" | "disabled";
+  verificationRequired: boolean;
 }
 export type WorkspaceRole = "owner" | "admin" | "editor" | "viewer";
 export type ProjectRole = "editor" | "viewer";
@@ -31,4 +38,5 @@ export interface AccountContext {
   user: AccountUser | null;
   workspaces: WorkspaceAccess[];
   invitations: TeamInvitation[];
+  policy?: AccountPolicy;
 }

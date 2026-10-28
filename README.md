@@ -67,6 +67,10 @@
 
 Register with an **email address, username, and ProjectAnvil password**; sign in with your **username and password**.
 
+**Account security:** verify your email, change or reset your password, inspect signed-in browser sessions, and revoke access on other browsers. Local verification/recovery links stay in a private outbox on this PC; no email is sent. Password resets end existing sessions. See [account recovery](docs/LOCAL_SETUP.md#account-security-and-recovery).
+
+**Access modes:** local mode retains the separate guest workspace and accepts loopback addresses only. A separately configured online mode requires approved, verified accounts and has no shared guest workspace. It stays unavailable until its HTTPS address, email service, secrets, and database migrations are prepared. This does not publish the app.
+
 Each account has a private personal workspace. Team owners and admins invite registered users by username; access begins after acceptance. Viewers read available work, Editors make changes, and Admins manage members and project permissions. Owners can appoint Admins and transfer ownership to an accepted teammate. Projects start shared and can be restricted to selected members; workspace Viewers remain read-only. **Work rooms and checkpoints remain personal**, including inside a team workspace. Assigning a task or adding a person label does not grant access.
 
 New workspaces start empty. Guest work stays separate from account and team workspaces.
@@ -91,7 +95,7 @@ For storage, backup, restore, and troubleshooting, see the [local setup guide](d
 - Projects can have restricted access inside a team workspace. Moving projects between workspaces is not implemented.
 - Simultaneous editing applies to Markdown after each editor chooses **Edit together**; other fields use conflict checks. Offline copies need an initial connection and trusted browser storage. Reconnect to verify current access and synchronize; account changes, uploads, archived recovery, and folder transfers need the local server.
 - Markdown folder transfers are manual. Automatic synchronization with an external folder is not implemented. Folder/ZIP import creates new notes; tasks, accounts, and histories use the other backup formats.
-- Notifications and mentions are in-app. Email, operating-system push, Google sign-in, email verification, password-reset mail, and invitation emails are not configured.
+- Notifications and mentions are in-app. Account verification and recovery use local links; external email delivery, operating-system push, Google sign-in, and invitation emails are not configured.
 - Reminders are in-app. Delivery needs the app open; snoozes and dismissals are browser preferences. Recurrence advances on completion rather than creating a backlog while the app is closed. See [planning behavior](docs/LOCAL_SETUP.md#project-planning-recurring-tasks-and-reminders) for time-zone and recovery details.
 - Brainstorm voting is visible to the workspace, with one shared guest identity in guest mode. JSON import retains current votes for matching ideas and clears votes on new imported ideas; complete local backups preserve the full vote state. See [connected thinking](docs/LOCAL_SETUP.md#connected-thinking) for details.
 - Workspace JSON excludes permissions, memberships, activity, watches, notifications, shared editing sessions, Trash, personal templates, archived note history, personal rooms, uploaded files, and accounts. Complete backups preserve confirmed local data; browser offline copies and queued or unsaved edits must be synchronized or downloaded separately. Importing resets relationship review markers and invalidates older Trash restores. Trash has no automatic expiry. See [backup options and storage limits](docs/LOCAL_SETUP.md#data-and-backups).

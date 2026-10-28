@@ -7,15 +7,11 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type ReactNode,
   type RefObject,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   Check,
   ChevronDown,
-  Eye,
-  EyeOff,
   Home,
   LoaderCircle,
   LogIn,
@@ -25,15 +21,20 @@ import {
   ShieldCheck,
   UserRound,
   Users,
-  X,
 } from "lucide-react";
 import type { AccountContext, WorkspaceAccess } from "../lib/access-types";
 import "./accounts.css";
-import { fetchWithTimeout } from "../lib/fetch-with-timeout";
 import { flushDraftGuards, hasUnpersistedDrafts } from "../lib/draft-store";
 import { useDraftScope } from "./useRecoverableDraft";
-import { useDialog } from "./useDialog";
 import TeamRoleEditor from "./TeamRoleEditor";
+import {
+  AccountAccess,
+  AccountSecurity,
+  AccountDialog,
+  Busy,
+  accountRequest as request,
+  readableAccountError as readableError,
+} from "./AccountAccess";
 import { useWorkspaceScope } from "./WorkspaceScope";
 
 type MaybeAsync = void | Promise<void>;
@@ -75,61 +76,6 @@ type ConfirmAction = {
   expectedOwnerId?: string;
 };
 const usernamePattern = /^[A-Za-z0-9_.]{3,30}$/;
-const readableError = (error: unknown) =>
-  error instanceof Error
-    ? error.message
-    : "Something went wrong. Please try again.";
-
-async function request<T>(
-  url: string,
-  body?: unknown,
-  signal?: AbortSignal,
-  expectedAccount = "guest",
-): Promise<T> {
-  const response = await fetchWithTimeout(url, {
-    method: body === undefined ? "GET" : "POST",
-    headers: {
-      "X-Account-Id": expectedAccount,
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-    },
-    credentials: "same-origin",
-    cache: "no-store",
-    signal,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const result = (await response.json().catch(() => null)) as {
-    error?: string | { message?: string };
-    message?: string;
-  } | null;
-  if (!response.ok) {
-    const message =
-      typeof result?.error === "string"
-        ? result.error
-        : result?.error?.message || result?.message;
-    throw new Error(
-      message ||
-        (response.status === 429
-          ? "Too many attempts. Please wait a moment and try again."
-          : "The request could not be completed. Please try again."),
-    );
-  }
-  return result as T;
-}
-
-function Busy({ busy, children }: { busy: boolean; children: ReactNode }) {
-  return (
-    <>
-      {busy && (
-        <LoaderCircle
-          size={16}
-          className="account-spinner"
-          aria-hidden="true"
-        />
-      )}
-      {children}
-    </>
-  );
-}
 function useDismiss(
   open: boolean,
   close: () => void,
@@ -182,57 +128,6 @@ function useDismiss(
   }, [open, close, ref]);
 }
 
-function AccountDialog({
-  title,
-  onClose,
-  children,
-  labelId,
-  busy = false,
-}: {
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-  labelId: string;
-  busy?: boolean;
-}) {
-  const container = useRef<HTMLElement>(null);
-  useDialog(container, onClose, busy);
-  return createPortal(
-    <div
-      className="account-dialog-shade"
-      onMouseDown={(event) => {
-        if (!busy && event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section
-        ref={container}
-        className="account-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={labelId}
-      >
-        <header className="account-dialog-heading">
-          <div className="account-dialog-mark">
-            <UserRound size={22} />
-          </div>
-          <h2 id={labelId}>{title}</h2>
-          <button
-            type="button"
-            className="account-icon-button"
-            aria-label="Close account dialog"
-            onClick={onClose}
-            disabled={busy}
-          >
-            <X size={20} />
-          </button>
-        </header>
-        {children}
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
 export function AccountMenu({
   account,
   onAuthChanged,
@@ -243,24 +138,14 @@ export function AccountMenu({
   const submitting = useRef(false);
   const [open, setOpen] = useState(false),
     [auth, setAuth] = useState<"login" | "register" | null>(null),
+    [security, setSecurity] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [show, setShow] = useState(false);
-  const menu = useRef<HTMLDivElement>(null),
-    dialogId = useId();
+    [error, setError] = useState("");
+  const menu = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []),
-    closeAuth = useCallback(() => {
-      setAuth(null);
-      setError("");
-      setShow(false);
-    }, []);
+    closeAuth = useCallback(() => setAuth(null), []),
+    closeSecurity = useCallback(() => setSecurity(false), []);
   useDismiss(open, close, menu);
-  function openAuth(mode: "login" | "register") {
-    setOpen(false);
-    setError("");
-    setShow(false);
-    setAuth(mode);
-  }
   async function prepareChange() {
     await flushDraftGuards(scope);
     if (hasUnpersistedDrafts(scope))
@@ -268,60 +153,11 @@ export function AccountMenu({
         "Keep this page open until your recording or recovery copy can be saved.",
       );
   }
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (submitting.current) return;
-    setError("");
-    const values = new FormData(event.currentTarget),
-      username = String(values.get("username") || "").trim(),
-      password = String(values.get("password") || "");
-    if (!usernamePattern.test(username)) {
-      setError(
-        "Choose a username with 3–30 letters, numbers, underscores, or dots.",
-      );
-      return;
-    }
-    if (auth === "register") {
-      if (password.length < 12 || password.length > 128) {
-        setError("Use a password with 12–128 characters.");
-        return;
-      }
-      if (password !== String(values.get("confirmPassword") || "")) {
-        setError("The passwords do not match.");
-        return;
-      }
-    }
-    submitting.current = true;
-    setBusy(true);
-    try {
-      await prepareChange();
-      await request(
-        auth === "register"
-          ? "/api/auth/sign-up/email"
-          : "/api/auth/sign-in/username",
-        auth === "register"
-          ? {
-              email: String(values.get("email") || "").trim(),
-              name: username,
-              username,
-              password,
-            }
-          : { username, password },
-      );
-      await onAuthChanged();
-      closeAuth();
-    } catch (e) {
-      setError(readableError(e));
-    } finally {
-      submitting.current = false;
-      setBusy(false);
-    }
-  }
   async function signOut() {
     if (submitting.current) return;
     if (isOffline) {
       setError(
-        "Connect to the local server to sign out. You can remove the offline copy from Workspace settings while disconnected.",
+        "Connect to ProjectAnvil to sign out. You can remove the offline copy from Workspace settings while disconnected.",
       );
       return;
     }
@@ -338,8 +174,8 @@ export function AccountMenu({
       );
       await onAuthChanged();
       setOpen(false);
-    } catch (e) {
-      setError(readableError(e));
+    } catch (cause) {
+      setError(readableError(cause));
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -372,7 +208,10 @@ export function AccountMenu({
           <button
             type="button"
             className="account-trigger account-guest-trigger"
-            onClick={() => openAuth("login")}
+            onClick={() => {
+              setOpen(false);
+              setAuth("login");
+            }}
             aria-label="Sign in or create account"
           >
             <UserRound size={17} />
@@ -389,6 +228,21 @@ export function AccountMenu({
               <strong>{account.user.username}</strong>
               <span>{account.user.email}</span>
             </div>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                menu.current
+                  ?.querySelector<HTMLButtonElement>(":scope > button")
+                  ?.focus();
+                setOpen(false);
+                setSecurity(true);
+              }}
+              disabled={isOffline}
+            >
+              <ShieldCheck size={17} />
+              Account security
+            </button>
             <button
               type="button"
               role="menuitem"
@@ -423,147 +277,22 @@ export function AccountMenu({
         )}
       </div>
       {auth && (
-        <AccountDialog
-          labelId={dialogId}
-          busy={busy}
-          title={auth === "login" ? "Welcome back" : "Create your account"}
+        <AccountAccess
+          policy={account.policy}
+          account={account}
+          initialMode={auth}
+          onAuthenticated={onAuthChanged}
           onClose={closeAuth}
-        >
-          <div className="account-auth-tabs" aria-label="Account access">
-            <button
-              type="button"
-              aria-pressed={auth === "login"}
-              disabled={busy}
-              onClick={() => {
-                setAuth("login");
-                setError("");
-              }}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              aria-pressed={auth === "register"}
-              disabled={busy}
-              onClick={() => {
-                setAuth("register");
-                setError("");
-              }}
-            >
-              Register
-            </button>
-          </div>
-          <p className="account-intro">
-            {auth === "login"
-              ? "Open your personal work and the team workspaces you belong to."
-              : "Your account starts with a private personal workspace. Join a team when you are ready to share."}
-          </p>
-          <form onSubmit={submit} className="account-auth-form" key={auth}>
-            {auth === "register" && (
-              <label className="account-field">
-                <span>Email address</span>
-                <input
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  required
-                  maxLength={254}
-                  placeholder="you@gmail.com"
-                  disabled={busy}
-                />
-                <small>
-                  Use your email address and create a password for ProjectAnvil.
-                </small>
-              </label>
-            )}
-            <label className="account-field">
-              <span>Username</span>
-              <input
-                data-initial-focus={auth === "login" ? true : undefined}
-                type="text"
-                name="username"
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                required
-                minLength={3}
-                maxLength={30}
-                pattern="[A-Za-z0-9_.]{3,30}"
-                placeholder="Your display name"
-                disabled={busy}
-              />
-              {auth === "register" && (
-                <small>
-                  3–30 letters, numbers, underscores, or dots. Usernames are not
-                  case-sensitive.
-                </small>
-              )}
-            </label>
-            <label className="account-field">
-              <span>Password</span>
-              <div className="account-password">
-                <input
-                  type={show ? "text" : "password"}
-                  name="password"
-                  autoComplete={
-                    auth === "register" ? "new-password" : "current-password"
-                  }
-                  required
-                  minLength={auth === "register" ? 12 : undefined}
-                  maxLength={128}
-                  disabled={busy}
-                />
-                <button
-                  className="account-icon-button"
-                  type="button"
-                  aria-label={show ? "Hide password" : "Show password"}
-                  aria-pressed={show}
-                  onClick={() => setShow((value) => !value)}
-                >
-                  {show ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {auth === "register" && (
-                <small>
-                  12–128 characters. Use a password you have not used elsewhere.
-                </small>
-              )}
-            </label>
-            {auth === "register" && (
-              <label className="account-field">
-                <span>Confirm password</span>
-                <input
-                  type={show ? "text" : "password"}
-                  name="confirmPassword"
-                  autoComplete="new-password"
-                  required
-                  minLength={12}
-                  maxLength={128}
-                  disabled={busy}
-                />
-              </label>
-            )}
-            {error && (
-              <p role="alert" className="account-error">
-                {error}
-              </p>
-            )}
-            <button
-              className="account-button account-primary account-submit"
-              type="submit"
-              disabled={busy}
-            >
-              <Busy busy={busy}>
-                {auth === "register" ? "Create account" : "Sign in"}
-              </Busy>
-              {!busy && <LogIn size={17} />}
-            </button>
-          </form>
-          <p className="account-footnote">
-            <ShieldCheck size={15} />
-            Guest work stays in its existing workspace when you sign in.
-          </p>
-        </AccountDialog>
+          prepareChange={prepareChange}
+        />
+      )}
+      {security && (
+        <AccountSecurity
+          account={account}
+          onAuthChanged={onAuthChanged}
+          onClose={closeSecurity}
+          prepareChange={prepareChange}
+        />
       )}
     </>
   );

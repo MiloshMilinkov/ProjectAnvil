@@ -12,6 +12,7 @@ Vinext supplies the runtime and [compatibility types](https://github.com/cloudfl
 | --- | --- |
 | `app/page.tsx`, `app/layout.tsx` | Entry point, metadata, global styles, themes, and installation support. |
 | `app/components/AccountShell.tsx` | Account/session refresh and switching between accessible workspaces. |
+| `app/components/AccountAccess.tsx`, `AccountControls.tsx` | Reusable account access/recovery forms and session security, plus account/workspace/team menus. |
 | `app/components/ProjectAnvil.tsx` | Application navigation, project scope, and composing feature screens. Keep detailed feature rendering outside this file. |
 | `app/components/dashboard/`, `tasks/`, `settings/`, `shell/` | Focused dashboard, task views, workspace settings, and navigation definitions. |
 | `app/components/shell/DeferredFeature.tsx` | Shared loading/retry boundary for optional screens; failures retain the surrounding workspace and retry without a reload. |
@@ -21,7 +22,7 @@ Vinext supplies the runtime and [compatibility types](https://github.com/cloudfl
 | `app/components/` | Notes, projects, collections, teamwork, shared controls, dialogs, and cross-feature React hooks. Feature styles live alongside their components. |
 | `app/lib/` | Domain types and validation, pure transformations, browser storage utilities, and server persistence modules. Their runtime boundaries are described below. |
 | `app/api/` | Request handlers for workspaces, accounts, teams, media, collaboration, and portability. Delegate business rules and persistence to `app/lib/`. |
-| `db/`, `drizzle/` | Database schemas and checked-in SQL migrations; preserve existing data when changing them. |
+| `db/`, `drizzle/`, `app/lib/database-migrations.ts` | Immutable SQL migration sources and the ordered checksum ledger. Local startup applies additive upgrades; prepared online startup only verifies reviewed releases. |
 | `public/` | Static icons, install manifest, and service worker. Private workspace content does not belong here. |
 | `app/components/markdown.css`, `knowledge.css` | Renderer-only styles and the consolidated note editor styles. Math and syntax-formatting modules load only for actual parsed content. |
 | `scripts/`, `build/` | Maintained startup, build, backup, test-runner, and local worker integration code. `build/` contains source; `dist/` contains generated output. |
@@ -35,6 +36,8 @@ Vinext supplies the runtime and [compatibility types](https://github.com/cloudfl
 - Keep domain rules and transformations independent of React and network requests. Shared examples include `workspace-model`, `task-scheduling`, `relationships`, and `portable-markdown`. A pure helper used only by one feature may stay beside that feature, as the graph and canvas models do.
 - Cache derived indexes from immutable workspace snapshots; avoid repeated full-list scans for every group or menu render. Keep heavy optional screens behind the shared boundary. Use `npm run size:report` to check source count, startup dependency closure, fonts, and the complete offline package before claiming a size improvement.
 - Server modules such as `access-store`, `workspace-store`, `workspace-journal`, and `media-store` resolve access and persist data. Client components must not import their runtime code. Browser modules such as `draft-store`, `offline-store`, and `browser-preferences` serve a different purpose; a `store` suffix alone does not mean a module is server-only.
+- `account-policy` validates deployment settings and exact origins; `auth` composes Better Auth, migration checks, and private `account-mail` delivery. The browser receives only public policy flags. Account session routes resolve opaque session IDs server-side; bearer tokens never belong in browser session lists. Local mail inspection is a separate read-only command, not an HTTP inbox.
+- Password changes rotate the current session through Better Auth. `AccountShell` invalidates earlier account requests and advances a session generation; the shared workspace fetch scope restarts old live/read effects without replacing a workspace that still has the same access. A token-free browser channel notifies other same-account tabs sharing that cookie. Actual denied access still follows the existing clearing and recovery path.
 - Import shared types with `import type`. Keep dependencies flowing from screens to hooks/models and from API handlers to server stores/models. Models must not import components, and feature folders must not import the application shell. Move genuinely shared logic downward rather than creating circular imports or compatibility barrels.
 
 ## Data and access ownership

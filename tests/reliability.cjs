@@ -11,6 +11,40 @@ module.exports = async function checkReliability({
   const historyRoute = require("./compiled/app/api/history/route");
   const storageRoute = require("./compiled/app/api/storage/route");
   const uploadRoute = require("./compiled/app/api/media/route");
+  const { readBoundedBody } = require("./compiled/app/lib/request-body");
+  const exact = new TextEncoder().encode("é文");
+  assert.deepEqual(
+    await readBoundedBody(new Request("http://127.0.0.1:5173/api/state", {
+      method: "POST", body: exact,
+    }), exact.byteLength, "Too large"),
+    exact,
+    "Request size counts bytes and accepts the exact limit",
+  );
+  for (const declaredLength of [undefined, "1"]) {
+    let cancelled = false;
+    let reads = 0;
+    const body = new ReadableStream({
+      pull(controller) {
+        reads++;
+        controller.enqueue(new Uint8Array(4));
+      },
+      cancel() {
+        cancelled = true;
+        throw new Error("Cancellation also failed");
+      },
+    }, { highWaterMark: 0 });
+    const request = new Request("http://127.0.0.1:5173/api/state", {
+      method: "POST", body, duplex: "half",
+      headers: declaredLength ? { "content-length": declaredLength } : {},
+    });
+    await assert.rejects(
+      readBoundedBody(request, 5, "Too large"),
+      (error) => error.status === 413 && error.message === "Too large",
+    );
+    assert.equal(reads, 2, "Oversized streams stop reading at the limit");
+    assert.equal(cancelled, true);
+    assert.equal(request.body.locked, false, "The request reader is released");
+  }
   const read = () => store.readWorkspace(request("/api/state", "alice"));
   const write = (input) =>
     store.mutateWorkspace(request("/api/state", "alice"), {
@@ -399,7 +433,7 @@ module.exports = async function checkReliability({
   await assert.rejects(
     () =>
       store.readMutationRequest(
-        new Request("https://projectanvil.example/api/state", {
+        new Request("http://127.0.0.1:5173/api/state", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
@@ -557,7 +591,7 @@ module.exports = async function checkReliability({
   await assert.rejects(
     () =>
       store.readMutationRequest(
-        new Request("https://projectanvil.example/api/state", {
+        new Request("http://127.0.0.1:5173/api/state", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: stream,

@@ -767,7 +767,7 @@ async function main() {
     const headers = new Headers(options.headers);
     if (userId) headers.set("x-test-user", userId);
     if (workspace) headers.set("x-workspace-id", workspace);
-    return new Request(new URL(route, "https://projectanvil.example"), {
+    return new Request(new URL(route, "http://127.0.0.1:5173"), {
       ...options,
       headers,
     });
@@ -926,7 +926,7 @@ async function main() {
     }),
   );
   const response = await upload.POST(
-    new Request("https://projectanvil.example/api/media", {
+    new Request("http://127.0.0.1:5173/api/media", {
       method: "POST",
       body: form,
     }),
@@ -938,7 +938,7 @@ async function main() {
   assert.equal(payload.workspace.projects.length, 0);
   const download = require("./compiled/app/api/media/[id]/route");
   const fileResponse = await download.GET(
-    new Request(`https://projectanvil.example${payload.media.url}`),
+    new Request(`http://127.0.0.1:5173${payload.media.url}`),
     { params: Promise.resolve({ id: payload.media.id }) },
   );
   assert.equal(fileResponse.status, 200);
@@ -949,7 +949,7 @@ async function main() {
   assert.match(fileResponse.headers.get("content-disposition"), /^attachment/);
   assert.equal(fileResponse.headers.get("x-content-type-options"), "nosniff");
   const ranged = await download.GET(
-    new Request(`https://projectanvil.example${payload.media.url}`, {
+    new Request(`http://127.0.0.1:5173${payload.media.url}`, {
       headers: { range: "bytes=0-6" },
     }),
     { params: Promise.resolve({ id: payload.media.id }) },
@@ -959,7 +959,7 @@ async function main() {
   assert.match(ranged.headers.get("content-range"), /^bytes 0-6\//);
   assert.equal((await ranged.arrayBuffer()).byteLength, 7);
   const invalidRange = await download.GET(
-    new Request(`https://projectanvil.example${payload.media.url}`, {
+    new Request(`http://127.0.0.1:5173${payload.media.url}`, {
       headers: { range: "bytes=9999-" },
     }),
     { params: Promise.resolve({ id: payload.media.id }) },
@@ -969,7 +969,7 @@ async function main() {
   assert.equal((await stateRoute.GET(request())).status, 200);
   const post = async (input) =>
     stateRoute.POST(
-      new Request("https://projectanvil.example/api/state", {
+      new Request("http://127.0.0.1:5173/api/state", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -1012,7 +1012,7 @@ async function main() {
     "",
   );
   const invalid = await stateRoute.POST(
-    new Request("https://projectanvil.example/api/state", {
+    new Request("http://127.0.0.1:5173/api/state", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{oops",

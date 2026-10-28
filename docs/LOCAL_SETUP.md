@@ -81,13 +81,35 @@ If an import response is lost, reselect the same unchanged folder/ZIP and target
 
 ## Accounts and workspace access
 
-Register with an email address, username, and a separate ProjectAnvil password. Passwords use 12–128 characters; usernames use 3–30 letters, numbers, underscores, or dots and are not case-sensitive. Sign in with username and password. Google sign-in and email services are not configured.
+Register with an email address, username, and a separate ProjectAnvil password. Passwords use 12–128 characters; usernames use 3–30 letters, numbers, underscores, or dots and are not case-sensitive. Sign in with username and password. Google sign-in and external email delivery are not configured.
 
 Every account has a private personal workspace. Create or select a team workspace before creating shared projects. Owners and Admins invite existing registered usernames within their role limits; invitations must be accepted inside the app. Accepted members can open the workspace, with Viewer, Editor, or Admin access and optional project restrictions. Owners control ownership and Admin appointments. Members can leave; Owners must transfer first. People labels and task assignments do not grant access. Guest records are separate and return when you sign out; signing in does not copy them into an account.
 
 Work rooms belong to the account and workspace where they were created, including team workspaces. Guest rooms belong to the local guest workspace. Relationships and their review state belong to the workspace and are visible to members who can open their connected items.
 
 Personal note/task templates belong to the account across its workspaces, including team workspaces, and are never shared with teammates. Guest templates use a separate local library. Reusing a template creates editable content with fresh IDs and reset completion; assignments, schedules, project links, history, and private attachment references are omitted. Manage them in **My task templates** or **My note templates**. The library's **Deleted** tab restores removed templates.
+
+### Account security and recovery
+
+Open your account menu → **Account security** to check email verification, change your password, or inspect signed-in browser sessions. **Revoke session** ends another browser's server access; **Sign out other sessions** keeps this browser signed in. Changing your password requires the current password and also signs out other sessions. **Sign out here** follows the existing draft/recovery safeguards. Session listings omit bearer tokens and IP addresses. Managing sessions requires a recently signed-in session; sign in again if prompted.
+
+Choose **Verify email** or **Forgot password?** in Sign in. A signed-in account can also request verification from Account security. In local mode links go to a private database outbox, never an HTTP inbox, console log, or external mail service. Request a link, then run:
+
+```sh
+npm run account-mail -- --email you@example.com
+```
+
+Open the relevant verification/reset link on this PC while the local server is running. Treat the output as private account credentials; never share or commit it. The command reads local SQLite storage without changing it. The outbox retains at most 100 links and only shows entries less than one hour old; reset tokens expire after 30 minutes and are single-use. Verification links expire after one hour. Request a new link if one expires. A successful password reset ends all previous sessions; sign in again with the new password. Unknown account recovery requests receive a neutral response. Browser offline copies are separate readable device data; revocation can be checked only after reconnecting.
+
+Local registration and sign-in do not require verification. This preserves current accounts and guest work. Verification/recovery need the running server and are not available offline. Account-link callbacks are restricted to this app; sensitive query parameters are cleared from the browser address when the form opens and are not stored as drafts.
+
+### Local and future online access modes
+
+The default **local** mode accepts loopback application addresses only (`127.0.0.1`, `localhost`, or IPv6 loopback). The launcher remains bound to this PC. Requests through a public hostname fail closed; changing an address/header cannot grant guest access. `BETTER_AUTH_URL`, when set, must match the actual origin, including its port.
+
+The code also supports a separately configured **online** access policy. It requires `PROJECTANVIL_MODE=online`, an explicit HTTPS `BETTER_AUTH_URL`, a private comma-separated `PROJECTANVIL_ALLOWED_EMAILS` list (up to 200 approved addresses), an `ACCOUNT_MAILER` service binding, a strong `BETTER_AUTH_SECRET`, and the current database migrations. There is no shared guest access. Registration/sign-in and each workspace access enforce approval, and sign-in/workspace access require verified email. Removing approval denies subsequent server access; it cannot erase previously downloaded device data. Only the trusted Cloudflare client-IP header is used for online authentication limits.
+
+`ACCOUNT_MAILER` is an unconfigured service contract, not an installed email provider: it accepts an internal POST with `{email,kind,url}` and returns success only after accepting delivery. Online mode never falls back to the local outbox. Real provider configuration, delivery, proxy behavior, and HTTPS tests remain release work. No cloud resource or deployment is created by these settings or migration-plan commands. Leave the current installation in local mode.
 
 ## Data and backups
 
@@ -277,7 +299,25 @@ Browser storage limits can be lower than these allowances. Offline copies and ap
 
 The portable execution profile is the default for a fresh checkout. `.openai/hosting.json` declares the local `DB` and `BUCKET` bindings; it does not publish the app. Preserve that tracked configuration when moving or updating the source.
 
-Startup creates a signing secret if missing and applies the idempotent account, access, work-room, reliability, activity, notification, and shared-note schemas without resetting existing records. Schema definitions live in `db/auth.sql`, `db/access.sql`, `db/workrooms.sql`, `db/reliability.sql`, `db/collaboration.sql`, and `db/note-collaboration.sql`. Legacy members default to Editor through separate role tables, preserving the original membership records. Legacy note snapshots migrate atomically into the archive alongside a successful workspace write. Other schema changes need a reviewed migration and a complete backup; generating SQL does not apply it.
+Startup creates a signing secret if missing and applies ordered local database migrations without resetting existing records. Existing installations receive a baseline ledger while retaining their accounts, workspaces, permissions, history, and uploaded-file references. Legacy members default to Editor through separate role tables; legacy note snapshots still move atomically into the archive alongside a successful workspace write.
+
+### Versioned migrations and recovery
+
+`app/lib/database-migrations.ts` defines the ordered sources in `drizzle/` and `db/`, including the private local account-mail outbox in `db/release.sql`. The `app_migrations` table records each version, name, SHA-256 source checksum, and application time. Treat applied SQL files as immutable: append a new migration instead of editing an old schema. Local startup checks the recorded sequence and existing tables, then applies each missing migration and its ledger entry in one atomic database batch. Failed batches can be retried; missing recorded tables, changed migration checksums, gaps, and databases newer than this application stop startup instead of silently rewriting data.
+
+Back up the complete stopped installation before updating schema or restoring an older application version. If startup reports a migration mismatch, preserve the state and matching secret, then restore matching source or a verified complete backup. Do not delete the ledger, edit its checksums, or run ad-hoc reverse SQL. An application rollback may also require restoring the matching database and uploads; newer browser drafts and offline copies remain separate recovery data.
+
+The prepared online mode only verifies the database history; it never creates tables or applies upgrades during a request. A future hosted release must apply reviewed migrations before its new application starts. Prepare an offline review artifact with:
+
+```sh
+npm run db:migrations:plan -- --from 0 --out outputs/migrations/first-release.json
+```
+
+Set `--from` to the verified target database version. The JSON contains the expected earlier ledger entries, checksums, and one atomic batch per pending migration, including its ledger entry. This command reads public SQL sources, writes a new file inside ignored `outputs/migrations/`, refuses overwrites/symlink paths, and never opens a database, applies SQL, or contacts hosting. An artifact is preparation rather than a migration execution tool; target-history checks, backups, release application, and restore rehearsal remain required when hosting is approved.
+
+To inspect the account schema produced by the current Better Auth configuration, run `node --experimental-strip-types scripts/generate-auth-schema.mjs`. It prints candidate SQL from a disposable in-memory database and never rewrites `db/auth.sql` or other files. Review differences against the applied schema and append a new migration when needed; do not redirect its output over a historical SQL source. Regression checks compare the candidate with the current recorded account schema and confirm that the generator leaves migration files unchanged.
+
+`npm run check` includes disposable migration rehearsals: clean and legacy upgrades, preserved records, repeated/concurrent startup, changed or missing history, read-only online verification, an interrupted batch with retry, and restoration of a pre-upgrade SQLite fixture. These tests do not use the everyday installation.
 
 Useful checks:
 

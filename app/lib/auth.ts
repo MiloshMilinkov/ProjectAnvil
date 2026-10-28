@@ -2,6 +2,9 @@ import { env } from "cloudflare:workers";
 import { betterAuth } from "better-auth";
 import { authOptions } from "./auth-options";
 import type { AccountUser } from "./access-types";
+import { accountPolicy, emailApproved } from "./account-policy";
+import { deliverAccountMail } from "./account-mail";
+import { ensureDatabaseSchema } from "./database-migrations";
 import authSQL from "../../db/auth.sql?raw";
 import workspaceSQL from "../../drizzle/0000_dear_mimic.sql?raw";
 import accessSQL from "../../db/access.sql?raw";
@@ -9,53 +12,46 @@ import workroomSQL from "../../db/workrooms.sql?raw";
 import reliabilitySQL from "../../db/reliability.sql?raw";
 import collaborationSQL from "../../db/collaboration.sql?raw";
 import noteCollaborationSQL from "../../db/note-collaboration.sql?raw";
+import releaseSQL from "../../db/release.sql?raw";
 
 let schemaReady: Promise<unknown> | undefined;
 const instances = new Map<string, ReturnType<typeof betterAuth>>();
 export async function getAuth(request: Request) {
+  const policy = accountPolicy(env, request.url);
   if (!env.DB) throw new Error("Account storage is unavailable.");
   if (!env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET.length < 32)
     throw new Error(
-      "Run the local launcher to initialize the account signing secret.",
+      policy.public.mode === "local"
+        ? "Run the local launcher to initialize the account signing secret."
+        : "Configure the production account signing secret before starting.",
     );
-  schemaReady ??= env.DB.batch(
-    (
-      workspaceSQL.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ") +
-      "\n" +
-      authSQL +
-      "\n" +
-      accessSQL +
-      "\n" +
-      workroomSQL +
-      "\n" +
-      reliabilitySQL +
-      "\n" +
-      collaborationSQL +
-      "\n" +
-      noteCollaborationSQL
-    )
-      .replace(/^--.*$/gm, "")
-      .split(";")
-      .map((sql) => sql.trim())
-      .filter((sql) => sql && !/^--[^\n]*$/.test(sql))
-      .map((sql) => env.DB!.prepare(sql)),
-  ).catch((error) => {
+  schemaReady ??= ensureDatabaseSchema(env.DB, policy.public.mode, [
+    workspaceSQL,
+    authSQL,
+    accessSQL,
+    workroomSQL,
+    reliabilitySQL,
+    collaborationSQL,
+    noteCollaborationSQL,
+    releaseSQL,
+  ]).catch((error) => {
     schemaReady = undefined;
     throw error;
   });
   await schemaReady;
-  const configured = new URL(env.BETTER_AUTH_URL || "http://127.0.0.1:5173")
-    .origin;
-  const requested = new URL(request.url).origin;
-  const baseURL =
-    !env.BETTER_AUTH_URL &&
-    ["http://127.0.0.1:5173", "http://localhost:5173"].includes(requested)
-      ? requested
-      : configured;
-  let auth = instances.get(baseURL);
+  const baseURL = policy.origin;
+  const key = `${policy.public.mode}:${baseURL}`;
+  let auth = instances.get(key);
   if (!auth) {
-    auth = betterAuth(authOptions(env.DB, env.BETTER_AUTH_SECRET, baseURL));
-    instances.set(baseURL, auth);
+    const database = env.DB;
+    auth = betterAuth(
+      authOptions(database, env.BETTER_AUTH_SECRET, baseURL, {
+        policy,
+        send: (email, url, kind) =>
+          deliverAccountMail(database, env, policy, { email, url, kind }),
+      }),
+    );
+    instances.set(key, auth);
   }
   return auth;
 }
@@ -65,11 +61,18 @@ export async function getSessionUser(
   const auth = await getAuth(request);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return null;
+  const policy = accountPolicy(env, request.url);
+  if (
+    policy.public.mode === "online" &&
+    (!session.user.emailVerified || !emailApproved(policy, session.user.email))
+  )
+    return null;
   const user = session.user as typeof session.user & { username?: string };
   return {
     id: user.id,
     username: user.username || user.name,
     name: user.username || user.name,
     email: user.email,
+    emailVerified: user.emailVerified,
   };
 }

@@ -1,7 +1,14 @@
 import { readFile } from "node:fs/promises";
-import { test, expect } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Request as BrowserRequest,
+  type Route,
+  type Page,
+} from "@playwright/test";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { validateDisposableTarget } from "../../scripts/test-runtime.mjs";
+import { readLocalAccountMail } from "../../scripts/account-mail.mjs";
 import type { AccountContext } from "../../app/lib/access-types";
 import {
   api,
@@ -25,13 +32,15 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   let owner: BrowserAccount;
   let colleague: BrowserAccount;
   let base: string;
+  let stateDirectory: string;
 
   test.beforeAll(async ({ browser, baseURL }) => {
     if (!baseURL) throw new Error("The disposable test origin is missing.");
-    await validateDisposableTarget(
+    const marker = await validateDisposableTarget(
       baseURL,
       process.env.PROJECTANVIL_TEST_MANIFEST,
     );
+    stateDirectory = marker.stateDirectory;
     base = baseURL;
     owner = await registerThroughUi(browser, base, "owner");
     colleague = await registerThroughUi(browser, base, "peer");
@@ -153,6 +162,404 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     }
   });
 
+  test("account recovery and session controls keep credentials private and preserve workspace access", async ({
+    browser,
+  }, testInfo) => {
+    const extra = await browser.newContext({ baseURL: base });
+    extra.on("page", (page) =>
+      page.on("pageerror", (error) => owner.pageErrors.push(error.message)),
+    );
+    const sibling = await owner.context.newPage();
+    const releaseHeldRequests: (() => void)[] = [];
+    const email = `${owner.username}@example.test`;
+    const accountHeaders = { "X-Account-Id": owner.userId };
+    const security = () =>
+      owner.page.getByRole("dialog", { name: "Account security", exact: true });
+    async function openSecurity() {
+      await owner.page
+        .getByRole("button", {
+          name: `Account: ${owner.username}`,
+          exact: true,
+        })
+        .click();
+      await owner.page
+        .getByRole("menuitem", { name: "Account security", exact: true })
+        .click();
+      await expect(security()).toBeVisible();
+      await expect(
+        security().getByText("This session", { exact: true }),
+      ).toBeVisible();
+    }
+    async function signInExtra(password = owner.password) {
+      return extra.request.post("/api/auth/sign-in/username", {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Account-Id": "guest",
+          Origin: base,
+        },
+        data: { username: owner.username, password },
+      });
+    }
+    async function mailLink(kind: "verification" | "reset") {
+      await expect
+        .poll(async () =>
+          (await readLocalAccountMail({ stateDirectory, email })).some(
+            (mail) => mail.kind === kind,
+          ),
+        )
+        .toBeTruthy();
+      const message = (
+        await readLocalAccountMail({ stateDirectory, email })
+      ).find((mail) => mail.kind === kind);
+      if (typeof message?.url !== "string")
+        throw new Error("The disposable account link is missing.");
+      return message.url;
+    }
+    try {
+      expect((await signInExtra()).ok()).toBeTruthy();
+      const sessionResponse = await owner.context.request.get(
+        "/api/account/sessions",
+        { headers: accountHeaders },
+      );
+      expect(sessionResponse.ok()).toBeTruthy();
+      const sessionText = await sessionResponse.text();
+      expect(sessionText).not.toMatch(/"token"|"ipAddress"/);
+      const listed = JSON.parse(sessionText);
+      expect(
+        listed.sessions.filter(
+          (session: { current: boolean }) => session.current,
+        ),
+      ).toHaveLength(1);
+      await openSecurity();
+      await security()
+        .getByRole("button", { name: "Revoke session", exact: true })
+        .click();
+      await expect(
+        security().getByText("That session has been signed out.", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      expect(
+        (await (await extra.request.get("/api/account")).json()).user,
+      ).toBeNull();
+
+      await security()
+        .getByRole("button", { name: "Send verification link", exact: true })
+        .click();
+      await expect(security().getByRole("status")).toContainText(
+        "no email is sent",
+      );
+      await owner.page.goto(await mailLink("verification"));
+      const verification = owner.page.getByRole("dialog", {
+        name: "Email verification",
+        exact: true,
+      });
+      await expect(verification).toContainText("Your email has been verified");
+      await expect
+        .poll(() => new URL(owner.page.url()).searchParams.has("token"))
+        .toBeFalsy();
+      await verification
+        .getByRole("button", { name: "Close account dialog", exact: true })
+        .click();
+      expect(
+        (await (await owner.context.request.get("/api/account")).json()).user
+          .emailVerified,
+      ).toBeTruthy();
+
+      expect((await signInExtra()).ok()).toBeTruthy();
+      async function holdLive(page: Page, open: () => Promise<unknown>) {
+        let heldRequest: BrowserRequest | undefined;
+        let capturedLive = () => {};
+        let finishedLive = () => {};
+        let release = () => {};
+        const captured = new Promise<void>((resolve) => {
+          capturedLive = resolve;
+        });
+        const released = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const finished = new Promise<void>((resolve) => {
+          finishedLive = resolve;
+        });
+        releaseHeldRequests.push(release);
+        const handler = async (route: Route) => {
+          if (heldRequest) return route.continue();
+          heldRequest = route.request();
+          capturedLive();
+          await released;
+          try {
+            await route.fulfill({
+              status: 409,
+              json: {
+                error:
+                  "The signed-in account changed. Reload before saving this workspace.",
+              },
+            });
+          } catch (error) {
+            if (!heldRequest.failure()) throw error;
+          } finally {
+            finishedLive();
+          }
+        };
+        await page.route("**/api/live?*", handler);
+        await open();
+        await appReady(page);
+        await captured;
+        const aborted = page.waitForEvent("requestfailed", {
+          predicate: (request) => request === heldRequest,
+        });
+        return {
+          aborted,
+          request: heldRequest!,
+          release,
+          finish: async () => {
+            await finished;
+            await page.unroute("**/api/live?*", handler);
+          },
+        };
+      }
+      const siblingLive = await holdLive(sibling, () => sibling.goto("/"));
+      const primaryLive = await holdLive(owner.page, () => owner.page.reload());
+      const siblingTrigger = await sibling
+        .getByRole("button", {
+          name: `Account: ${owner.username}`,
+          exact: true,
+        })
+        .elementHandle();
+      const originalTrigger = await owner.page
+        .getByRole("button", {
+          name: `Account: ${owner.username}`,
+          exact: true,
+        })
+        .elementHandle();
+      await openSecurity();
+      await security().locator("summary").click();
+      const previousPassword = owner.password;
+      const changedPassword = `${previousPassword}-changed`;
+      await security()
+        .getByLabel("Current password", { exact: true })
+        .fill(previousPassword);
+      await security()
+        .getByLabel(/^New password/)
+        .fill(changedPassword);
+      await security()
+        .getByLabel("Confirm new password", { exact: true })
+        .fill(changedPassword);
+      expect(primaryLive.request.failure()).toBeNull();
+      expect(siblingLive.request.failure()).toBeNull();
+      await security()
+        .getByRole("button", { name: "Change password", exact: true })
+        .click();
+      await expect(security().getByRole("status")).toContainText(
+        "Password changed",
+      );
+      await Promise.all([primaryLive.aborted, siblingLive.aborted]);
+      primaryLive.release();
+      siblingLive.release();
+      await Promise.all([primaryLive.finish(), siblingLive.finish()]);
+      expect(
+        await siblingTrigger?.evaluate((node) => node.isConnected),
+      ).toBeTruthy();
+      expect(
+        await originalTrigger?.evaluate((node) => node.isConnected),
+      ).toBeTruthy();
+      await expect(security()).toBeVisible();
+      owner.password = changedPassword;
+      expect(
+        (await (await extra.request.get("/api/account")).json()).user,
+      ).toBeNull();
+      expect((await signInExtra(previousPassword)).ok()).toBeFalsy();
+      await security().locator("summary").click();
+      await security()
+        .getByRole("button", { name: "Close account dialog", exact: true })
+        .click();
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+          await owner.page
+            .getByRole("button", { name: /^Appearance:/ })
+            .click();
+          await owner.page
+            .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+            .click();
+          await openSecurity();
+          expect(
+            await owner.page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBeTruthy();
+          const path = testInfo.outputPath(
+            `account-security-${theme.toLowerCase()}-${width}.png`,
+          );
+          await owner.page.screenshot({ path, fullPage: false });
+          await testInfo.attach(
+            `account-security-${theme.toLowerCase()}-${width}`,
+            { path, contentType: "image/png" },
+          );
+          await security().press("Escape");
+          await expect(security()).toBeHidden();
+          await expect(
+            owner.page.getByRole("button", {
+              name: `Account: ${owner.username}`,
+              exact: true,
+            }),
+          ).toBeFocused();
+        }
+      }
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+      const recoveryPage = await extra.newPage();
+      await recoveryPage.goto("/");
+      await appReady(recoveryPage);
+      await recoveryPage
+        .getByRole("button", { name: "Sign in or create account", exact: true })
+        .click();
+      await recoveryPage
+        .getByRole("button", { name: "Forgot password?", exact: true })
+        .click();
+      await recoveryPage
+        .getByLabel("Email address", { exact: true })
+        .fill(email);
+      await recoveryPage
+        .getByRole("button", { name: "Prepare reset link", exact: true })
+        .click();
+      await expect(
+        recoveryPage
+          .getByRole("dialog", { name: "Reset your password", exact: true })
+          .getByRole("status"),
+      ).toContainText("no email is sent");
+      const resetLink = await mailLink("reset");
+      await owner.page.goto(resetLink);
+      const reset = owner.page.getByRole("dialog", {
+        name: "Choose a new password",
+        exact: true,
+      });
+      await expect(reset).toBeVisible();
+      await expect
+        .poll(() => new URL(owner.page.url()).searchParams.has("token"))
+        .toBeFalsy();
+      const resetPassword = `${previousPassword}-reset`;
+      await reset.getByLabel(/^New password/).fill(resetPassword);
+      await reset
+        .getByLabel("Confirm password", { exact: true })
+        .fill(resetPassword);
+      await reset
+        .getByRole("button", { name: "Save new password", exact: true })
+        .click();
+      const login = owner.page.getByRole("dialog", {
+        name: "Welcome back",
+        exact: true,
+      });
+      await expect(login.getByRole("status")).toContainText("Password changed");
+      await login.getByLabel("Username", { exact: true }).fill(owner.username);
+      await login.getByLabel("Password", { exact: true }).fill(resetPassword);
+      await login
+        .locator("form")
+        .getByRole("button", { name: "Sign in", exact: true })
+        .click();
+      await expect(
+        owner.page.getByRole("button", {
+          name: `Account: ${owner.username}`,
+          exact: true,
+        }),
+      ).toBeVisible();
+      owner.password = resetPassword;
+      await owner.page.goto(resetLink);
+      const expired = owner.page.getByRole("dialog", {
+        name: "Choose a new password",
+        exact: true,
+      });
+      await expect(expired.getByRole("alert")).toContainText(
+        "invalid or has expired",
+      );
+      await expired
+        .getByRole("button", { name: "Close account dialog", exact: true })
+        .click();
+      expect((await workspace(owner)).name).toBeTruthy();
+      const gate = await extra.newPage();
+      await gate.route("**/api/account", (route) =>
+        route.fulfill({
+          json: {
+            user: null,
+            workspaces: [],
+            invitations: [],
+            policy: {
+              mode: "online",
+              registration: "invite-only",
+              verificationRequired: true,
+              emailDelivery: "external",
+            },
+          },
+        }),
+      );
+      await gate.addInitScript(() => {
+        const theme = new URL(window.location.href).searchParams.get(
+          "test_theme",
+        );
+        if (theme && ["light", "dark", "warp", "focus", "soft"].includes(theme))
+          localStorage.setItem("projectanvil-appearance", theme);
+      });
+      for (const width of [1365, 320]) {
+        await gate.setViewportSize({ width, height: 900 });
+        for (const theme of ["light", "dark", "warp", "focus", "soft"]) {
+          await gate.goto(`/?test_theme=${theme}`);
+          await expect(
+            gate.getByRole("heading", {
+              name: "Welcome back",
+              exact: true,
+              level: 1,
+            }),
+          ).toBeVisible();
+          await expect(gate.locator("html")).toHaveAttribute(
+            "data-theme",
+            theme,
+          );
+          await expect(
+            gate.getByRole("complementary", { name: "Workspace navigation" }),
+          ).toHaveCount(0);
+          await gate.getByLabel("Username", { exact: true }).focus();
+          await gate.keyboard.press("Tab");
+          await expect(
+            gate.getByLabel("Password", { exact: true }),
+          ).toBeFocused();
+          await gate
+            .getByRole("button", { name: "Register", exact: true })
+            .click();
+          await expect(
+            gate.getByText(
+              /Registration is limited to approved email addresses/,
+            ),
+          ).toBeVisible();
+          await gate.keyboard.press("Escape");
+          await expect(
+            gate.getByRole("heading", {
+              name: "Create your account",
+              exact: true,
+              level: 1,
+            }),
+          ).toBeVisible();
+          expect(
+            await gate.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBeTruthy();
+          const path = testInfo.outputPath(
+            `account-gate-${theme}-${width}.png`,
+          );
+          await gate.screenshot({ path, fullPage: false });
+          await testInfo.attach(`account-gate-${theme}-${width}`, {
+            path,
+            contentType: "image/png",
+          });
+        }
+      }
+    } finally {
+      for (const release of releaseHeldRequests) release();
+      await sibling.close();
+      await extra.close();
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+  });
+
   test("team invitations, viewer/editor roles, and revoked project access update both accounts", async () => {
     const name = `Browser teamwork ${fixtureId().slice(0, 8)}`;
     await navigate(owner.page, /^Teams & people/);
@@ -198,7 +605,49 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     const team = ((raw.account || raw) as AccountContext).workspaces.find(
       (item) => item.name === name,
     )!;
-    await createProjectUi(owner.page, "Shared review project");
+    await owner.page
+      .getByRole("button", { name: "Create project", exact: true })
+      .first()
+      .click();
+    const newProject = owner.page.getByRole("dialog", {
+      name: "New project",
+      exact: true,
+    });
+    await newProject
+      .getByLabel("Project name", { exact: true })
+      .fill("Shared review project");
+    await expect(
+      newProject.getByLabel("Project name", { exact: true }),
+    ).toHaveValue("Shared review project");
+    const currentRole = owner.page.getByRole("combobox", {
+      name: new RegExp(`^Role for ${colleague.username}`),
+    });
+    // A permission refresh can replace the workspace view while a form is open.
+    // Observe the refreshed role before checking that its draft still contains the name.
+    for (const [role, expectedRole] of [
+      ["editor", "viewer"],
+      ["viewer", "editor"],
+    ] as const) {
+      await api(owner, "/api/teams", {
+        action: "set-role",
+        workspaceId: team.id,
+        userId: colleague.userId,
+        role,
+        expectedRole,
+      });
+      await expect(currentRole).toHaveValue(role, { timeout: 30_000 });
+      await expect(
+        newProject.getByLabel("Project name", { exact: true }),
+      ).toHaveValue("Shared review project");
+    }
+    await newProject.getByLabel(/^Task prefix/).fill("TEST");
+    await expect(
+      newProject.getByLabel("Project name", { exact: true }),
+    ).toHaveValue("Shared review project");
+    await newProject
+      .getByRole("button", { name: "Create project", exact: true })
+      .click();
+    await expect(newProject).toBeHidden();
     const project = (await workspace(owner, team.id)).projects.find(
       (item) => item.name === "Shared review project",
     )!;
@@ -1818,7 +2267,15 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    const chunk = /\/Collections-[^/]+\.js(?:\?.*)?$/;
+    const manifest = JSON.parse(
+      await readFile(
+        new URL("../../dist/client/.vite/manifest.json", import.meta.url),
+        "utf8",
+      ),
+    ) as Record<string, { file?: string }>;
+    const file = manifest["app/components/Collections.tsx"]?.file;
+    if (!file) throw new Error("The current build has no Collections entry.");
+    const chunk = (url: URL) => url.pathname === `/${file}`;
     let blocked = 0;
     const blockChunk = async (route: import("@playwright/test").Route) => {
       // Module preload and its subsequent import can request the same chunk.

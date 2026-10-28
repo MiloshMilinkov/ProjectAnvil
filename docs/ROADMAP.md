@@ -16,8 +16,8 @@ All phases follow the [interface standard](UI_STANDARDS.md): readable and access
 
 Two-account Chromium browser regressions and repeatable populated-workspace measurements are available through the [testing commands](TESTING.md). The [capacity review](PERFORMANCE.md) records the measured limits and next improvements.
 
-- Isolate anonymous visitors or require login; the current guest workspace is intended for one local installation.
-- Add email verification, account recovery, and session management; review production origins and request limits.
+- Local release preparation now includes loopback-only guest access, fail-closed online policies with approved/verified accounts, local account-link delivery, account recovery/session controls, and versioned migration rehearsals. Real online resources and an external email service remain unconfigured.
+- Connect and verify real account email delivery, HTTPS/proxy behavior, and authentication request limits on future staging.
 - Prepare larger-workspace storage, pagination, quotas, and retention; measure realistic loads and rehearse migrations.
 - Review runtime/dependencies, automated browser coverage, monitoring, backup restore, and rollback. Include offline copies, queued changes, and access changes in release rehearsals.
 

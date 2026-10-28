@@ -248,6 +248,13 @@
   letter-spacing: -0.5px;
   flex: 1;
 }
+:root .account-dialog-heading h1 {
+  margin: 0;
+  flex: 1;
+  font-size: 22px;
+  line-height: 1.3;
+  letter-spacing: -0.5px;
+}
 :root .account-dialog-mark {
   width: 42px;
   height: 44px;
@@ -294,7 +301,7 @@
 }
 :root .account-intro {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
   margin: 17px 0 20px;
 }
@@ -307,7 +314,7 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   min-width: 0;
 }
@@ -354,7 +361,7 @@
 }
 :root .account-button {
   padding: 10px 14px;
-  font-size: 13px;
+  font-size: 14px;
   min-width: 0;
   text-decoration: none;
 }
@@ -410,6 +417,99 @@
   border-radius: 8px;
   margin: 0;
   overflow-wrap: anywhere;
+}
+:root .account-entry {
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 24px);
+}
+:root .account-access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-3, 16px);
+}
+:root .account-success {
+  padding: 11px 13px;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+:root .account-security {
+  display: grid;
+  gap: var(--space-4, 24px);
+  font-size: 15px;
+}
+:root .account-security section,
+:root .account-security details {
+  min-width: 0;
+}
+:root .account-security h3 {
+  font-size: 16px;
+  margin: 0 0 var(--space-2, 8px);
+}
+:root .account-security p {
+  color: var(--muted);
+  margin: 0 0 var(--space-3, 16px);
+  line-height: 1.6;
+}
+:root .account-security .account-error {
+  color: var(--danger);
+}
+:root .account-security .account-success {
+  color: var(--text);
+}
+:root .account-security-email {
+  overflow-wrap: anywhere;
+}
+:root .account-security details {
+  border-block: 1px solid var(--border);
+  padding-block: var(--space-2, 8px);
+}
+:root .account-security summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 10px;
+  font-weight: 600;
+}
+:root .account-security summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+:root .account-session-list {
+  display: grid;
+  gap: var(--space-3, 16px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root .account-session-list li {
+  display: grid;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+}
+:root .account-session-list li > div {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+:root .account-session-list span,
+:root .account-session-list small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+:root .account-session-list .account-button {
+  justify-self: start;
 }
 :root .account-dropdown .account-error,
 :root .account-workspace-dropdown .account-error {

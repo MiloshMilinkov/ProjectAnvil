@@ -13,6 +13,9 @@ const output = fs.mkdtempSync(
 );
 const files = [
   "app/lib/types.ts",
+  "app/lib/database-migrations.ts",
+  "app/lib/account-policy.ts",
+  "app/lib/account-mail.ts",
   "app/lib/offline-store.ts",
   "app/lib/workspace-transport.ts",
   "app/lib/response-bytes.ts",
@@ -77,6 +80,8 @@ const files = [
   "app/api/media/[id]/route.ts",
   "app/api/export/route.ts",
   "app/api/account/route.ts",
+  "app/api/account/sessions/route.ts",
+  "app/api/auth/[...all]/route.ts",
   "app/api/teams/route.ts",
   "app/api/rooms/route.ts",
   "app/api/history/route.ts",
@@ -139,6 +144,8 @@ try {
   for (const name of [
     "phase1-trash.cjs",
     "offline.cjs",
+    "database-migrations.cjs",
+    "account-security.cjs",
     "queued-mutation-locks.cjs",
     "response-bytes.cjs",
     "portable-markdown.cjs",
@@ -180,6 +187,8 @@ try {
   process.exitCode = result.status ?? 1;
   for (const check of [
     { file: "drafts.cjs" },
+    { file: "database-migrations.cjs" },
+    { file: "account-security.cjs" },
     { file: "offline.cjs" },
     { file: "queued-mutation-locks.cjs" },
     { file: "response-bytes.cjs" },

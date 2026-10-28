@@ -252,7 +252,14 @@ export async function createProjectUi(page: Page, name: string) {
     .click();
   const dialog = page.getByRole("dialog", { name: "New project", exact: true });
   await dialog.getByLabel("Project name", { exact: true }).fill(name);
+  await expect(dialog.getByLabel("Project name", { exact: true })).toHaveValue(
+    name,
+  );
   await dialog.getByLabel(/^Task prefix/).fill("TEST");
+  await expect(dialog.getByLabel("Project name", { exact: true })).toHaveValue(
+    name,
+  );
+  await expect(dialog.getByLabel(/^Task prefix/)).toHaveValue("TEST");
   await dialog
     .getByRole("button", { name: "Create project", exact: true })
     .click();

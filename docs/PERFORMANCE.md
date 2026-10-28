@@ -86,6 +86,14 @@ Use `npm run size:report -- --disk --out outputs/size/review.json` after a curre
 
 The finished build passed type/lint/API/model checks, 29 Node regressions, 15 two-account browser workflows, the new size budgets, and all three existing capacity profiles. At the large profile, all ten distinct-task writes succeeded, full owner reads measured 67 ms median, and task opening measured 816 ms for both account observations. Search measured 269–279 ms; it did not show a consistent improvement over the prior 224–259 ms. Access, conflict, retry, and quota assertions passed with no browser JavaScript exceptions. These local results support capacity preservation; the demonstrated improvement is payload size, not a general latency guarantee.
 
+## Local release preparation
+
+The account/recovery and migration preparation retains the existing size budgets: startup JavaScript stays below **1,250,000 bytes**, the complete offline app below **8,000,000 bytes**, and math fonts remain WOFF2-only. The verified release-preparation build uses **1,115,951 startup JavaScript bytes** and **7,497,201 offline bytes**. Compared with the preceding cleanup build, the additional controls and compatible framework update add about 69 KB to startup and 60 KB to the offline package. No account or email SDK was added; Better Auth remains the account implementation.
+
+Account UI is separated into reusable access/recovery forms and menus instead of duplicating a second sign-in implementation. A session generation restarts requests carrying a previous cookie after password changes, preserving the unchanged workspace and dialog while normal revoked-access clearing remains in place. Same-browser tabs can receive a token-free session-change signal. Database upgrades reuse the existing SQL sources with a checksum ledger; offline review commands do not connect to cloud resources. Security/migration coverage uses disposable data and simulated email delivery.
+
+Final verification passed strict types, zero-warning lint, backend/model and native Better Auth integration checks, 31 Node tests, and all 16 browser workflows. Twenty account security/gate screenshots cover five themes at desktop and 320 px widths. Held pre-rotation live requests are retired in both same-cookie tabs; separate sessions are revoked, and a project draft survives two permission refreshes. Both dependency audits report zero findings. Online gate visuals use a mocked local response; actual email delivery, HTTPS/proxy behavior, and hosted load still require future staging checks.
+
 ## Remaining capacity work
 
 1. **Storage granularity:** active records still share one workspace snapshot and revision. Larger teams would benefit from independently stored/queryable records and incremental updates. Design and rehearse that migration before increasing limits.
