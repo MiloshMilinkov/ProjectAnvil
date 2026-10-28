@@ -2,25 +2,12 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { RotateCcw, Trash2, X } from "lucide-react";
-import type { FeatureProps, Entity } from "../lib/types";
+import type { FeatureProps } from "../lib/types";
+import { entityLabel } from "../lib/collaboration-model";
 import type { TrashEntry, TrashPage } from "../lib/trash-types";
 import { useWorkspaceFetch } from "./WorkspaceScope";
 import { useDialog } from "./useDialog";
 import "./everyday-workflow.css";
-
-const labels: Record<Entity, string> = {
-  tasks: "Task",
-  notes: "Note",
-  projects: "Project",
-  canvases: "Canvas",
-  media: "Attachment",
-  people: "Assignment label",
-  savedViews: "Saved view",
-  relationships: "Relationship",
-  noteTypes: "Note type",
-  relationshipPresets: "Relationship preset",
-  brainstorms: "Brainstorm board",
-};
 
 export default function TrashDialog({
   mutate,
@@ -120,7 +107,7 @@ export default function TrashDialog({
     setError("");
     try {
       await mutate({ action: "restore", id: entry.id });
-      notify(`${labels[entry.entity]} restored`);
+      notify(`${entityLabel(entry.entity)} restored`);
       await load();
       returnFocus.current = true;
     } catch (cause) {
@@ -152,22 +139,19 @@ export default function TrashDialog({
         aria-busy={loading || !!restoring}
       >
         <header className="dialog-heading">
-          <h2 id={titleId}>
-            <Trash2 size={21} /> Workspace Trash
-          </h2>
+          <h2 id={titleId}>Workspace Trash</h2>
           <button
             className="btn-icon"
             aria-label="Close Trash"
             disabled={!!restoring}
             onClick={onClose}
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </header>
         <p className="muted" id={descriptionId}>
-          Restore deleted items and their available connections. Newer edits are
-          kept. Trash belongs to this workspace; personal templates have their
-          own Deleted tab.
+          Restore deleted items with any links that are still available. Newer
+          edits are preserved. Personal templates have their own Deleted tab.
         </p>
         {error && (
           <div className="form-error" role="alert">
@@ -176,7 +160,7 @@ export default function TrashDialog({
         )}
         {warnings.length > 0 && (
           <div className="trash-restore-details" role="status">
-            <strong>Restored with connections to review</strong>
+            <strong>Check the restored connections</strong>
             <ul>
               {warnings.map((warning, index) => (
                 <li key={index}>{warning}</li>
@@ -188,36 +172,35 @@ export default function TrashDialog({
           {entries.map((entry) => (
             <article className="trash-row" key={entry.id}>
               <div>
-                <strong>{entry.title || labels[entry.entity]}</strong>
+                <strong>{entry.title || entityLabel(entry.entity)}</strong>
                 <span>
-                  {labels[entry.entity]} ·{" "}
+                  {entityLabel(entry.entity)} ·{" "}
                   {new Date(entry.deletedAt).toLocaleString()}
                 </span>
                 {!entry.restorable && (
                   <p className="muted">
                     {entry.unavailableReason ||
-                      "This recovery copy is no longer available to restore."}
+                      "This recovery copy can no longer be restored."}
                   </p>
                 )}
               </div>
               <button
                 className="btn btn-secondary"
                 disabled={loading || !!restoring || !entry.restorable}
-                aria-label={`Restore ${entry.title || labels[entry.entity]}`}
+                aria-label={`Restore ${entry.title || entityLabel(entry.entity)}`}
                 onClick={() => void restore(entry)}
               >
-                <RotateCcw size={15} />
+                <RotateCcw size={15} aria-hidden="true" />
                 {restoring === entry.id ? "Restoring…" : "Restore"}
               </button>
             </article>
           ))}
           {!entries.length && (
             <div className="everyday-empty" role="status">
-              <Trash2 size={28} />
-              <strong>{loading ? "Loading Trash…" : "Nothing in Trash"}</strong>
+              <Trash2 size={28} aria-hidden="true" />
+              <strong>{loading ? "Loading Trash…" : "Trash is empty"}</strong>
               <p>
-                Items moved here stay available for recovery. There is no
-                automatic expiry.
+                Deleted items appear here. They do not expire automatically.
               </p>
             </div>
           )}

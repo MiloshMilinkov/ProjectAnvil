@@ -29,6 +29,8 @@ Sixteen browser workflows cover two UI-registered accounts, private workspaces, 
 
 Backend release checks exercise local/online policy boundaries, private recovery mail, streamed request limits, sanitized session controls, and migration history/drift. Migration rehearsals upgrade legacy fixtures, inject a failed atomic migration, retry, verify online startup without schema writes, and restore a pre-upgrade SQLite backup. All databases and email transports are disposable or simulated; no real mail or cloud resources are used.
 
+Interface checks use the current labels in navigation, search, dialogs, and guides. Invalid workspace JSON shows a readable error before any import request is sent, leaving the saved workspace unchanged. The copy/readability review also checked seven empty views across five themes at desktop and 320 px widths, including board text sizes, touch targets, consistent guest naming, and an empty canvas without a false Saved status. This visual matrix was a local review; the maintained browser command above runs the sixteen workflows.
+
 Useful browser options:
 
 ```sh

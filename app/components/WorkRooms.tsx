@@ -81,7 +81,7 @@ const checkpointLength = 2000;
 const locationLabels: Record<WorkLocation["page"], string> = {
   overview: "Workspace overview",
   "my-work": "My work",
-  tasks: "Task board",
+  tasks: "Tasks",
   projects: "Projects",
   notes: "Notes",
   graph: "Relationship graph",
@@ -89,13 +89,13 @@ const locationLabels: Record<WorkLocation["page"], string> = {
   collections: "Collections",
   brainstorm: "Brainstorming",
   activity: "Activity",
-  daily: "Daily planner",
+  daily: "Daily notes",
 };
 
 function errorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
-    : "Your work rooms could not be saved. Please try again.";
+    : "Couldn't save work rooms. Try again.";
 }
 
 function savedDate(value: string): string {
@@ -131,7 +131,7 @@ function useWorkRooms() {
       if (!response.ok || !Array.isArray(result?.rooms)) {
         throw new Error(
           result?.error ||
-            "Your work rooms could not be opened. Please try again.",
+            "Couldn't load work rooms. Try again.",
         );
       }
       return [...result.rooms].sort((left, right) =>
@@ -534,7 +534,7 @@ function RoomEditor({
     event.preventDefault();
     if (busyRef.current) return;
     if (!draft.name.trim()) {
-      setError("Give this work room a name.");
+      setError("Enter a work room name.");
       return;
     }
     busyRef.current = true;
@@ -628,7 +628,6 @@ function RoomEditor({
             <DoorOpen size={22} />
           </span>
           <div>
-            <span className="room-eyebrow">KEEP YOUR PLACE</span>
             <h2 id={headingId}>
               {room ? "Edit work room" : "Create a work room"}
             </h2>
@@ -644,14 +643,12 @@ function RoomEditor({
           </button>
         </header>
         <p className="room-intro">
-          Pin the context you need, then leave a checkpoint for your next
-          session. Your notes and tasks stay in their original places.
+          Pin a task, notes, and a canvas, then save a checkpoint for next time.
         </p>
         <form onSubmit={save}>
           {recovered && (
             <p className="room-notice" role="status">
-              Recovered your unsaved room changes. They reach the workspace only
-              when you save this room.
+              Unsaved room changes restored. Choose Save room to keep them.
             </p>
           )}
           {storageError && (
@@ -688,7 +685,7 @@ function RoomEditor({
                     }));
                   }}
                 >
-                  <option value="">No specific project</option>
+                <option value="">No project</option>
                   {workspace.projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
@@ -884,8 +881,8 @@ function RoomEditor({
                 </h3>
               </div>
               <p className="room-help">
-                A short handover to your future self. These fields save when you
-                choose Save room.
+                Record progress and the next step. Choose Save room to save this
+                checkpoint.
               </p>
               <label className="room-field">
                 <span>What changed</span>
@@ -894,7 +891,7 @@ function RoomEditor({
                   maxLength={checkpointLength}
                   value={draft.summary}
                   onChange={(event) => update("summary", event.target.value)}
-                  placeholder="What did you work out or finish?"
+                  placeholder="Progress, decisions, or completed work"
                 />
               </label>
               <label className="room-field">
@@ -905,7 +902,7 @@ function RoomEditor({
                   maxLength={checkpointLength}
                   value={draft.nextStep}
                   onChange={(event) => update("nextStep", event.target.value)}
-                  placeholder="Where should you pick up next?"
+                  placeholder="What to do next"
                 />
               </label>
               <label className="room-field">
@@ -915,7 +912,7 @@ function RoomEditor({
                   maxLength={checkpointLength}
                   value={draft.question}
                   onChange={(event) => update("question", event.target.value)}
-                  placeholder="What still needs an answer?"
+                  placeholder="Questions or unresolved issues"
                 />
               </label>
             </section>
@@ -1125,7 +1122,7 @@ function RoomCard({
         <p>
           {checkpoint?.nextStep ||
             checkpoint?.summary ||
-            "Save a next step so you can return without reconstructing your plan."}
+            "Add progress notes or a next step."}
         </p>
         {checkpoint?.question && (
           <small>
@@ -1214,11 +1211,9 @@ export default function WorkRooms(props: WorkRoomsProps) {
     <div className="page work-rooms-page" data-tour="work-rooms">
       <header className="work-rooms-heading">
         <div>
-          <span className="room-eyebrow">YOUR WORK, WAITING FOR YOU</span>
           <h1>Work rooms</h1>
           <p>
-            Keep the context for a piece of work together, leave a next step,
-            and return to the same view.
+            Save a working view with pinned references and a checkpoint.
           </p>
         </div>
         <button
@@ -1235,8 +1230,8 @@ export default function WorkRooms(props: WorkRoomsProps) {
         <LockKeyhole size={19} />
         <p>
           {account.user
-            ? "These rooms are private to your account, even in a team workspace. Pinning an item does not change who can access it."
-            : "These rooms belong to the local guest workspace. Sign in to keep rooms private to your account."}
+            ? "Work rooms are private to your account. Pinned items keep their existing access settings."
+            : "These rooms belong to the guest workspace. Sign in for a private room library."}
         </p>
       </div>
       {error && (
@@ -1255,7 +1250,7 @@ export default function WorkRooms(props: WorkRoomsProps) {
       {loading && (
         <div className="room-empty" role="status">
           <LoaderCircle size={25} className="room-spinner" />
-          <p>Opening your work rooms…</p>
+          <p>Loading work rooms…</p>
         </div>
       )}
       {!loading && !rooms.length && !error && (
@@ -1263,10 +1258,10 @@ export default function WorkRooms(props: WorkRoomsProps) {
           <span className="room-mark">
             <DoorOpen size={28} />
           </span>
-          <h2>A place to pick up where you left off</h2>
+          <h2>No work rooms yet</h2>
           <p>
-            Open a note or canvas, come here, and create a room from your last
-            working view. Pin references and write down your next step.
+            Create a room to save your current view, pin references, and record
+            the next step.
           </p>
           <button
             type="button"
@@ -1274,7 +1269,7 @@ export default function WorkRooms(props: WorkRoomsProps) {
             onClick={() => setEditor({ room: null, checkpoint: false })}
           >
             <Plus size={17} />
-            Create your first room
+            Create work room
           </button>
         </section>
       )}
@@ -1335,7 +1330,7 @@ export function ResumeWorkCard({
         </span>
         <div>
           <h2>Work rooms</h2>
-          <p>Your rooms could not be opened.</p>
+          <p>{"Couldn't load work rooms."}</p>
         </div>
         <button
           type="button"
@@ -1357,15 +1352,13 @@ export function ResumeWorkCard({
         <DoorOpen size={22} />
       </span>
       <div>
-        <span className="room-eyebrow">
-          {room ? "READY WHEN YOU ARE" : "KEEP YOUR PLACE"}
-        </span>
-        <h2>{room ? room.name : "Return with a clear next step"}</h2>
+        {room && <span className="room-eyebrow">Work room</span>}
+        <h2>{room ? room.name : "Work rooms"}</h2>
         <p>
           {room?.checkpoint?.nextStep ||
             room?.checkpoint?.summary ||
             (room
-              ? "Resume your saved view and pinned context."
+              ? "Open your saved view and pinned references."
               : "Save a work room with your notes, task, canvas, and next step.")}
         </p>
       </div>

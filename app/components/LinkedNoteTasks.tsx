@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowUpRight, CheckSquare, ChevronDown } from 'lucide-react';
+import { ArrowRight, CheckSquare, ChevronDown } from 'lucide-react';
 import type { Task } from '../lib/types';
 import { statuses } from '../lib/types';
 import './linked-note-tasks.css';
@@ -33,7 +33,7 @@ export default function LinkedNoteTasks({ tasks, onOpenTask }: LinkedNoteTasksPr
             {task.source && <small>{task.source.excerpt.replace(/\s+/g, ' ').slice(0, 140)}</small>}
           </span>
           <span className="linked-note-task-status">{status.label}</span>
-          <ArrowUpRight size={15} />
+          <ArrowRight size={15} aria-hidden="true" />
         </button>;
       })}
     </div>}

@@ -49,6 +49,18 @@ These rules apply the [visual hierarchy principles](https://www.nngroup.com/arti
 - Keep the page usable from 320 px mobile layouts through large desktop screens and at 200% zoom. Contain deliberate horizontal scrolling inside boards, timelines, canvases, and wide tables; avoid page-level overflow.
 - Check long names, many projects, populated workspaces, and empty workspaces. Preserve readable content rather than shrinking text to make it fit.
 
+## Writing and icons
+
+- Use short, familiar labels that describe the tool or action. Navigation uses **Tasks**, **Daily notes**, and **Teams & workspaces**; use the same names in search, headings, and guides. Keep stored keys separate from display labels.
+- Use sentence case. Omit promotional eyebrows, motivational slogans, and promises such as "magic" or "effortless." A heading should help someone find their work. Warm, ordinary language is welcome; avoid repeated coaching.
+- Give an empty state a factual heading and one useful next action. Avoid generic illustrations and repeated reassurance that add no information.
+- Keep helper text close to the control it explains. Explain unusual behavior, limits, and consequences; don't restate an obvious label. Put operational detail in the setup guide or an optional disclosure.
+- Errors should explain what happened and what to do next. Preserve distinctions between drafts, queued changes, saved work, conflicts, and denied access. Never imply an email was sent, a save succeeded, or a backup exists unless it did.
+- Show readable field and item names in ordinary feedback. Reuse the shared field/entity labels; don't show schema keys, request identifiers, or synchronization internals as product copy. Raw export and optional recovery inspection formats remain available.
+- Use the existing Lucide icons consistently. A pencil edits; an ellipsis opens a menu; an internal arrow opens an item; an external-link arrow opens another window or destination. Icons must describe the actual action. Reserve warning graphics for a state that needs attention.
+- Keep text labels for important actions. Give icon-only buttons an accessible name and hide adjacent decorative icons from screen readers. Don't display a keyboard-key badge unless it represents a real shortcut.
+- Retain useful detail and creative template examples. Concise copy must not hide sharing rules, data-loss consequences, offline limits, or recovery choices.
+
 ## Review checklist
 
 Before an interface change is finished:

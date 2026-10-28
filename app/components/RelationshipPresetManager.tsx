@@ -79,8 +79,7 @@ function PresetList({
           </button>
         </div>
         <p className="muted">
-          Save a connection’s meaning, item types, and suggested explanation for
-          reuse in this workspace.
+          Save a relationship type, item types, and a suggested reason for reuse.
         </p>
         <div className="preset-toolbar">
           <button className="btn btn-primary" onClick={() => onEdit(null)}>
@@ -122,7 +121,7 @@ function PresetList({
             <p className="preset-empty">
               {archived
                 ? "No archived presets."
-                : "Create a preset for connections you use often, such as evidence supporting a plan or a decision depending on research."}
+                : "No presets yet. Create one for a relationship you use often."}
             </p>
           )}
         </div>
@@ -206,8 +205,8 @@ function PresetEditor({
           </button>
         </div>
         <p className="muted">
-          A preset fills a new relationship. Existing connections keep their own
-          meaning when this preset changes.
+          Presets fill in new relationships. Editing a preset does not change
+          existing relationships.
         </p>
         <fieldset className="entity-editor-fields" disabled={editor.busy}>
           <label className="form-label">

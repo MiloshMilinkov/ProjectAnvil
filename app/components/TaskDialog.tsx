@@ -322,7 +322,7 @@ export default function TaskDialog({
   async function save(close = true): Promise<boolean> {
     if (busy.current) return false;
     if (!latestForm.current.task.title.trim()) {
-      setError("Give your task a title.");
+      setError("Enter a task title.");
       return false;
     }
     const { startDate, dueDate } = latestForm.current.task;
@@ -902,7 +902,7 @@ export default function TaskDialog({
                     id={`${fieldId}-description`}
                     className="description-editor"
                     maxLength={100000}
-                    placeholder="Add context, acceptance criteria, or link an idea with [[Note title]]…"
+                    placeholder="Details, requirements, or [[Note title]] links"
                     value={draft.description}
                     onChange={(e) => set("description", e.target.value)}
                   />
@@ -958,7 +958,7 @@ export default function TaskDialog({
                     id={`${fieldId}-subtask`}
                     value={subtask}
                     maxLength={300}
-                    placeholder="Add a small next step…"
+                    placeholder="Add a checklist item…"
                     onChange={(e) => change({ subtask: e.target.value })}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -989,8 +989,8 @@ export default function TaskDialog({
                   </summary>
                   <div className="task-advanced-planning-body">
                     <p className="editor-field-help">
-                      Add structure when you need it. These options stay with
-                      the task when this section is closed.
+                      Optional hierarchy, estimates, tags, repeat schedules,
+                      and reminders.
                     </p>
                     <div className="task-meta-grid task-planning-options">
                       <label>
@@ -1101,8 +1101,7 @@ export default function TaskDialog({
                   ))}
                   {!w.notes.length && (
                     <p className="task-connections-empty">
-                      No notes yet. Create a note in Notes, then link it here to
-                      keep the task&apos;s context close.
+                      No notes yet. Create a note in Notes, then link it here.
                     </p>
                   )}
                 </div>
@@ -1137,8 +1136,7 @@ export default function TaskDialog({
                     ))}
                   {!w.tasks.some((t) => t.id !== draft.id) && (
                     <p className="task-connections-empty">
-                      No other tasks yet. Add another task to choose work that
-                      needs to finish before this one.
+                      No other tasks yet. Create one to add a dependency.
                     </p>
                   )}
                 </div>
@@ -1170,8 +1168,8 @@ export default function TaskDialog({
                   ))}
                   {!draft.comments.length && (
                     <Empty
-                      title="Start a conversation"
-                      text="Keep decisions and feedback with the task."
+                      title="No comments yet"
+                      text="Add an update, question, or decision."
                     />
                   )}
                 </div>
@@ -1185,7 +1183,7 @@ export default function TaskDialog({
                 <textarea
                   id={`${fieldId}-comment`}
                   className="field"
-                  placeholder="Share an update or decision…"
+                  placeholder="Write a comment…"
                   value={comment}
                   maxLength={10000}
                   onChange={(e) => change({ comment: e.target.value })}
@@ -1218,7 +1216,7 @@ export default function TaskDialog({
                 disabled={saving}
                 onClick={() => void loadLatest()}
               >
-                {exists ? "Use latest saved values" : "Check saved version"}
+                {exists ? "Load saved version" : "Check saved version"}
               </button>
             </div>
           )}
@@ -1293,7 +1291,7 @@ export default function TaskDialog({
                   "Replace the current unfinished task with this template?",
                 )
               )
-                throw new Error("Your current task is kept.");
+                throw new Error("Template not applied. Your current task is unchanged.");
               replaceUnfinishedTask(next);
             } else change(next);
           }}

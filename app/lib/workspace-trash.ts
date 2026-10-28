@@ -228,7 +228,7 @@ export async function trashPage(
     ...(row.invalidated_at
       ? {
           unavailableReason:
-            "A workspace import or a newer deletion superseded this item.",
+            "A workspace import or a newer deletion replaced this recovery copy.",
         }
       : {}),
   }));
@@ -299,7 +299,7 @@ export async function prepareTrashRestore(
   }
   if (row.invalidated_at) {
     throw new WorkspaceError(
-      "A workspace import or a newer deletion superseded this item. Restore a current Trash entry instead.",
+      "A workspace import or a newer deletion replaced this recovery copy. Restore the latest Trash entry instead.",
       409,
     );
   }
@@ -316,7 +316,7 @@ export async function prepareTrashRestore(
     snapshot.primary.item.id !== row.entity_id
   ) {
     throw new WorkspaceError(
-      "This Trash record could not be read safely.",
+      "This Trash item's recovery copy is incomplete or damaged.",
       409,
     );
   }
@@ -645,12 +645,12 @@ export async function prepareTrashRestore(
     ) {
       if (primary) {
         throw new WorkspaceError(
-          "A newer deletion or import superseded this Trash entry.",
+          "A newer deletion or import replaced this recovery copy. Restore the latest Trash entry instead.",
           409,
         );
       }
       warn(
-        "Some relationships were not restored because a newer change superseded them.",
+        "Some relationships were not restored because they have newer changes.",
       );
       return;
     }

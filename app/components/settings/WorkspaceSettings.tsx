@@ -31,6 +31,7 @@ import { workspaceNavigation as nav } from "../shell/navigation";
 import StorageHealth from "../StorageHealth";
 import { AppearancePicker } from "../ThemeControls";
 import { useDraftScope } from "../useRecoverableDraft";
+import { useWorkspaceScope } from "../WorkspaceScope";
 import type { useWorkspaceData } from "../useWorkspaceData";
 import { useWorkspacePermissions } from "../WorkspacePermissions";
 
@@ -45,6 +46,8 @@ export default function WorkspaceSettings(
   },
 ) {
   const { workspace, mutate, notify, prefs, savePrefs } = props;
+  const { account } = useWorkspaceScope();
+  const local = account.policy?.mode !== "online";
   const settingsScope = useDraftScope();
   const permissions = useWorkspacePermissions(workspace);
   const [name, setName] = useState(workspace.name);
@@ -79,9 +82,8 @@ export default function WorkspaceSettings(
   return (
     <div ref={settingsRef} className="page settings-page">
       <PageHeader
-        eyebrow="MAKE IT YOURS"
         title="Workspace settings"
-        description="Adjust your everyday workspace, then open other settings when you need them."
+        description="Manage your workspace, appearance, storage, and access."
       />
 
       <nav className="settings-jump-nav" aria-label="Settings sections">
@@ -105,15 +107,16 @@ export default function WorkspaceSettings(
       <SettingsGroup
         id="workspace"
         title="Workspace"
-        description="Name and a quick overview of your records."
+        description="Workspace name and record counts."
         icon={Settings2}
         initiallyOpen
       >
         <section className="panel settings-section">
-          <h2>Workspace name and totals</h2>
+          <h2>Workspace details</h2>
           <p>
-            Your projects, knowledge, tasks, and uploaded files are stored on
-            this PC.
+            {local
+              ? "Workspace data is stored on this PC."
+              : "Workspace data is stored by this service."}
           </p>
           <label className="form-label">
             Workspace name
@@ -184,10 +187,7 @@ export default function WorkspaceSettings(
       >
         <section className="panel settings-section appearance-section">
           <h2>Appearance</h2>
-          <p>
-            Choose a look for your workspace. Your choice is saved on this
-            device.
-          </p>
+          <p>Choose a theme for this device.</p>
           <AppearancePicker />
         </section>
         <section className="panel settings-section">
@@ -224,7 +224,7 @@ export default function WorkspaceSettings(
           <label className="setting-toggle">
             <span>
               <strong>Open this view on startup</strong>
-              <small>Save a default workspace layout.</small>
+              <small>Choose the view that opens when you start the app.</small>
             </span>
             <select
               className="field"
@@ -347,14 +347,27 @@ export default function WorkspaceSettings(
                 setImporting(true);
                 setImportError("");
                 try {
-                  const imported = JSON.parse(await file.text());
+                  const text = await file.text();
+                  let imported;
+                  try {
+                    imported = JSON.parse(text);
+                  } catch {
+                    setImportError(
+                      "This file isn't valid JSON. Choose a ProjectAnvil workspace export.",
+                    );
+                    return;
+                  }
                   await mutate({
                     action: "import",
                     workspace: { ...imported, revision: workspace.revision },
                   });
                   notify("Workspace imported");
                 } catch (err) {
-                  setImportError((err as Error).message);
+                  setImportError(
+                    err instanceof Error
+                      ? err.message
+                      : "Couldn't import this workspace. Try again.",
+                  );
                 } finally {
                   setImporting(false);
                   e.target.value = "";
@@ -380,14 +393,14 @@ export default function WorkspaceSettings(
       <SettingsGroup
         id="people"
         title="People & access"
-        description="Assignment labels and how local access works."
+        description="Assignment labels and workspace permissions."
         icon={Users}
       >
         <section className="panel settings-section">
           <h2>Assignment labels</h2>
           <p>
             Optional labels for planning. To give someone access, invite their
-            registered username through Teams &amp; people.
+            registered username through Teams &amp; workspaces.
           </p>
           <div className="settings-data-actions">
             <button
@@ -413,20 +426,19 @@ export default function WorkspaceSettings(
           </div>
         </section>
         <section className="panel settings-section">
-          <h2>Local access</h2>
+          <h2>Workspace access</h2>
           <p>
-            ProjectAnvil runs on this PC at http://127.0.0.1:5173. Other devices
-            cannot open this local address. Accounts have private personal
-            workspaces. Team workspaces share their projects, tasks, notes, and
-            files with accepted members. Assignment labels do not grant access.
+            {local
+              ? "This installation runs on this PC. Other devices can't connect to its local address. "
+              : "Sign-in is required for this installation. "}
+            Personal workspaces are private. Team roles and project permissions
+            control shared work.
           </p>
           <div className="info-note">
             <Network size={17} />
             <p>
-              Live updates refresh saved work across open windows. Optional
-              offline copies and queued changes stay in this browser profile.
-              Keep the local server running for accounts, attachments, and
-              synchronization.
+              Live updates keep open windows in sync. Offline copies and pending
+              changes stay in this browser. Reconnect to sync them.
             </p>
           </div>
         </section>

@@ -25,7 +25,7 @@ const options = [
   {
     id: "light" as const,
     label: "Light",
-    description: "A bright, clear workspace.",
+    description: "Light surfaces and dark text.",
     icon: Sun,
     bg: "#f4f6f9",
     sidebar: "#eef0f5",
@@ -36,7 +36,7 @@ const options = [
   {
     id: "dark" as const,
     label: "Dark",
-    description: "Quiet charcoal and cool accents.",
+    description: "Charcoal surfaces and cool accents.",
     icon: Moon,
     bg: "#111318",
     sidebar: "#181b22",
@@ -47,7 +47,7 @@ const options = [
   {
     id: "warp" as const,
     label: "Warp",
-    description: "The original violet appearance.",
+    description: "Dark surfaces and violet accents.",
     icon: Palette,
     bg: "#15151a",
     sidebar: "#19191f",
@@ -58,7 +58,7 @@ const options = [
   {
     id: "focus" as const,
     label: "Focus",
-    description: "Light slate surfaces, dark framing.",
+    description: "Light content with dark navigation.",
     icon: Contrast,
     bg: "#e4e8ee",
     sidebar: "#17191c",
@@ -69,7 +69,7 @@ const options = [
   {
     id: "soft" as const,
     label: "Soft",
-    description: "Blush pink, mauve, and gentle pastels.",
+    description: "Pink surfaces and mauve accents.",
     icon: Flower2,
     bg: "#fff4f7",
     sidebar: "#faf2f6",

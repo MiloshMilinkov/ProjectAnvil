@@ -45,11 +45,11 @@ import {
   LoaderCircle,
   Mic,
   MoreHorizontal,
+  PanelRight,
   Plus,
   Presentation,
   Scissors,
   Search,
-  Settings2,
   Square,
   Trash2,
   Users,
@@ -1160,14 +1160,15 @@ export default function Knowledge({
         method: "POST",
         body: data,
       });
-      if (!response.ok) throw new Error("Upload failed");
+      if (!response.ok) throw new Error("File upload failed. Try again.");
       const { media, workspace: updatedWorkspace } =
         (await response.json()) as {
           media?: Media;
           workspace?: Workspace;
           error?: string;
         };
-      if (!media?.url) throw new Error("No file URL returned");
+      if (!media?.url)
+        throw new Error("The upload could not be verified. Check Storage & recovery before uploading again.");
       binarySaved = true;
       // The upload route stores media in the shared workspace; upsert also refreshes clients.
       if (!updatedWorkspace)
@@ -1349,7 +1350,7 @@ export default function Knowledge({
     const current = draftRef.current;
     const field = editor.current;
     if (!current || !field || field.selectionEnd === field.selectionStart) {
-      notify("Select some text in the editor to move it into a new note.");
+      notify("Select text in the editor to move it into a new note.");
       setView("edit");
       setMoreOpen(false);
       return;
@@ -1370,7 +1371,7 @@ export default function Knowledge({
     };
     try {
       if (!(await flush()))
-        throw new Error("Save this note successfully before extracting text.");
+        throw new Error("Save this note before extracting text.");
       await mutate({
         action: "upsert",
         entity: "notes",
@@ -1471,7 +1472,7 @@ export default function Knowledge({
       );
     } catch (cause) {
       notify(
-        cause instanceof Error ? cause.message : "Could not delete the note.",
+        cause instanceof Error ? cause.message : "Could not move this note to Trash.",
       );
     } finally {
       deletingRef.current = false;
@@ -1920,7 +1921,7 @@ export default function Knowledge({
                   aria-controls={`${controlId}-details`}
                   onClick={() => setDetails((value) => !value)}
                 >
-                  <Settings2 size={16} />
+                  <PanelRight size={16} aria-hidden="true" />
                   <span>Details</span>
                 </button>
                 <div className="note-more-wrap">
@@ -2335,7 +2336,7 @@ export default function Knowledge({
                 >
                   {effectiveView !== "preview" && (
                     <div className="note-source-pane">
-                      <div className="note-pane-label">MARKDOWN</div>
+                      <div className="note-pane-label">Markdown</div>
                       <textarea
                         ref={editor}
                         aria-label="Note content"
@@ -2348,7 +2349,7 @@ export default function Knowledge({
                           }) ||
                           (liveEditing && (!shared.ready || !shared.canEdit))
                         }
-                        placeholder="Start writing. Use [[note names]] to connect your ideas…"
+                        placeholder="Write a note… Use [[note title]] to add a link."
                         onChange={(event) =>
                           edit({ content: event.target.value })
                         }
@@ -2358,7 +2359,7 @@ export default function Knowledge({
                   {effectiveView !== "edit" && (
                     <div className="note-preview-pane" ref={previewPane}>
                       {effectiveView === "split" && (
-                        <div className="note-pane-label">PREVIEW</div>
+                        <div className="note-pane-label">Preview</div>
                       )}
                       <Markdown
                         content={draft.content}
@@ -2367,7 +2368,7 @@ export default function Knowledge({
                       />
                       {!draft.content && (
                         <div className="note-preview-empty">
-                          Your next great idea starts here.
+                          This note is empty.
                         </div>
                       )}
                     </div>
@@ -2393,7 +2394,7 @@ export default function Knowledge({
                   aria-label="Note details"
                 >
                   <div className="note-details-title">
-                    NOTE DETAILS
+                    Note details
                     <button
                       className="btn-icon"
                       aria-label="Close note details"
@@ -2554,8 +2555,8 @@ export default function Knowledge({
                     ))}
                     {!backlinks.length && (
                       <p className="note-details-empty">
-                        Notes that link here will appear here. Connect an idea
-                        with <code>[[{draft.title}]]</code>.
+                        Notes linking to this note appear here. Use{" "}
+                        <code>[[{draft.title}]]</code> to add a link.
                       </p>
                     )}
                   </div>
@@ -2579,21 +2580,20 @@ export default function Knowledge({
                     ))}
                     {!linkedTasks.length && (
                       <p className="note-details-empty">
-                        Link this note from a task to keep the plan and the work
-                        connected.
+                        Tasks linked to this note appear here.
                       </p>
                     )}
                   </div>
                   <div className="note-details-section note-syntax-help">
-                    <h3>A little writing magic</h3>
+                    <h3>Formatting reference</h3>
                     <p>
-                      <code>[[Note title]]</code> connect ideas
+                      <code>[[Note title]]</code> link a note
                     </p>
                     <p>
                       <code>![[Note title]]</code> embed a note
                     </p>
                     <p>
-                      <code>[[Note#Heading]]</code> link a section
+                      <code>[[Note#Heading]]</code> link to a heading
                     </p>
                     <p>
                       <code>- [ ]</code> create a checklist
@@ -2619,12 +2619,10 @@ export default function Knowledge({
             <div>
               <BookOpen size={32} />
             </div>
-            <span className="eyebrow">IDEAS BECOME PLANS</span>
-            <h2>A home for everything you know.</h2>
+            <h2>{notes.length ? "Select a note" : "No notes here yet"}</h2>
             <p>
-              Capture a thought, plan a project, keep a routine, or explore a
-              creative idea. Connect notes to each other and to the tasks that
-              move them forward.
+              Write notes, add references, and link them to your projects and
+              tasks.
             </p>
             <button
               ref={emptyCreateRef}
@@ -2686,7 +2684,6 @@ export default function Knowledge({
           >
             <div className="knowledge-modal-heading">
               <div>
-                <span className="eyebrow">MAKE SPACE FOR AN IDEA</span>
                 <h2>Create a note</h2>
               </div>
               <button
@@ -2720,7 +2717,7 @@ export default function Knowledge({
                   selectedTemplate.kind === "daily"
                     ? today()
                     : newTemplateId === "blank"
-                      ? "Give your idea a name…"
+                      ? "Note title"
                       : selectedTemplate.label
                 }
                 onKeyDown={(event) => {
@@ -2730,7 +2727,7 @@ export default function Knowledge({
               />
             </label>
             <div className="note-template-label">
-              CHOOSE A STARTING POINT{" "}
+              Templates{" "}
               <span>{templates.length} built-in templates</span>
             </div>
             {personalCreation && (
@@ -2862,7 +2859,6 @@ export default function Knowledge({
           >
             <div className="knowledge-modal-heading">
               <div>
-                <span className="eyebrow">YOUR EARLIER WORK</span>
                 <h2>Version history</h2>
               </div>
               <button
@@ -2875,9 +2871,8 @@ export default function Knowledge({
               </button>
             </div>
             <p className="knowledge-modal-description">
-              Earlier versions are stored separately from your current
-              workspace. Restoring a version first saves your changes and
-              preserves the content being replaced.
+              Restoring a version saves your current changes first and keeps a
+              copy of the content being replaced.
             </p>
             {historyError && (
               <p className="form-error" role="alert">
@@ -2910,7 +2905,7 @@ export default function Knowledge({
             {!history.length && !historyLoading && !historyError && (
               <div className="note-list-empty">
                 <History size={28} />
-                <p>Your earlier versions will appear as you edit this note.</p>
+                <p>Earlier versions appear here as you edit this note.</p>
               </div>
             )}
             {historyCursor && (

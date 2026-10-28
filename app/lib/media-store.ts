@@ -140,6 +140,6 @@ export async function storageHealth(
       partial,
     },
     retention:
-      "Unreferenced files and archived history are retained. This check never deletes files.",
+      "Unused uploads and note history are kept. This check does not delete files.",
   };
 }

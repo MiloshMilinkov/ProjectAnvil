@@ -97,7 +97,7 @@ export function useWorkRoomNavigation({
       if (!(await beforeNavigation())) return;
       if (!workspace?.canvases.some((canvas) => canvas.id === id)) {
         notify(
-          "This canvas is no longer in the workspace. Update the room pins.",
+          "This canvas is unavailable. Update the pinned items in the room.",
         );
         return;
       }
@@ -165,9 +165,7 @@ export function useWorkRoomNavigation({
         if (targetPage === "canvas") targetPage = "overview";
       }
       setPage(targetPage);
-      notify(
-        `Resumed ${room.name}${room.checkpoint?.nextStep ? ": " + room.checkpoint.nextStep : ""}`,
-      );
+      notify(`Resumed ${room.name}`);
     },
     [
       workspace,

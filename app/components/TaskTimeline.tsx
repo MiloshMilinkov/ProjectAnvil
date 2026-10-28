@@ -179,7 +179,7 @@ export default function TaskTimeline({
           }
           text={
             tasks.length
-              ? "Add a planned start or due date in a task’s Planning section."
+              ? "Add a planned start or due date under Dates in the task editor."
               : "Adjust your filters to see scheduled work."
           }
         />

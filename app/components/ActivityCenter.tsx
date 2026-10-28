@@ -142,16 +142,14 @@ export default function ActivityCenter({
       <header className="collaboration-heading">
         <div>
           <h1>Activity history</h1>
-          <p>
-            Follow confirmed changes and the people moving the work forward.
-          </p>
+          <p>See saved changes in this workspace and who made them.</p>
         </div>
         <button
           className="btn"
           disabled={loading || more}
           onClick={() => void load()}
         >
-          <RefreshCw size={16} />
+          <RefreshCw size={16} aria-hidden="true" />
           Refresh
         </button>
       </header>
@@ -159,7 +157,7 @@ export default function ActivityCenter({
         {projectFilter
           ? workspace.projects.find((project) => project.id === projectFilter)
               ?.name || "Selected project"
-          : "All accessible projects"}{" "}
+          : "All projects you can access"}{" "}
         · Recent workspace activity
       </p>
       {error && (
@@ -173,12 +171,9 @@ export default function ActivityCenter({
         </p>
       ) : !entries.length ? (
         <div className="collaboration-empty">
-          <Clock3 size={28} />
-          <h2>No activity to show yet</h2>
-          <p>
-            New saved changes appear here. The history respects your current
-            workspace and project access.
-          </p>
+          <Clock3 size={28} aria-hidden="true" />
+          <h2>No activity yet</h2>
+          <p>Saved changes appear here for the projects you can access.</p>
         </div>
       ) : (
         <ol className="activity-list">
@@ -220,8 +215,8 @@ export default function ActivityCenter({
         </button>
       )}
       <p className="collaboration-footnote">
-        The latest 10,000 workspace events are retained. Entries show changed
-        fields; note text history remains in the note editor.
+        The latest 10,000 changes are kept here. To see earlier note text, open
+        its version history in the note editor.
       </p>
     </section>
   );

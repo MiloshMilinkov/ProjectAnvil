@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUpRight, Quote } from 'lucide-react';
+import { ArrowRight, Quote } from 'lucide-react';
 import type { Task, Workspace } from '../lib/types';
 import './linked-note-tasks.css';
 
@@ -17,10 +17,10 @@ export default function SourceNoteCard({ task, workspace, onOpenNote }: SourceNo
 
   return <section className="task-source-note" aria-label="Task source note">
     <header>
-      <span><Quote size={16} />From a note</span>
-      {note && <button type="button" onClick={() => onOpenNote(note.id)}>{note.title}<ArrowUpRight size={15} /></button>}
+      <span><Quote size={16} aria-hidden="true" />Source note</span>
+      {note && <button type="button" onClick={() => onOpenNote(note.id)}>{note.title}<ArrowRight size={15} aria-hidden="true" /></button>}
     </header>
     <blockquote>{source.excerpt}</blockquote>
-    <p>{note ? 'Original text captured when this task was created. Open the note for its latest version.' : 'The source note is no longer available.'}</p>
+    <p>{note ? 'Text saved when the task was created. Open the note to see its current version.' : 'The source note is no longer available.'}</p>
   </section>;
 }

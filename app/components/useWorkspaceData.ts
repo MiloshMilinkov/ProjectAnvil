@@ -445,7 +445,7 @@ export function useWorkspaceData() {
           if (offline.current)
             return Promise.reject(
               new Error(
-                "Reconnect to confirm this deletion before restoring it. Your recovery receipt is kept.",
+                "Reconnect to check whether this deletion was saved before restoring it. Your recovery information is kept.",
               ),
             );
         }
@@ -555,7 +555,7 @@ export function useWorkspaceData() {
             }
             if (claim.state === "changed")
               throw new SaveError(
-                "This pending change changed in another window. Review it before synchronizing.",
+                "This pending change was edited in another window. Review it before syncing.",
                 409,
               );
             persisted = claim.draft;
@@ -772,7 +772,7 @@ export function useWorkspaceData() {
       const entry = readDraft<Mutation, unknown>(scope, "mutations", id);
       if (!entry || entry.token !== token)
         throw new Error(
-          "This queued change changed in another window. Review it again.",
+          "This queued change was edited in another window. Review it again.",
         );
       const mutation = structuredClone(entry.value);
       if (

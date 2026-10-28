@@ -60,7 +60,7 @@ export default function LiveNoteStatus({
                 .join(
                   ", ",
                 )}${peers.length > 4 ? ` and ${peers.length - 4} more` : ""}`
-            : "Checking who is here"}
+            : status === "opening" ? "Checking participants…" : "No participants listed"}
         </span>
       </div>
       {(error || recoveryError) && <p role="alert">{error || recoveryError}</p>}

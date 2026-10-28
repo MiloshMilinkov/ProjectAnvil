@@ -178,7 +178,7 @@ export function supersedeBulkFailures(
       null,
     );
     if (copy.error)
-      return "The previous batch could not be kept in recovery. Keep this page open and free browser storage before replacing it.";
+      return "The previous batch could not be saved for recovery. Keep this page open and free up browser storage before replacing it.";
   }
   for (const record of candidates) {
     const operationId = record.value.operationId!;
@@ -186,7 +186,7 @@ export function supersedeBulkFailures(
       !removeDraft(scope, "mutations", operationId, record.token) &&
       readDraft(scope, "mutations", operationId)?.token === record.token
     )
-      return "Some previous batch writes could not be retired. Keep this page open and retry when browser storage is available.";
+      return "Some earlier pending saves could not be cleared. Keep this page open and try again when browser storage is available.";
   }
   return null;
 }

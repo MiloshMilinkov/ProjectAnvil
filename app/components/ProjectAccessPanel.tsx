@@ -126,7 +126,7 @@ export default function ProjectAccessPanel({
       setError(
         cause instanceof Error
           ? cause.message
-          : "Project access could not be saved. Your choices remain available.",
+          : "Couldn't save project access. Your selections are kept.",
       );
     } finally {
       pending.current = false;
@@ -158,8 +158,8 @@ export default function ProjectAccessPanel({
       </summary>
       <div className="team-permissions-body">
         <p>
-          Owners and admins can always manage this project. Project roles can
-          reduce access; a workspace Viewer stays read-only.
+          Owners and admins keep full access. A project role cannot give a
+          workspace Viewer editing access.
         </p>
         {!details && !error && <p role="status">Loading project access…</p>}
         {details && (

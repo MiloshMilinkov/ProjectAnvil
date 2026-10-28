@@ -5,7 +5,7 @@
 <h1 align="center">ProjectAnvil</h1>
 
 <p align="center">
-  <strong>Your ideas, plans, and progress. Connected.</strong><br>
+  <strong>Projects, tasks, and notes in one workspace.</strong><br>
   A browser workspace for project planning, task management, notes, and visual thinking.
 </p>
 
@@ -18,11 +18,11 @@
 
 ---
 
-## From an idea to the next step
+## Connected work
 
-- **Turn notes into work.** Create linked tasks from selected text, paragraphs, or checklist items, with duplicate detection, source quotes, and live progress beside the note.
-- **Return with context.** Work rooms pin a project, focus task, notes, and canvas. Save what changed, your next step, and an open question; resume the working view and canvas position.
-- **See what a change affects.** Connect items with **depends on**, **supports**, **contradicts**, or **was decided because of**. Highlight direct and downstream effects, then acknowledge reviewed connections.
+- **Linked tasks.** Create tasks from selected note text or checklist items, with source quotes, duplicate detection, and progress beside the note.
+- **Work rooms.** Pin a project, focus task, notes, and canvas. Save a checkpoint with your next step, then resume the view and canvas position.
+- **Relationships and reviews.** Connect items with **depends on**, **supports**, **contradicts**, or **was decided because of**. See which work may be affected by a change and mark reviewed connections.
 
 ## Features
 

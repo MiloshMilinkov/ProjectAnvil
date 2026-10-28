@@ -365,7 +365,7 @@ export function WorkspaceSwitcher({
           aria-label="Your workspaces"
           className="account-workspace-dropdown"
         >
-          <span className="account-menu-caption">YOUR WORKSPACES</span>
+          <span className="account-menu-caption">Workspaces</span>
           {account.workspaces.map((workspace) => (
             <button
               role="menuitemradio"
@@ -573,9 +573,11 @@ export function TeamManager({
     return (
       <section className="page account-team-page">
         <header className="account-page-heading">
-          <span className="account-eyebrow">YOUR WORK, TOGETHER</span>
           <h1>Teams & workspaces</h1>
-          <p>A place for your own plans, and a shared place for each team.</p>
+          <p>
+            Personal workspaces are private. Team workspaces let you share
+            projects.
+          </p>
         </header>
         <div className="account-model-grid">
           <article className="account-card">
@@ -617,20 +619,13 @@ export function TeamManager({
   return (
     <section className="page account-team-page">
       <header className="account-page-heading">
-        <span className="account-eyebrow">YOUR WORK, TOGETHER</span>
         <h1>Teams & workspaces</h1>
-        <p>
-          Keep your own work private. Open a team workspace to plan and build
-          together.
-        </p>
+        <p>Manage your workspaces, invitations, and team members.</p>
       </header>
       <div className="account-workspace-explanation">
-        <ShieldCheck size={19} />
         <p>
-          <strong>Workspace access is clear.</strong> Your personal workspace
-          belongs to you. A team shares projects and connected work according to
-          workspace roles and project permissions. A person label on a task does
-          not grant access.
+          <strong>Sharing work</strong> Team roles and project permissions
+          control access. Adding a name to a task does not share the workspace.
         </p>
       </div>
       {error && (
@@ -723,7 +718,7 @@ export function TeamManager({
               onClick={() => switchWorkspace(personal.id)}
             >
               {activeId === personal.id
-                ? "You are here"
+                ? "Current workspace"
                 : "Open personal workspace"}
             </button>
           </article>
@@ -749,9 +744,7 @@ export function TeamManager({
               )}
             </div>
             <h2>{workspace.name}</h2>
-            <p>
-              Shared projects and connected work, with access set by your role.
-            </p>
+            <p>Your role determines what you can view or edit.</p>
             <button
               type="button"
               className="account-button"
@@ -759,7 +752,7 @@ export function TeamManager({
               onClick={() => switchWorkspace(workspace.id)}
             >
               {activeId === workspace.id
-                ? "You are here"
+                ? "Current workspace"
                 : "Open team workspace"}
             </button>
           </article>
@@ -769,10 +762,7 @@ export function TeamManager({
             <Plus size={21} />
             <h2>Create a team</h2>
           </div>
-          <p>
-            Start an empty shared workspace. Invite registered users by their
-            username.
-          </p>
+          <p>Create a shared workspace and invite people by username.</p>
           <form onSubmit={createTeam}>
             <label className="account-field">
               <span>Team name</span>
@@ -782,7 +772,7 @@ export function TeamManager({
                 onChange={(event) => setTeamName(event.target.value)}
                 required
                 maxLength={80}
-                placeholder="A name for your team"
+                placeholder="e.g. Design team"
                 disabled={!!busy}
               />
             </label>
@@ -926,8 +916,8 @@ export function TeamManager({
                   <div className="account-invite-area">
                     <h3>Invite a teammate</h3>
                     <p>
-                      They must already have a ProjectAnvil account. They get an
-                      invitation here in the app.
+                      They need a ProjectAnvil account. They&apos;ll see the
+                      invitation in Teams &amp; workspaces.
                     </p>
                     <form onSubmit={invite}>
                       <label className="account-field">
@@ -1065,7 +1055,7 @@ export function TeamManager({
               onClick={closeConfirm}
               disabled={!!busy}
             >
-              Keep as is
+              Cancel
             </button>
             <button
               type="button"

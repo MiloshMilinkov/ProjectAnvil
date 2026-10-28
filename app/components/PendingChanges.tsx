@@ -16,9 +16,36 @@ import {
   type DraftRecoveryCopy,
 } from "../lib/draft-store";
 import type { Mutation, Workspace } from "../lib/types";
+import { statuses } from "../lib/types";
+import { entityLabel, fieldLabel } from "../lib/collaboration-model";
 import { useDraftScope } from "./useRecoverableDraft";
 import { useDialog } from "./useDialog";
 import { useWorkspacePermissions } from "./WorkspacePermissions";
+
+function comparisonValue(
+  key: string,
+  value: unknown,
+  workspace: Workspace,
+): string {
+  if (key === "projectId")
+    return (
+      workspace.projects.find((item) => item.id === value)?.name ||
+      (value ? "Unavailable project" : "No project")
+    );
+  if (key === "assigneeId")
+    return (
+      workspace.people.find((item) => item.id === value)?.name ||
+      (value ? "Unavailable person" : "Unassigned")
+    );
+  if (value === null || value === "" || value === undefined) return "Not set";
+  if (key === "status" && typeof value === "string")
+    return statuses.find((status) => status.id === value)?.label || value;
+  if (key === "priority" && typeof value === "string")
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  return String(value);
+}
 
 /** Recovery controls for changes that could not be acknowledged by the server. */
 export default function PendingChanges({
@@ -157,13 +184,12 @@ export default function PendingChanges({
             disabled={busy || !!reviewing}
             onClick={onClose}
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         <p className="muted">
-          Changes kept on this device still need synchronization. Compare your
-          queued values with the last confirmed record, then apply a reviewed
-          change or keep a recovery download.
+          Changes on this device still need confirmation. Compare them with the
+          last saved version, or download a recovery copy.
         </p>
         {error && (
           <p className="account-error" role="alert">
@@ -171,7 +197,7 @@ export default function PendingChanges({
           </p>
         )}
         {!drafts.length && !copies.length && (
-          <p>All queued changes have been saved or discarded.</p>
+          <p>No changes are waiting to sync.</p>
         )}
         <div className="pending-change-list">
           {drafts.map(({ id, record }) => {
@@ -192,20 +218,8 @@ export default function PendingChanges({
                     ),
                 )
                 .map(([key, value]) => {
-                  const label = key
-                    .replace(/([A-Z])/g, " $1")
-                    .replace(/^./, (letter) => letter.toUpperCase());
-                  const readable =
-                    key === "projectId"
-                      ? workspace.projects.find((item) => item.id === value)
-                          ?.name || "No project"
-                      : key === "assigneeId"
-                        ? workspace.people.find((item) => item.id === value)
-                            ?.name || "Unassigned"
-                        : typeof value === "object"
-                          ? JSON.stringify(value, null, 2)
-                          : String(value ?? "");
-                  return `${label}: ${readable}`;
+                  const label = fieldLabel(key, mutation.entity);
+                  return `${label}: ${comparisonValue(key, value, workspace)}`;
                 })
                 .join("\n\n");
             };
@@ -241,26 +255,23 @@ export default function PendingChanges({
                       "review-relationship": "Review connection",
                       "vote-idea": "Vote",
                     }[record.value.action] || "Change"}{" "}
-                    ·{" "}
-                    {(record.value.entity || "workspace")
-                      .replace(/([A-Z])/g, " $1")
-                      .toLowerCase()}{" "}
-                    · {new Date(record.updatedAt).toLocaleString()}
+                    · {entityLabel(record.value.entity || "workspace")} ·{" "}
+                    {new Date(record.updatedAt).toLocaleString()}
                   </p>
                   {issues[id] && <p className="account-error">{issues[id]}</p>}
                   <details data-tour="sync-conflicts">
-                    <summary>Compare queued and saved values</summary>
+                    <summary>Compare changes</summary>
                     <div className="sync-field-comparison">
                       <section>
-                        <h4>Queued on this device</h4>
+                        <h4>On this device</h4>
                         <pre>
                           {mutation.action === "delete"
-                            ? "Move this record to Trash"
+                            ? "Move this item to Trash"
                             : describe(mutation.item)}
                         </pre>
                       </section>
                       <section>
-                        <h4>Last confirmed on the server</h4>
+                        <h4>Last saved version</h4>
                         <pre>
                           {describe(
                             confirmed && mutation.item
@@ -293,7 +304,7 @@ export default function PendingChanges({
                             setError(
                               cause instanceof Error
                                 ? cause.message
-                                : "This change could not synchronize.",
+                                : "This change could not be synced. Try again.",
                             );
                           } finally {
                             setReviewing("");
@@ -315,7 +326,7 @@ export default function PendingChanges({
                   onClick={() => {
                     if (
                       window.confirm(
-                        "Discard this pending save? It will no longer be retried. Any separate editor recovery draft stays on this device.",
+                        "Discard this pending save? It will not be retried. Any separate editor draft stays on this device.",
                       )
                     )
                       removeDraft(scope, "mutations", id, record.token);
@@ -331,43 +342,68 @@ export default function PendingChanges({
           <>
             <h3>Drafts kept from another window</h3>
             <p className="small-text muted">
-              Review or download these copies before merging useful text into
-              the current item. They are kept separately so one window cannot
-              erase another window’s unfinished work.
+              Review or download these drafts before copying changes into the
+              current item. They are kept separately from your current draft.
             </p>
             <div className="pending-change-list">
-              {copies.map(({ id, record }) => (
-                <article key={id}>
-                  <div>
-                    <strong>
-                      {record.value.entity} · {record.value.id}
-                    </strong>
-                    <p className="small-text muted">
-                      {new Date(record.value.record.updatedAt).toLocaleString()}
-                    </p>
-                    <details>
-                      <summary>Inspect recovered draft</summary>
-                      <pre className="recovery-copy-content">
-                        {JSON.stringify(record.value.record.value, null, 2)}
-                      </pre>
-                    </details>
-                  </div>
-                  <button
-                    className="btn danger"
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Discard this recovery copy? Download it first if it contains work you need.",
+              {copies.map(({ id, record }) => {
+                const raw = record.value.record.value;
+                const value =
+                  raw && typeof raw === "object"
+                    ? (raw as Record<string, unknown>)
+                    : {};
+                const item =
+                  value.item && typeof value.item === "object"
+                    ? (value.item as Record<string, unknown>)
+                    : value;
+                const recoveredTitle =
+                  (typeof item.title === "string" && item.title) ||
+                  (typeof item.name === "string" && item.name) ||
+                  "Recovered draft";
+                return (
+                  <article key={id}>
+                    <div>
+                      <strong>{recoveredTitle}</strong>
+                      <p className="small-text muted">
+                        {entityLabel(
+                          typeof value.entity === "string"
+                            ? value.entity
+                            : record.value.entity,
+                        )}{" "}
+                        ·{" "}
+                        {new Date(
+                          record.value.record.updatedAt,
+                        ).toLocaleString()}
+                      </p>
+                      <details>
+                        <summary>View recovered draft</summary>
+                        <pre className="recovery-copy-content">
+                          {JSON.stringify(record.value.record.value, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                    <button
+                      className="btn danger"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Discard this recovery copy? Download it first if it contains work you need.",
+                          )
                         )
-                      )
-                        removeDraft(scope, "recovery-copies", id, record.token);
-                    }}
-                  >
-                    Discard recovery copy
-                  </button>
-                </article>
-              ))}
+                          removeDraft(
+                            scope,
+                            "recovery-copies",
+                            id,
+                            record.token,
+                          );
+                      }}
+                    >
+                      Discard recovery copy
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           </>
         )}
@@ -377,7 +413,7 @@ export default function PendingChanges({
             onClick={download}
             disabled={!drafts.length && !copies.length}
           >
-            <Download size={15} />
+            <Download size={15} aria-hidden="true" />
             Download recovery copy
           </button>
           <button className="btn" disabled={busy} onClick={onClose}>

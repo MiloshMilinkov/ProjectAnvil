@@ -207,7 +207,7 @@ assert.throws(
         "one.md": encoder.encode("two"),
       }),
     ),
-  /case-colliding/,
+  /duplicate file paths or paths that differ only by letter case/,
 );
 assert.throws(
   () =>

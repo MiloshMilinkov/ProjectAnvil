@@ -1359,21 +1359,22 @@ svg {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: var(--theme-ink-4f405c, #4f405c);
-  font-size: 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
   border: 1px dashed var(--theme-line-302637, #302637);
   border-radius: 5px;
 }
 .add-to-column {
-  color: var(--theme-ink-756180, #756180);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 5px;
   padding: 11px 0 4px;
-  font-size: 9px;
+  min-height: var(--control-height);
+  font-size: var(--font-size-control);
 }
 .add-to-column:hover {
-  color: var(--theme-ink-bba0d1, #bba0d1);
+  color: var(--text-primary);
 }
 .save-view-bar {
   border: 1px solid var(--theme-line-493354, #493354);

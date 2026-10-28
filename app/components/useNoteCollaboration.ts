@@ -480,7 +480,7 @@ export function useNoteCollaboration({
             setError(
               cause instanceof Error
                 ? cause.message
-                : "The local server could not be reached. Your unfinished text is kept.",
+                : "Cannot connect to ProjectAnvil. Your unsaved text is kept.",
             );
             if (!active.blocked) setStatus("offline");
             setPending(active.dirty);

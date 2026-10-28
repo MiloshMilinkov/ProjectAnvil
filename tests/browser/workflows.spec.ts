@@ -232,7 +232,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       ).toHaveLength(1);
       await openSecurity();
       await security()
-        .getByRole("button", { name: "Revoke session", exact: true })
+        .getByRole("button", { name: "Sign out", exact: true })
         .click();
       await expect(
         security().getByText("That session has been signed out.", {
@@ -244,10 +244,10 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       ).toBeNull();
 
       await security()
-        .getByRole("button", { name: "Send verification link", exact: true })
+        .getByRole("button", { name: "Request verification link", exact: true })
         .click();
       await expect(security().getByRole("status")).toContainText(
-        "no email is sent",
+        "doesn't send email",
       );
       await owner.page.goto(await mailLink("verification"));
       const verification = owner.page.getByRole("dialog", {
@@ -420,13 +420,13 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         .getByLabel("Email address", { exact: true })
         .fill(email);
       await recoveryPage
-        .getByRole("button", { name: "Prepare reset link", exact: true })
+        .getByRole("button", { name: "Request reset link", exact: true })
         .click();
       await expect(
         recoveryPage
           .getByRole("dialog", { name: "Reset your password", exact: true })
           .getByRole("status"),
-      ).toContainText("no email is sent");
+      ).toContainText("check for a link");
       const resetLink = await mailLink("reset");
       await owner.page.goto(resetLink);
       const reset = owner.page.getByRole("dialog", {
@@ -562,7 +562,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
 
   test("team invitations, viewer/editor roles, and revoked project access update both accounts", async () => {
     const name = `Browser teamwork ${fixtureId().slice(0, 8)}`;
-    await navigate(owner.page, /^Teams & people/);
+    await navigate(owner.page, /^Teams & workspaces/);
     await owner.page.getByLabel("Team name", { exact: true }).fill(name);
     await owner.page
       .getByRole("button", { name: "Create team workspace", exact: true })
@@ -573,7 +573,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         exact: true,
       }),
     ).toBeVisible();
-    await navigate(owner.page, /^Teams & people/);
+    await navigate(owner.page, /^Teams & workspaces/);
     const panel = owner.page.locator(".account-members-panel");
     await panel
       .getByLabel("Username", { exact: true })
@@ -589,7 +589,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     ).toBeVisible();
     await colleague.page.reload();
     await appReady(colleague.page);
-    await navigate(colleague.page, /^Teams & people/);
+    await navigate(colleague.page, /^Teams & workspaces/);
     await colleague.page
       .locator(".account-invitation-row")
       .filter({ hasText: name })
@@ -656,7 +656,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       title: "Shared role-check task",
       projectId: project.id,
     });
-    await navigate(colleague.page, "Task board");
+    await navigate(colleague.page, "Tasks");
     await expect(
       colleague.page.getByRole("button", { name: /Shared role-check task/ }),
     ).toBeVisible({ timeout: 30_000 });
@@ -702,9 +702,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         exact: true,
       }),
     ).toBeDisabled();
-    await navigate(colleague.page, "Task board");
+    await navigate(colleague.page, "Tasks");
 
-    await navigate(owner.page, /^Teams & people/);
+    await navigate(owner.page, /^Teams & workspaces/);
     const roleEditor = owner.page.locator(".team-role-editor").filter({
       has: owner.page.getByRole("combobox", {
         name: new RegExp(`^Role for ${colleague.username}`),
@@ -836,9 +836,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         name: "Unsaved changes",
         exact: true,
       });
-      await review
-        .getByText("Compare queued and saved values", { exact: true })
-        .click();
+      await review.getByText("Compare changes", { exact: true }).click();
       await expect(review).toContainText("The colleague's conflicting plan.");
       await expect(review).toContainText("The owner's newer confirmed plan.");
       await review
@@ -1406,7 +1404,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
           await expect(count).toHaveText("0 of 3 notes");
           await expect(items).toHaveCount(0);
           await expect(browser.locator(".note-list-empty")).toContainText(
-            "No notes match these filters",
+            "No matching notes",
           );
           await clear.focus();
           await expect(clear).toBeFocused();
@@ -1511,6 +1509,38 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         }
       }
       await owner.page.setViewportSize({ width: 1365, height: 900 });
+      const beforeInvalidImport = await workspace(owner);
+      const attemptedImports: string[] = [];
+      const watchImport = (request: BrowserRequest) => {
+        if (
+          new URL(request.url()).pathname === "/api/state" &&
+          request.method() === "POST"
+        )
+          attemptedImports.push(request.url());
+      };
+      owner.page.on("request", watchImport);
+      try {
+        await jump
+          .getByRole("button", { name: "Data & offline", exact: true })
+          .press("Enter");
+        owner.page.once("dialog", (dialog) => dialog.accept());
+        await groups("data")
+          .locator('input[type="file"][accept="application/json,.json"]')
+          .setInputFiles({
+            name: "invalid-workspace.json",
+            mimeType: "application/json",
+            buffer: Buffer.from('{"notes":'),
+          });
+        await expect(groups("data").getByRole("alert")).toHaveText(
+          "This file isn't valid JSON. Choose a ProjectAnvil workspace export.",
+        );
+        expect(attemptedImports).toEqual([]);
+        expect((await workspace(owner)).revision).toBe(
+          beforeInvalidImport.revision,
+        );
+      } finally {
+        owner.page.off("request", watchImport);
+      }
       const id = `calm_note_${fixtureId()}`;
       await upsert(owner, owner.personal.id, "notes", {
         id,
@@ -1547,8 +1577,8 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   test("task essentials stay visible and collapsed planning keeps saved values", async ({}, testInfo) => {
     await owner.page.setViewportSize({ width: 1365, height: 900 });
     await selectWorkspace(owner, owner.personal);
-    await navigate(owner.page, "Task board");
-    const newTask = owner.page.getByRole("button", {
+    await navigate(owner.page, "Tasks");
+    const newTask = owner.page.locator(".page-heading .heading-actions").getByRole("button", {
       name: "Create task",
       exact: true,
     });
@@ -1665,7 +1695,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         .getByRole("button", { name: "Save changes", exact: true })
         .click();
       await expect(editor.locator(".entity-editor-error")).toContainText(
-        "Choose a valid recurrence",
+        "Choose a valid schedule start",
       );
       await expect(planning).toHaveAttribute("open", "");
       await editor.getByLabel("Repeat this task", { exact: true }).uncheck();

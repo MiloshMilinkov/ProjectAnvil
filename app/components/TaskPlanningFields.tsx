@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { ArrowUpRight, Bell, GitBranch, Repeat2 } from "lucide-react";
+import { ArrowRight, Bell, GitBranch, Repeat2 } from "lucide-react";
 import type {
   RecurrenceRule,
   ReminderRule,
@@ -129,9 +129,8 @@ export function TaskHierarchyFields({
         </label>
       </div>
       <p className="task-planning-help">
-        Parent tasks group larger pieces of work. Progress counts their
-        lowest-level tasks once. A child can inherit its parent&apos;s
-        milestone.
+        Progress counts tasks without children once. Child tasks can inherit
+        their parent&apos;s milestone.
       </p>
       {parent && onOpenTask && (
         <button
@@ -139,7 +138,8 @@ export function TaskHierarchyFields({
           className="text-button task-parent-link"
           onClick={() => onOpenTask(parent.id)}
         >
-          <ArrowUpRight size={15} /> Open parent: {parent.key} · {parent.title}
+          <ArrowRight size={15} aria-hidden="true" /> Open parent: {parent.key} ·{" "}
+          {parent.title}
         </button>
       )}
       {children.length > 0 && (
@@ -236,8 +236,8 @@ export function TaskScheduleOptions({
         </summary>
         <div className="task-schedule-option-body">
           <p className="task-planning-help">
-            Completing this task creates one new occurrence. Missed dates are
-            skipped; the schedule stays anchored to its original calendar day.
+            Completing this task creates the next one. Missed dates are skipped;
+            the schedule keeps its original calendar day.
           </p>
           {task.recurrenceNextId && (
             <div className="task-recurrence-successor">
@@ -251,7 +251,8 @@ export function TaskScheduleOptions({
                   className="text-button"
                   onClick={() => onOpenTask(nextTask.id)}
                 >
-                  Open next occurrence <ArrowUpRight size={14} />
+                  Open next occurrence{" "}
+                  <ArrowRight size={14} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -323,7 +324,7 @@ export function TaskScheduleOptions({
               </div>
               <div className="task-meta-grid">
                 <label>
-                  Schedule anchor
+                  Schedule start
                   <input
                     type="date"
                     value={rule.anchorDate}
@@ -376,9 +377,8 @@ export function TaskScheduleOptions({
         </summary>
         <div className="task-schedule-option-body">
           <p className="task-planning-help">
-            Reminders appear inside ProjectAnvil while it is open. Missed
-            reminders appear when you return. They follow the time zone you
-            choose.
+            Reminders appear while the app is open or when you return. Times use
+            the selected time zone.
           </p>
           <label className="task-option-toggle">
             <input
@@ -439,8 +439,8 @@ export function TaskScheduleOptions({
                 />
               </label>
               <p className="task-planning-help">
-                Repeated autumn hours use the earlier time once. Choose another
-                time if the clock skips this time in spring.
+                If the clock repeats an hour, the reminder uses its first
+                occurrence. If the clock skips a time, choose another.
               </p>
               {!reminderInstant && (
                 <p className="task-schedule-error" role="status">
@@ -468,7 +468,7 @@ export function taskScheduleError(task: Task): string | null {
       (rule.untilDate &&
         (!isCalendarDate(rule.untilDate) || rule.untilDate < rule.anchorDate)))
   )
-    return "Choose a valid recurrence anchor, interval, time zone, and end date.";
+    return "Choose a valid schedule start, interval, time zone, and end date.";
   if (task.reminder && !wallTimeToInstant(task.reminder))
     return "Choose a valid reminder date, time, and time zone. The clock may skip that local time during daylight saving.";
   return null;

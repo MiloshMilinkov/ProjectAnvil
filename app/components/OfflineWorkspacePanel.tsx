@@ -65,7 +65,7 @@ export default function OfflineWorkspacePanel({
       setMessage(
         cause instanceof Error
           ? cause.message
-          : "This offline action could not finish.",
+          : "Couldn't update the offline copy. Try again.",
       );
     } finally {
       setWorking(false);
@@ -154,7 +154,7 @@ export default function OfflineWorkspacePanel({
         <div className="offline-copy-summary">
           <strong>
             {copy.workspace
-              ? "Offline copy enabled"
+              ? "Offline copy saved"
               : "Refreshing offline access"}
           </strong>
           <span>
@@ -170,8 +170,8 @@ export default function OfflineWorkspacePanel({
         </div>
       ) : (
         <p className="muted">
-          Offline access is off for this workspace. Connect once to save its
-          current records.
+          No offline copy is saved. Connect to save this workspace on your
+          device.
         </p>
       )}
       <div className="offline-actions">
@@ -251,8 +251,8 @@ export default function OfflineWorkspacePanel({
                 setProtectedStorage(!!result);
                 setMessage(
                   result
-                    ? "The browser granted persistent storage. Keep backups too."
-                    : "The browser did not grant persistent storage. Keep regular backups and avoid clearing site data.",
+                    ? "The browser approved storage protection. Keep backups too."
+                    : "The browser couldn't protect this storage from automatic cleanup. Keep backups and avoid clearing site data.",
                 );
               })
             }

@@ -36,7 +36,7 @@ export function EntityEditorFeedback({
     <>
       {recovered && (
         <p className="entity-editor-notice" role="status">
-          Recovered your unfinished changes. Review them before saving.
+          Recovered an unsaved draft. Review it before saving.
         </p>
       )}
       {storageError && (
@@ -58,7 +58,7 @@ export function EntityEditorFeedback({
             disabled={busy}
             onClick={() => void loadLatest()}
           >
-            {existing ? "Use latest saved values" : "Check saved version"}
+            {existing ? "Load saved version" : "Check saved version"}
           </button>
         </div>
       )}

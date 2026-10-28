@@ -47,7 +47,7 @@ export default function PersonDialog({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.name.trim()) {
-      editor.setError("Give the assignment label a name.");
+      editor.setError("Enter an assignment label name.");
       return;
     }
     if (await editor.save({ ...draft, name: draft.name.trim() })) {
@@ -103,8 +103,8 @@ export default function PersonDialog({
           </button>
         </div>
         <p className="muted">
-          Add a name for task assignments. Invite registered accounts through
-          Teams &amp; people to grant workspace access.
+          Assignment labels do not grant access. Invite registered accounts in
+          Teams &amp; workspaces to share a workspace.
         </p>
         <fieldset className="entity-editor-fields" disabled={editor.busy}>
           <label className="form-label">
@@ -121,7 +121,7 @@ export default function PersonDialog({
           </label>
           <label className="form-label">
             <span>
-              Role <small className="editor-optional">(optional)</small>
+              Job title <small className="editor-optional">(optional)</small>
             </span>
             <input
               className="field"

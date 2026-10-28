@@ -60,9 +60,9 @@ export default function NoteTypeManager(props: Props) {
           </button>
         </div>
         <p className="muted">
-          Build reusable property structures for this workspace, such as a
-          research source, recipe, or location. Existing freeform properties
-          stay available.
+          Define properties for notes such as research sources, recipes, or
+          locations.
+          Existing note properties stay available.
         </p>
         <button
           className="btn btn-primary"
@@ -234,9 +234,9 @@ function NoteTypeEditor({
             <span>{draft.fields.length} of 30</span>
           </div>
           <p className="note-structure-help">
-            Required properties are reminders to finish a note; incomplete notes
-            can still be saved. Populated fields cannot be removed or changed to
-            an incompatible format.
+            Incomplete notes can be saved with required fields left blank.
+            Properties with saved values cannot be removed or changed to an
+            incompatible format.
           </p>
           <div className="note-type-fields">
             {draft.fields.map((field, index) => (

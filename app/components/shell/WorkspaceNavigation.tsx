@@ -36,7 +36,7 @@ export default function WorkspaceNavigation({
           aria-current={page === id ? "page" : undefined}
           onClick={() => onNavigate(item.id)}
         >
-          <item.icon size={17} />
+          <item.icon size={17} aria-hidden="true" />
           <span>{item.title}</span>
           {id === "my-work" && assignedCount > 0 && (
             <small>{assignedCount}</small>
@@ -59,7 +59,7 @@ export default function WorkspaceNavigation({
       <details className="navigation-more" ref={more}>
         <summary>
           More tools <span>{morePages.length}</span>
-          <ChevronDown size={16} />
+          <ChevronDown size={16} aria-hidden="true" />
         </summary>
         {renderLinks(morePages)}
       </details>

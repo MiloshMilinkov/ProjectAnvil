@@ -7,8 +7,8 @@ import "./ui-foundation.css";
 import { ThemeProvider } from "./components/ThemeControls";
 import AppInstallation from "./components/AppInstallation";
 export const metadata: Metadata = {
-  title: "ProjectAnvil — Your projects, connected",
-  description: "Connected projects, tasks, notes, and everyday planning.",
+  title: "ProjectAnvil",
+  description: "Project planning, tasks, notes, and visual workspaces.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

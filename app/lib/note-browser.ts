@@ -30,7 +30,7 @@ export function indexNotes(
       note.content
         .replace(/[#*[\]`>_=]/g, "")
         .replace(/\s+/g, " ")
-        .slice(0, 90) || "A blank page, a new possibility.",
+        .slice(0, 90) || "Empty note",
     typeLabel:
       noteTypeLabel(note, types) ||
       (note.kind === "decision" ? "Decision record" : note.folder),

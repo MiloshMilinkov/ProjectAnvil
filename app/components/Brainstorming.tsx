@@ -123,7 +123,7 @@ export default function Brainstorming(props: FeatureProps) {
         <div>
           <h1>Brainstorming</h1>
           <p>
-            Collect ideas, find patterns, and decide what deserves attention.
+            Group ideas and compare them with votes.
           </p>
         </div>
         <button
@@ -234,7 +234,7 @@ export default function Brainstorming(props: FeatureProps) {
             </strong>
             <p>
               {selected.votingOpen
-                ? "Give each idea one vote and remove it at any time. Votes and totals are visible to workspace members."
+                ? "You can vote once per idea and remove your vote while voting is open. Workspace members can see the totals."
                 : "Ideas are available for review. Edit the board to reopen voting."}
               {!account.user &&
                 " Guest votes belong to this installation’s shared guest workspace."}
@@ -356,8 +356,7 @@ export default function Brainstorming(props: FeatureProps) {
           </div>
           {!selected.ideas.length && (
             <p className="brainstorm-empty-copy">
-              Start with a question or a possible solution. Use Add idea to
-              capture it.
+              No ideas yet. Choose Add idea to add one to this board.
             </p>
           )}
         </>
@@ -367,11 +366,10 @@ export default function Brainstorming(props: FeatureProps) {
           <h2>
             {projectFilter
               ? "No boards for this project"
-              : "Make room for your next idea"}
+              : "No boards yet"}
           </h2>
           <p>
-            Create a board, collect possibilities, and group related ideas. Open
-            voting when you are ready to compare them.
+            Create a board to add ideas, organize groups, and collect votes.
           </p>
           <button
             className="btn btn-primary"
@@ -727,12 +725,12 @@ function BrainstormEditor({
           </button>
         </header>
         <p className="brainstorm-help">
-          Capture possibilities and arrange them into groups. Changes stay in
-          this form until you save.
+          Add ideas and organize groups. Changes stay in this form until you
+          save.
         </p>
         {recovered && (
           <p className="brainstorm-notice" role="status">
-            Your unfinished board is recovered.{" "}
+            Recovered your unfinished board.{" "}
             <button
               className="text-button"
               type="button"
@@ -833,8 +831,7 @@ function BrainstormEditor({
               </button>
             </div>
             <p className="brainstorm-help">
-              Groups help related ideas sit together. Removing a group moves its
-              ideas to Ungrouped.
+              Removing a group moves its ideas to Ungrouped.
             </p>
             {draft.groups.map((group, index) => (
               <div className="brainstorm-group-field" key={group.id}>

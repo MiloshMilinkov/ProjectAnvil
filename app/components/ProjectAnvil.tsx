@@ -513,7 +513,7 @@ export default function ProjectAnvil() {
                 onClick={() => setPalette(true)}
               >
                 <Search size={15} />
-                <span>Search anything</span>
+                <span>Search workspace</span>
                 <kbd>Ctrl K</kbd>
               </button>
               <div className="sidebar-scroll">
@@ -530,7 +530,7 @@ export default function ProjectAnvil() {
                 />
                 <div className="sidebar-projects">
                   <div className="nav-caption">
-                    YOUR PROJECTS
+                    Projects
                     <button
                       title="Create project"
                       aria-label="Create project"
@@ -590,7 +590,7 @@ export default function ProjectAnvil() {
                   onClick={() => go("team")}
                 >
                   <Users size={17} />
-                  Teams & people
+                  Teams &amp; workspaces
                   <span className="nav-end">{w.people.length}</span>
                 </button>
                 <button
@@ -619,7 +619,7 @@ export default function ProjectAnvil() {
                         ? "Save needs attention"
                         : pending
                           ? "Saving changes…"
-                          : "Local workspace ready"}
+                          : "Connected"}
                   <button
                     title="Keyboard shortcuts"
                     aria-label="Keyboard shortcuts"
@@ -647,7 +647,9 @@ export default function ProjectAnvil() {
               <ChevronRight size={13} />
               <strong>
                 {activeNav?.title ||
-                  (page === "team" ? "Team & people" : "Settings")}
+                  (page === "team"
+                    ? "Teams & workspaces"
+                    : "Workspace settings")}
               </strong>
             </div>
             <div className="topbar-actions">
@@ -677,13 +679,13 @@ export default function ProjectAnvil() {
               </button>
               {focus && (
                 <button className="btn" onClick={() => setFocus(false)}>
-                  Show workspace
+                  Exit focus mode
                 </button>
               )}
               <span
                 className="live-indicator"
                 data-tour="live-updates"
-                title="Local connection checks for changes and reconnects automatically"
+                title="Updates automatically while connected"
                 role="status"
               >
                 <span />
@@ -913,9 +915,8 @@ export default function ProjectAnvil() {
               page === "projects" && (
                 <div className="page">
                   <PageHeader
-                    eyebrow="THE BIG PICTURE"
                     title="Projects"
-                    description="Organize goals, tasks, and notes around a shared outcome."
+                    description="Keep each project's tasks, notes, and plans together."
                     action={
                       <button
                         className="btn btn-primary"
@@ -952,8 +953,8 @@ export default function ProjectAnvil() {
                       }}
                     >
                       <Plus size={25} />
-                      <strong>Start something new</strong>
-                      <span>Create a project for your next idea</span>
+                      <strong>New project</strong>
+                      <span>Add tasks, notes, and a plan.</span>
                     </button>
                   </div>
                 </div>
@@ -1115,7 +1116,9 @@ export default function ProjectAnvil() {
                   <X size={18} />
                 </button>
               </div>
-              <p className="muted">A few shortcuts to keep your flow.</p>
+              <p className="muted">
+                Use these shortcuts when you&apos;re not typing in a field.
+              </p>
               <div className="shortcut-row">
                 Search & quick actions <kbd>Ctrl / ⌘ K</kbd>
               </div>

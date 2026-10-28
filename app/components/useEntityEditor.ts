@@ -217,7 +217,7 @@ export function useEntityEditor<T extends Editable>({
       );
       if (!validate(latest))
         throw new Error(
-          "No saved version was found. Your unfinished changes are kept; retry saving or copy them before closing.",
+          "No saved version was found. Your draft is kept. Try saving again or copy it before closing.",
         );
       baseline.current = latest;
       current.current = latest;

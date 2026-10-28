@@ -137,7 +137,7 @@ function MathExpression({
       aria-busy={pending || undefined}
       title={
         failed
-          ? "Math rendering is unavailable. Reconnect to retry; the source remains readable."
+          ? "Math formatting is unavailable. Showing the source; reconnect to try again."
           : undefined
       }
     >
@@ -171,7 +171,7 @@ function SyntaxCode({
       aria-busy={pending || undefined}
       title={
         failed
-          ? "Syntax colors are unavailable. Reconnect to retry; the code remains readable."
+          ? "Code highlighting is unavailable. Showing plain code; reconnect to try again."
           : undefined
       }
     >

@@ -62,8 +62,8 @@ export function CanvasAddDialog({
       >
         <div className="visual-modal-heading">
           <div>
-            <h2 id="canvas-add-title">Add to your canvas</h2>
-            <p>Another piece of the bigger picture.</p>
+            <h2 id="canvas-add-title">Add a card</h2>
+            <p>Choose a note, task, text, file, or website.</p>
           </div>
           <button
             className="btn-icon"
@@ -78,7 +78,7 @@ export function CanvasAddDialog({
             [
               { type: "note", label: "Note", icon: FileText },
               { type: "task", label: "Task", icon: CheckSquare2 },
-              { type: "text", label: "Thought", icon: StickyNote },
+              { type: "text", label: "Text", icon: StickyNote },
               { type: "media", label: "Media", icon: ImagePlus },
               { type: "url", label: "Website", icon: Globe2 },
             ] as const
@@ -139,13 +139,13 @@ export function CanvasAddDialog({
         {addType === "text" && (
           <div className="canvas-add-form">
             <label className="visual-field-label" htmlFor="new-canvas-thought">
-              What are you thinking?
+              Card text
             </label>
             <textarea
               id="new-canvas-thought"
               className="field"
               rows={7}
-              placeholder="An idea, a useful detail, a question worth exploring…"
+              placeholder="Add a note, question, or reminder…"
               value={newText}
               onChange={(e) => onTextChange(e.target.value)}
             />
@@ -153,7 +153,7 @@ export function CanvasAddDialog({
               className="btn btn-primary"
               onClick={() => addCard("text", "", newText)}
             >
-              <Plus size={15} /> Add thought
+              <Plus size={15} /> Add text
             </button>
           </div>
         )}
@@ -175,7 +175,7 @@ export function CanvasAddDialog({
               }}
             />
             <p className="visual-muted">
-              Keep useful references close to the ideas they inspire.
+              Add a website link to the canvas.
             </p>
             <button
               className="btn btn-primary"
@@ -200,8 +200,8 @@ export function CanvasAddDialog({
               )}
               <strong>
                 {uploading
-                  ? "Uploading your file…"
-                  : "Bring your references in"}
+                  ? "Uploading file…"
+                  : "Upload a file"}
               </strong>
               <span>Images, PDFs, audio, and video · Up to 20 MB per file</span>
             </button>

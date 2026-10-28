@@ -180,7 +180,6 @@ export default function PersonalTemplates({
       >
         <header className="personal-template-heading">
           <div>
-            <span className="eyebrow">YOUR PERSONAL LIBRARY</span>
             <h2 id={`${id}-title`}>My {kind} templates</h2>
           </div>
           <button
@@ -193,9 +192,8 @@ export default function PersonalTemplates({
           </button>
         </header>
         <p className="personal-template-help">
-          Reusable starting points for you across your workspaces. Team members
-          do not see this library. Files, assignments, dates, and history are
-          excluded.
+          These templates are private and available across your workspaces.
+          Files, assignments, dates, and history are excluded.
         </p>
         {source && !removed && (
           <form
@@ -253,7 +251,7 @@ export default function PersonalTemplates({
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
-          <div role="group" aria-label="Template collection">
+          <div role="group" aria-label="Template view">
             <button
               ref={!removed ? collectionButton : undefined}
               className="btn"

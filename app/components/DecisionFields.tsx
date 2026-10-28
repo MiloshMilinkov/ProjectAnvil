@@ -41,9 +41,8 @@ export default function DecisionFields({
       </summary>
       <div className="decision-fields-body">
         <p className="note-structure-help">
-          Keep the reasoning with the outcome. Connect evidence through Graph
-          relationships using “was decided because of” to flag changes for
-          review.
+          Record the reasons for a decision. In Graph, use “was decided because of”
+          to link supporting evidence and flag later changes for review.
         </p>
         <div className="decision-meta">
           <label className="form-label">
@@ -114,7 +113,7 @@ export default function DecisionFields({
             [
               ["context", "Context and question"],
               ["options", "Options considered"],
-              ["outcome", "Chosen outcome"],
+              ["outcome", "Outcome"],
               ["consequences", "Consequences and tradeoffs"],
             ] as const
           ).map(([field, label]) => (

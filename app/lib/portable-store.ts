@@ -56,7 +56,7 @@ export async function exportMarkdownFolder(request: Request) {
     (!validIdentifier(projectId) ||
       !workspace.projects.some((project) => project.id === projectId))
   )
-    throw new WorkspaceError("This export project is unavailable.", 404);
+    throw new WorkspaceError("This project is no longer available for export.", 404);
   const selected = projectId
     ? {
         ...workspace,
@@ -65,7 +65,7 @@ export async function exportMarkdownFolder(request: Request) {
     : workspace;
   if (!selected.notes.length)
     throw new WorkspaceError(
-      "Add a note to this scope before exporting Markdown.",
+      "There are no notes to export. Add a note or choose another project.",
     );
   if (selected.notes.length > portableLimits.notes)
     throw new WorkspaceError(
@@ -113,13 +113,13 @@ export async function exportMarkdownFolder(request: Request) {
         : null);
     if (!object)
       throw new WorkspaceError(
-        "An attachment is missing. Check workspace storage before exporting this scope.",
+        "An attachment is missing. Check workspace storage before exporting these notes.",
         409,
       );
     total += object.size;
     if (total > portableLimits.expandedBytes)
       throw new WorkspaceError(
-        "Export at most 24 MB at a time. Choose a smaller project scope.",
+        "Export at most 24 MB at a time. Choose a smaller project.",
         413,
       );
     if (
@@ -146,7 +146,7 @@ export async function exportMarkdownFolder(request: Request) {
     )
   )
     throw new WorkspaceError(
-      "Your access changed during export. Reopen the export to use the currently available records.",
+      "Your access changed during export. Start the export again to include only the items you can still open.",
       409,
     );
   try {
@@ -174,7 +174,7 @@ export async function importMarkdownFolder(request: Request) {
     !validIdentifier(operationId)
   )
     throw new WorkspaceError(
-      "Choose a valid import project and operation identifier.",
+      "This import is missing a valid project or save reference. Review the import and try again.",
     );
   let access = await resolveWorkspace(request);
   let current = await readRawWorkspace(access);

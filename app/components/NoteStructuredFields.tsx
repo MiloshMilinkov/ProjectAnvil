@@ -25,7 +25,7 @@ export default function NoteStructuredFields({
     if (
       Object.values(values).some(Boolean) &&
       !window.confirm(
-        "Change the custom note type and clear its structured values? Your note content and freeform properties will remain.",
+        "Change the note type and clear its type-specific property values? Note text and other properties will stay.",
       )
     )
       return;

@@ -94,6 +94,12 @@ Account UI is separated into reusable access/recovery forms and menus instead of
 
 Final verification passed strict types, zero-warning lint, backend/model and native Better Auth integration checks, 31 Node tests, and all 16 browser workflows. Twenty account security/gate screenshots cover five themes at desktop and 320 px widths. Held pre-rotation live requests are retired in both same-cookie tabs; separate sessions are revoked, and a project draft survives two permission refreshes. Both dependency audits report zero findings. Online gate visuals use a mocked local response; actual email delivery, HTTPS/proxy behavior, and hosted load still require future staging checks.
 
+## Copy and readability review
+
+The interface copy review retains **328 source files** and adds no dependencies. Navigation, search, forms, and guides share the same tool names; existing field/entity labels are reused in activity, conflicts, and recovery. Promotional headings, repeated badges, and the generic empty-state graphic were removed. Task-board supporting text and controls now use the shared readable type and height tokens.
+
+The finished build passed the project checks, 31 Node tests, and all 16 browser workflows, including invalid-import feedback without changing saved data. A disposable visual review checked 70 page/theme/viewport cases and captured 95 screenshots; representative images were inspected after correcting guest naming, empty-canvas status, and board readability. Startup JavaScript is **1,114,607 bytes** and the complete offline app **7,495,301 bytes**, within the existing budgets. These measurements describe size and workflow preservation, not a latency improvement.
+
 ## Remaining capacity work
 
 1. **Storage granularity:** active records still share one workspace snapshot and revision. Larger teams would benefit from independently stored/queryable records and incremental updates. Design and rehearse that migration before increasing limits.

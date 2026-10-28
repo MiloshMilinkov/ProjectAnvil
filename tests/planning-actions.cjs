@@ -210,7 +210,7 @@ async function main() {
         ...frozen,
         item: { id: frozen.item.id, priority: "low" },
       }),
-    /changed in another tab/,
+    /changed since you opened/,
   );
 
   for (const status of [0, 401, 403, 404, 500]) {
@@ -344,7 +344,7 @@ async function main() {
   storage.failRemove = true;
   assert.match(
     supersedeBulkFailures(scope, [blocked], new Set()),
-    /could not be retired/,
+    /could not be cleared/,
   );
   storage.failRemove = false;
   assert.equal(supersedeBulkFailures(scope, [blocked], new Set()), null);

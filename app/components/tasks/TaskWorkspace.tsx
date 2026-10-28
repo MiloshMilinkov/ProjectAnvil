@@ -102,13 +102,12 @@ function TaskWorkspace(
   return (
     <div className="page tasks-page">
       <PageHeader
-        eyebrow={mine ? "YOUR NEXT STEPS" : "FROM PLANNING TO PROGRESS"}
-        title={mine ? "My work" : "Task board"}
+        title={mine ? "My work" : "Tasks"}
         description={
           mine
             ? currentPerson
               ? "Tasks assigned to you in this workspace."
-              : "Your unassigned tasks, ready to work on as a guest."
+              : "Unassigned tasks in the guest workspace."
             : "Organize tasks by status, priority, project, and person."
         }
         action={
@@ -256,8 +255,8 @@ function TaskWorkspace(
               title={filtered ? "No tasks match" : "No tasks yet"}
               text={
                 filtered
-                  ? "Try fewer filters to find your tasks."
-                  : "Create a task to plan your next step."
+                  ? "Clear a filter or change your search."
+                  : "Create a task to add it here."
               }
               action={
                 <button

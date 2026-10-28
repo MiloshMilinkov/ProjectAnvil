@@ -132,7 +132,7 @@ function userCopy(user: AccountUser | null): AccountUser | null {
     user.name.length > 300
   )
     throw new OfflineStorageError(
-      "The account could not be kept for offline use.",
+      "This account could not be saved for offline use.",
     );
   // Email, sessions, invitations, passwords, and tokens have no offline purpose.
   return { id: user.id, username: user.username, name: user.name, email: "" };
@@ -223,7 +223,7 @@ function snapshotCopy(
     return { workspace: validateWorkspace(JSON.parse(serialized)), bytes };
   } catch {
     throw new OfflineStorageError(
-      "The offline workspace copy could not be verified.",
+      "The offline workspace copy is incomplete or damaged. Reconnect and save a fresh copy.",
     );
   }
 }
@@ -573,7 +573,7 @@ export function createOfflineStore(adapter: OfflineStorageAdapter) {
             file.type.split(";")[0].toLowerCase())
       )
         throw new OfflineStorageError(
-          "The downloaded attachment could not be verified.",
+          "The attachment download does not match the saved file. Download it again.",
         );
       const earlier = copy.attachments.find((item) => item.id === id);
       if (
@@ -682,7 +682,7 @@ export function createOfflineStore(adapter: OfflineStorageAdapter) {
 function storageFailure(cause: unknown): Error {
   if (cause instanceof OfflineStorageError) return cause;
   return new OfflineStorageError(
-    "This browser could not save the offline copy. Free device storage or allow browser storage, then try again. Keep this page open until pending changes are safely kept.",
+    "The offline copy could not be saved. Free up device storage or allow browser storage, then try again. Keep this page open until your pending changes are saved.",
   );
 }
 

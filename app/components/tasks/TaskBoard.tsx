@@ -130,11 +130,15 @@ export default function TaskBoard({
                   <div className="task-card-top">
                     <span className="task-key">
                       {task.type === "bug" ? (
-                        <Bug size={12} />
+                        <Bug size={12} role="img" aria-label="Bug" />
                       ) : task.type === "epic" ? (
-                        <Zap size={12} />
+                        <Zap size={12} role="img" aria-label="Epic" />
                       ) : (
-                        <CheckSquare size={12} />
+                        <CheckSquare
+                          size={12}
+                          role="img"
+                          aria-label={task.type === "story" ? "Story" : "Task"}
+                        />
                       )}{" "}
                       {task.key}
                     </span>

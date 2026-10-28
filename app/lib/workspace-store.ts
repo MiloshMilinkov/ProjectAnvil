@@ -680,7 +680,7 @@ export async function mutateWorkspaceResult(
     );
   }
   throw new WorkspaceError(
-    "Several changes are being saved at once. Your change was not saved; try again.",
+    "Other changes are being saved. Yours has not been saved yet. Try again.",
     409,
   );
 }
@@ -705,7 +705,7 @@ export function routeError(error: unknown): Response {
     return Response.json(
       {
         error:
-          "Local account storage needs its database setup. Run the ProjectAnvil launcher to apply the database migrations.",
+          "Account storage needs an update. Stop the app, then start it again with the ProjectAnvil launcher.",
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
@@ -713,7 +713,7 @@ export function routeError(error: unknown): Response {
   return Response.json(
     {
       error:
-        "The server could not save or load the workspace. Please try again.",
+        "The workspace could not be loaded or saved. Try again.",
     },
     { status: 500, headers: { "Cache-Control": "no-store" } },
   );
@@ -725,7 +725,7 @@ export async function readMutationRequest(request: Request): Promise<unknown> {
   const bytes = await readBoundedBody(
     request,
     4_000_000,
-    "This request is too large. Keep mutation bodies below 4 MB.",
+    "This change is too large. Keep it below 4 MB.",
   );
   const text = new TextDecoder().decode(bytes);
   const mutation = JSON.parse(text);

@@ -312,7 +312,7 @@ export async function openNote(actor: BrowserAccount, id: string) {
 }
 
 export async function createTaskUi(page: Page, title: string) {
-  await navigate(page, "Task board");
+  await navigate(page, "Tasks");
   await page.getByRole("button", { name: "Create task", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Create task", exact: true });
   await dialog

@@ -270,8 +270,8 @@ export default function SavedTaskViews({
             <X size={17} />
           </button>
           <p className="muted">
-            {mine ? "My work always shows your assignment. " : ""}Views are
-            shared with this workspace members.
+            {mine ? "My work always shows your assigned tasks. " : ""}Saved views
+            are shared with members of this workspace.
           </p>
         </form>
       )}

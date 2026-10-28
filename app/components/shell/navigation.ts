@@ -2,29 +2,30 @@ import {
   BookOpen,
   CalendarDays,
   CheckSquare,
-  Columns3,
-  Database,
+  ListTodo,
+  TableProperties,
   FolderKanban,
   LayoutDashboard,
-  ListChecks,
+  History,
   Network,
   PanelsTopLeft,
-  Zap,
+  Lightbulb,
+  Frame,
 } from "lucide-react";
 
 export const workspaceNavigation = [
   { id: "overview", title: "Overview", icon: LayoutDashboard },
   { id: "my-work", title: "My work", icon: CheckSquare },
-  { id: "tasks", title: "Task board", icon: Columns3 },
+  { id: "tasks", title: "Tasks", icon: ListTodo },
   { id: "projects", title: "Projects", icon: FolderKanban },
   { id: "rooms", title: "Work rooms", icon: PanelsTopLeft },
   { id: "notes", title: "Notes", icon: BookOpen },
-  { id: "brainstorm", title: "Brainstorming", icon: Zap },
-  { id: "activity", title: "Activity", icon: ListChecks },
+  { id: "brainstorm", title: "Brainstorming", icon: Lightbulb },
+  { id: "activity", title: "Activity", icon: History },
   { id: "graph", title: "Relationship graph", icon: Network },
-  { id: "canvas", title: "Canvas", icon: PanelsTopLeft },
-  { id: "collections", title: "Collections", icon: Database },
-  { id: "daily", title: "Daily planner", icon: CalendarDays },
+  { id: "canvas", title: "Canvas", icon: Frame },
+  { id: "collections", title: "Collections", icon: TableProperties },
+  { id: "daily", title: "Daily notes", icon: CalendarDays },
 ] as const;
 
 export type WorkspacePage =
@@ -34,11 +35,11 @@ export type WorkspacePage =
 
 export const navigationGroups = [
   {
-    title: "Plan & work",
+    title: "Work",
     pages: ["overview", "my-work", "tasks", "projects", "daily"],
   },
   {
-    title: "Ideas & knowledge",
+    title: "Notes & ideas",
     pages: ["notes", "brainstorm", "canvas", "graph"],
   },
   { title: "More tools", pages: ["rooms", "collections", "activity"] },

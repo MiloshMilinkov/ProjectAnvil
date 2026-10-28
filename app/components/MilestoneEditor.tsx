@@ -127,7 +127,7 @@ export default function MilestoneEditor({
     event.preventDefault();
     if (busy.current) return;
     if (!draft.title.trim()) {
-      setError("Give this milestone a title.");
+      setError("Enter a milestone title.");
       return;
     }
     busy.current = true;
@@ -228,8 +228,8 @@ export default function MilestoneEditor({
           </button>
         </header>
         <p className="muted">
-          Give this part of the project a clear outcome and optional target
-          date. Progress follows its tasks.
+          Add a description and optional target date. Progress is based on the
+          tasks in this milestone.
         </p>
         {recovered && (
           <p className="project-planning-notice" role="status">
@@ -283,7 +283,7 @@ export default function MilestoneEditor({
               maxLength={10000}
               value={draft.description}
               onChange={(event) => change({ description: event.target.value })}
-              placeholder="What will be ready at this point?"
+              placeholder="Expected outcome or deliverables"
             />
           </label>
           <label className="form-label">

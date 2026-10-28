@@ -26,6 +26,7 @@ export function MediaContent({ media }: { media: Media }) {
   if (media.type.startsWith("video/"))
     return (
       <video
+        aria-label={media.name}
         controls
         preload="metadata"
         src={resolved.url}
@@ -37,6 +38,7 @@ export function MediaContent({ media }: { media: Media }) {
       <div className="canvas-audio">
         <span>Audio reference</span>
         <audio
+          aria-label={media.name}
           controls
           preload="metadata"
           src={resolved.url}
@@ -47,7 +49,7 @@ export function MediaContent({ media }: { media: Media }) {
     );
   if (media.type === "application/pdf")
     return (
-      <object data={resolved.url} type="application/pdf">
+      <object data={resolved.url} type="application/pdf" aria-label={media.name}>
         <a href={resolved.url} target="_blank" rel="noopener noreferrer">
           Open {media.name}
         </a>

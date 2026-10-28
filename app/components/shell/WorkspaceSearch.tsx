@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  ArrowUpRight,
+  ArrowRight,
   BookOpen,
   CalendarDays,
   CircleHelp,
@@ -19,7 +19,7 @@ import { workspaceNavigation, type WorkspacePage } from "./navigation";
 
 const destinations = [
   ...workspaceNavigation,
-  { id: "team" as const, title: "Teams & people", icon: Users },
+  { id: "team" as const, title: "Teams & workspaces", icon: Users },
   { id: "settings" as const, title: "Workspace settings", icon: Settings },
 ];
 interface Props {
@@ -142,7 +142,7 @@ export default function WorkspaceSearch({
               </button>
               <button onClick={() => choose(() => onNavigate("daily"))}>
                 <CalendarDays size={16} />
-                Open today’s planner
+                Open today&apos;s note
               </button>
               <button onClick={() => choose(onGuide)}>
                 <CircleHelp size={16} />
@@ -160,7 +160,6 @@ export default function WorkspaceSearch({
                 >
                   <tool.icon size={16} />
                   {tool.title}
-                  <span className="badge">Tool</span>
                 </button>
               ))}
             </>
@@ -175,7 +174,7 @@ export default function WorkspaceSearch({
               <StatusIcon status={item.status} />
               <span className="muted">{item.key}</span>
               <span className="palette-result-title">{item.title}</span>
-              <ArrowUpRight size={13} />
+              <ArrowRight size={13} aria-hidden="true" />
             </button>
           ))}
           {notes.map(({ item }) => (

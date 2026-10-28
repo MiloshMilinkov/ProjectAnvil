@@ -77,7 +77,7 @@ export default function ProjectDialog({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.name.trim()) {
-      editor.setError("Give your project a name.");
+      editor.setError("Enter a project name.");
       return;
     }
     const cleaned = {
@@ -138,8 +138,8 @@ export default function ProjectDialog({
           </button>
         </div>
         <p className="muted">
-          This project belongs to the current workspace. In a team workspace,
-          every accepted member can access its tasks, notes, and files.
+          Projects follow the access settings of their workspace. Team projects
+          are shared with members unless you restrict project access.
         </p>
         <fieldset className="entity-editor-fields" disabled={editor.busy}>
           <label className="form-label">
@@ -186,22 +186,22 @@ export default function ProjectDialog({
               maxLength={10000}
               value={draft.description}
               onChange={(event) => change({ description: event.target.value })}
-              placeholder="What are you working toward?"
+              placeholder="Project scope, background, or requirements"
             />
           </label>
           <label className="form-label">
-            Next milestone
+            Goal
             <input
               className="field"
               maxLength={10000}
               value={draft.goal}
               onChange={(event) => change({ goal: event.target.value })}
-              placeholder="First milestone complete"
+              placeholder="The outcome this project should achieve"
             />
           </label>
           <div className="form-grid">
             <label className="form-label">
-              Phase
+              Status
               <select
                 className="field"
                 value={draft.status}

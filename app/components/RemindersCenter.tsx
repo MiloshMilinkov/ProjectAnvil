@@ -182,13 +182,12 @@ export default function RemindersCenter({
               </header>
               <p className="muted" id={descriptionId}>
                 For tasks assigned to you and unassigned work in this workspace.
-                Reminders appear while ProjectAnvil is open; missed reminders
-                are ready when you return.
+                Reminders appear while the app is open or when you return.
               </p>
               <div
                 className="planning-choice-group"
                 role="group"
-                aria-label="Reminder collection"
+                aria-label="Reminder view"
               >
                 {(
                   [
@@ -283,15 +282,15 @@ export default function RemindersCenter({
                     <Bell size={28} />
                     <strong>
                       {section === "due"
-                        ? "You're up to date"
+                        ? "No reminders due"
                         : section === "upcoming"
                           ? "No upcoming reminders"
                           : "No dismissed reminders"}
                     </strong>
                     <p>
-                      Set a reminder in the task Planning details. Dismissals
-                      and snoozes stay in this browser for this account and
-                      workspace.
+                      Set reminders under More planning options in the task
+                      editor. Dismissals and snoozes apply only to this account
+                      and workspace in this browser.
                     </p>
                   </div>
                 )}

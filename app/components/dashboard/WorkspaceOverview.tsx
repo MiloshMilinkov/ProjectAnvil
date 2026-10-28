@@ -1,19 +1,17 @@
 "use client";
 import {
   ArrowRight,
-  ArrowUpRight,
   BookOpen,
   Bookmark,
   CheckSquare,
   ChevronRight,
   CircleCheck,
   CircleDashed,
-  Columns3,
   FolderKanban,
-  Layers,
+  ListTodo,
   Network,
   Plus,
-  Target,
+  UserRound,
 } from "lucide-react";
 import { projectProgress } from "../../lib/planning-progress";
 import type { FeatureProps } from "../../lib/types";
@@ -78,7 +76,7 @@ export default function WorkspaceOverview(
         action={
           <>
             <button className="btn" onClick={() => onGo("tasks")}>
-              <Columns3 size={15} />
+              <ListTodo size={15} aria-hidden="true" />
               View tasks
             </button>
             <button
@@ -102,20 +100,20 @@ export default function WorkspaceOverview(
               (tasks.length === 1
                 ? " task in this view"
                 : " tasks in this view"),
-            icon: Layers,
+            icon: ListTodo,
             color: "violet",
           },
           {
             label: "In progress",
             value: tasks.filter((task) => task.status === "in-progress").length,
-            sub: "Work currently underway",
+            sub: "In this view",
             icon: CircleDashed,
             color: "blue",
           },
           {
             label: "Completed",
             value: done.length,
-            sub: `${tasks.length ? Math.round((done.length / tasks.length) * 100) : 0}% of all tasks finished`,
+            sub: `${tasks.length ? Math.round((done.length / tasks.length) * 100) : 0}% of tasks in this view`,
             icon: CircleCheck,
             color: "green",
           },
@@ -124,15 +122,19 @@ export default function WorkspaceOverview(
             value: mine.length,
             sub: overdue.length
               ? `${overdue.length} overdue`
-              : "No overdue tasks in this group",
-            icon: Target,
+              : "None overdue",
+            icon: UserRound,
             color: "orange",
           },
         ].map((stat) => (
           <div className="stat-card" key={stat.label}>
             <div className="stat-top">
               <span>{stat.label}</span>
-              <stat.icon size={17} className={"color-" + stat.color} />
+              <stat.icon
+                size={17}
+                className={"color-" + stat.color}
+                aria-hidden="true"
+              />
             </div>
             <strong>{stat.value}</strong>
             <small>{stat.sub}</small>
@@ -201,8 +203,8 @@ export default function WorkspaceOverview(
             })}
             {!projects.length && (
               <Empty
-                title="Your next project starts here"
-                text="Create a project to connect its tasks and ideas."
+                title="No projects yet"
+                text="Create a project to group its tasks, notes, and canvases."
               />
             )}
           </div>
@@ -218,7 +220,7 @@ export default function WorkspaceOverview(
               aria-label="Open notes"
               onClick={() => onGo("notes")}
             >
-              <ArrowUpRight size={17} />
+              <ArrowRight size={17} aria-hidden="true" />
             </button>
           </div>
           {notes.map((note) => (
@@ -246,12 +248,12 @@ export default function WorkspaceOverview(
           {!notes.length && (
             <Empty
               title="No notes yet"
-              text="Open Notes to capture a plan or reference."
+              text="Add project details or reference material in Notes."
             />
           )}
           <button className="knowledge-footer" onClick={() => onGo("graph")}>
             <Network size={16} />
-            <span>See how your ideas connect</span>
+            <span>Open relationship graph</span>
             <ArrowRight size={14} />
           </button>
         </section>
@@ -271,7 +273,7 @@ export default function WorkspaceOverview(
         {!upcoming.length && (
           <Empty
             title="No upcoming tasks"
-            text="Create a task to plan what comes next."
+            text="Create a task to add it here."
             action={
               <button className="btn" onClick={onCreate}>
                 <Plus size={15} />

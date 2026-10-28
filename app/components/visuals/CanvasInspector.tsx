@@ -65,14 +65,14 @@ export function CanvasInspector({
       aria-label="Canvas details"
     >
       <div className="visual-inspector-label">
-        {selectedCard ? "CARD DETAILS" : edge ? "CONNECTION" : "CANVAS DETAILS"}
+        {selectedCard ? "Card details" : edge ? "Connection" : "Canvas details"}
       </div>
       {selectedCard ? (
         <>
           <div className="canvas-inspector-type">
             <span style={{ color: cssColor(selectedCard.color) }}>
               {selectedCard.type === "text"
-                ? "Thought"
+                ? "Text"
                 : selectedCard.type === "url"
                   ? "Web reference"
                   : selectedCard.type}
@@ -113,7 +113,7 @@ export function CanvasInspector({
               <label className="visual-field-label" htmlFor="canvas-card-text">
                 {selectedCard.type === "url"
                   ? "Website address"
-                  : "Your thoughts"}
+                  : "Card text"}
               </label>
               <textarea
                 id="canvas-card-text"
@@ -123,7 +123,7 @@ export function CanvasInspector({
                 placeholder={
                   selectedCard.type === "url"
                     ? "https://…"
-                    : "An idea worth exploring…"
+                    : "Add a note, question, or reminder…"
                 }
                 onChange={(e) => {
                   updateCard(selectedCard.id, { text: e.target.value }, false);
@@ -266,7 +266,7 @@ export function CanvasInspector({
             }
           />
           <p className="visual-muted canvas-detail-hint">
-            Give the connection a name to explain how these ideas relate.
+            Label the connection to describe the relationship.
           </p>
         </>
       ) : (
@@ -294,13 +294,12 @@ export function CanvasInspector({
               disabled={!writable}
               onClick={titleEditor.onStart}
             >
-              {canvas?.title || "Your first canvas"}
-              <span>{writable ? "Click to rename" : "View only"}</span>
+              {canvas?.title || "Canvas"}
+              <span>{writable ? "Rename canvas" : "View only"}</span>
             </button>
           )}
           <p className="visual-muted">
-            A living map of your ideas. Bring related work closer and connect
-            the dots.
+            Arrange cards and add connections to plan your work.
           </p>
           <div className="graph-stats canvas-stats">
             <div>
@@ -313,11 +312,11 @@ export function CanvasInspector({
             </div>
           </div>
           <div className="visual-inspector-label canvas-guide-heading">
-            MAKE IT YOURS
+            Canvas controls
           </div>
           <div className="graph-hint">
             <StickyNote size={15} />
-            <span>Add a thought, reminder, or project idea.</span>
+            <span>Add text for notes and reminders.</span>
           </div>
           <div className="graph-hint">
             <Link2 size={15} />
@@ -325,7 +324,7 @@ export function CanvasInspector({
           </div>
           <div className="graph-hint">
             <ImagePlus size={15} />
-            <span>Bring in concept art, audio, videos, and PDFs.</span>
+            <span>Add images, audio, video, and PDFs.</span>
           </div>
           <button
             className="btn graph-open"

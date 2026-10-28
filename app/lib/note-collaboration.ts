@@ -49,7 +49,7 @@ export function createTextDocument(content: string): Y.Doc {
     )
   )
     throw new Error(
-      "This note contains an incomplete Unicode character. Correct it in the ordinary editor before starting shared editing.",
+      "This note contains an incomplete Unicode character. Fix it in the note editor before starting shared editing.",
     );
   const doc = new Y.Doc();
   if (content) doc.getText("content").insert(0, content);
@@ -97,7 +97,7 @@ export function replaceCollaborativeText(doc: Y.Doc, next: string): void {
     )
   )
     throw new Error(
-      "Complete this Unicode character before synchronizing the note.",
+      "Finish entering this Unicode character before syncing the note.",
     );
   const text = doc.getText("content"),
     previous = text.toString();

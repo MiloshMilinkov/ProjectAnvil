@@ -252,12 +252,11 @@ export function GraphView(
     <div className="visual-feature">
       <div className="visual-heading">
         <div>
-          <div className="visual-eyebrow">CONNECTED THINKING</div>
           <h1>
-            Knowledge graph{" "}
+            Relationship graph{" "}
             <span className="visual-count">{data.nodes.length}</span>
           </h1>
-          <p>See how your notes, projects, and tasks fit together.</p>
+          <p>View links between notes, tasks, and projects.</p>
         </div>
         <div className="graph-heading-actions">
           <button
@@ -654,7 +653,7 @@ export function GraphView(
           {selectedNode ? (
             <>
               <div className="visual-inspector-label">
-                <span>EXPLORING</span>
+                <span>Selected item</span>
                 <button
                   className="btn-icon"
                   aria-label="Clear selection"
@@ -716,21 +715,21 @@ export function GraphView(
                 })}
                 {!connected.length && (
                   <p className="visual-muted">
-                    Link this note with [[another note]], or attach it to a task
-                    to start connecting ideas.
+                    No connections yet. Add note links or relationships to
+                    connect items.
                   </p>
                 )}
               </div>
             </>
           ) : (
             <>
-              <div className="visual-inspector-label">YOUR WORK, CONNECTED</div>
+              <div className="visual-inspector-label">Graph controls</div>
               <div className="graph-intro-icon">
                 <Network size={28} />
               </div>
-              <h3>A bigger picture.</h3>
+              <h3>Connections</h3>
               <p className="visual-muted">
-                Explore the connections between your notes, tasks, and projects.
+                Select an item to see its details and links.
               </p>
               <div className="graph-hint">
                 <MousePointer2 size={15} />

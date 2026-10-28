@@ -190,7 +190,7 @@ export default function NotificationCenter(props: Props) {
         }}
         data-tour="notifications"
       >
-        <Inbox size={18} />
+        <Inbox size={18} aria-hidden="true" />
         {data.unreadCount > 0 && (
           <span aria-hidden="true">
             {data.unreadCount > 99 ? "99+" : data.unreadCount}
@@ -285,23 +285,22 @@ function NotificationDialog({
             aria-label="Close notifications"
             onClick={onClose}
           >
-            <X size={19} />
+            <X size={19} aria-hidden="true" />
           </button>
         </div>
         {!signedIn ? (
           <div className="collaboration-empty">
-            <Inbox size={28} />
-            <h3>Keep up with your team</h3>
+            <Inbox size={28} aria-hidden="true" />
+            <h3>Sign in for notifications</h3>
             <p>
-              Sign in to watch items and receive mentions. Guest work remains
-              available without an account.
+              Receive mentions and updates to items you watch. Guest work does
+              not require an account.
             </p>
           </div>
         ) : (
           <>
             <p className="collaboration-scope">
-              Mentions and watched updates in this workspace ·{" "}
-              {data.unreadCount} unread
+              Mentions and updates in this workspace · {data.unreadCount} unread
             </p>
             <div className="notification-toolbar">
               <div role="group" aria-label="Notification filter">
@@ -327,7 +326,7 @@ function NotificationDialog({
                 disabled={loading || !!busy}
                 onClick={() => void onLoad()}
               >
-                <RefreshCw size={16} />
+                <RefreshCw size={16} aria-hidden="true" />
                 Refresh
               </button>
               <button
@@ -335,7 +334,7 @@ function NotificationDialog({
                 disabled={!data.unreadCount || !!busy}
                 onClick={() => void onMark()}
               >
-                <CheckCheck size={16} />
+                <CheckCheck size={16} aria-hidden="true" />
                 {busy === "all" ? "Saving…" : "Mark all read"}
               </button>
             </div>
@@ -353,12 +352,11 @@ function NotificationDialog({
               </p>
             ) : !data.entries.length ? (
               <div className="collaboration-empty">
-                <Inbox size={28} />
-                <h3>{unread ? "You are caught up" : "No notifications yet"}</h3>
-                <p>
-                  Watch a note, task, or project, or ask someone to mention your
-                  registered @username.
-                </p>
+                <Inbox size={28} aria-hidden="true" />
+                <h3>
+                  {unread ? "No unread notifications" : "No notifications yet"}
+                </h3>
+                <p>Mentions and changes to items you watch appear here.</p>
               </div>
             ) : (
               <ol className="notification-list">
@@ -412,8 +410,8 @@ function NotificationDialog({
               </button>
             )}
             <p className="collaboration-footnote">
-              Notifications stay in the app. Watched updates are grouped by
-              item; your own changes do not notify you.
+              In-app notifications only. Updates to watched items are grouped.
+              Your own changes do not notify you.
             </p>
           </>
         )}

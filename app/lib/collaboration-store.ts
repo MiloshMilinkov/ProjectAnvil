@@ -208,7 +208,7 @@ export async function readActivity(
   if (latest.securityRevision !== access.securityRevision) {
     if (retry)
       throw new WorkspaceError(
-        "Your access changed. Refresh activity to see the latest permitted updates.",
+        "Your access changed. Refresh activity to see the updates available to you.",
         409,
       );
     return readActivity(request, retry + 1);
@@ -360,7 +360,7 @@ export async function readNotifications(
   if (latest.securityRevision !== access.securityRevision) {
     if (retry)
       throw new WorkspaceError(
-        "Your access changed. Refresh notifications to see the latest permitted updates.",
+        "Your access changed. Refresh notifications to see the updates available to you.",
         409,
       );
     return readNotifications(request, retry + 1);

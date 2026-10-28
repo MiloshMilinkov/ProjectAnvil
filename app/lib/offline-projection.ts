@@ -221,7 +221,7 @@ export function projectOfflineMutation(
     mutation.action === "upsert" &&
     (typeof mutation.item?.id !== "string" || !mutation.item.id)
   )
-    throw new WorkspaceError("This offline change needs a stable record ID.");
+    throw new WorkspaceError("This offline change is missing its item reference. Reopen the item before editing it.");
   const authorization = {
     id: access.id,
     kind: access.kind,
@@ -292,7 +292,7 @@ export function projectOfflineMutations(
     try {
       if (entry.record.value.operationId !== entry.id)
         throw new WorkspaceError(
-          "This queued change has an invalid receipt ID.",
+          "This pending change has an invalid save reference. Download a recovery copy before discarding it.",
         );
       const result = projectOfflineMutation(
         workspace,

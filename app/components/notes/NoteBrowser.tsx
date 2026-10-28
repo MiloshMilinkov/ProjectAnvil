@@ -103,7 +103,7 @@ export default function NoteBrowser({
           ) : (
             <BookOpen size={18} />
           )}{" "}
-          {mode === "daily" ? "Daily journal" : "Notes"}
+          {mode === "daily" ? "Daily notes" : "Notes"}
         </span>
         <button
           className="btn-icon"
@@ -131,7 +131,6 @@ export default function NoteBrowser({
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Find a note…"
         />
-        <kbd>⌕</kbd>
       </label>
       <div className="note-scope">
         <button
@@ -243,13 +242,17 @@ export default function NoteBrowser({
           ))
         ) : (
           <div className="note-list-empty">
-            <Search size={25} />
+            {notes.length ? (
+              <Search size={25} aria-hidden="true" />
+            ) : (
+              <FileText size={25} aria-hidden="true" />
+            )}
             <p>
               {notes.length
-                ? "No notes match these filters. Try another search, folder, tag, type, or bookmark filter."
+                ? "No matching notes. Change or clear the filters."
                 : canCreate
-                  ? "No notes here yet. Create your first note to get started."
-                  : "No notes are available in this view yet."}
+                  ? "No notes here yet. Create a note to get started."
+                  : "No notes available in this view."}
             </p>
             <button className="btn" disabled={!canCreate} onClick={onCreate}>
               Create a note

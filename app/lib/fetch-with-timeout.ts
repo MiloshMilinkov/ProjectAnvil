@@ -18,11 +18,11 @@ export async function fetchWithTimeout(
   } catch (error) {
     if (timedOut)
       throw new Error(
-        "The local server did not respond in time. Your unsaved edits are kept for recovery. Retry when the server is ready.",
+        "ProjectAnvil took too long to respond. Try again. Keep this page open if you have unsaved changes.",
       );
     if (error instanceof TypeError)
       throw new Error(
-        "Cannot reach ProjectAnvil. Keep the local server running, then retry. Unsaved changes remain available for recovery.",
+        "Cannot reach ProjectAnvil. Check your connection and try again. Keep this page open if you have unsaved changes.",
       );
     throw error;
   } finally {

@@ -10,14 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  Eye,
-  EyeOff,
-  LoaderCircle,
-  ShieldCheck,
-  UserRound,
-  X,
-} from "lucide-react";
+import { Eye, EyeOff, LoaderCircle, UserRound, X } from "lucide-react";
 import type { AccountContext, AccountPolicy } from "../lib/access-types";
 import { fetchWithTimeout } from "../lib/fetch-with-timeout";
 import { useDialog } from "./useDialog";
@@ -43,7 +36,7 @@ const localPolicy: AccountPolicy = {
 export const readableAccountError = (error: unknown) =>
   error instanceof Error
     ? error.message
-    : "The request could not finish. Please try again.";
+    : "Couldn't complete the request. Try again.";
 
 /** Account identity is checked by the server, including reads and session changes. */
 export async function accountRequest<T>(
@@ -76,7 +69,7 @@ export async function accountRequest<T>(
       message ||
         (response.status === 429
           ? "Too many attempts. Wait a moment and try again."
-          : "The request could not finish. Please try again."),
+          : "Couldn't complete the request. Try again."),
     );
   }
   return result as T;
@@ -193,10 +186,10 @@ export function clearAccountCallback() {
 
 function deliveryHelp(policy: AccountPolicy) {
   return policy.emailDelivery === "local"
-    ? "Local delivery saves the link privately on this PC. Use the account-mail command in the local setup guide; no email is sent."
+    ? "This local version doesn't send email. Use the account-mail command in the setup guide to open your private link."
     : policy.emailDelivery === "disabled"
-      ? "Account email is unavailable. Contact the installation owner for help."
-      : "Check your inbox and spam folder. Links expire and can be used only as intended.";
+      ? "Account email is unavailable. Contact the person who manages this installation."
+      : "Check your inbox and spam folder.";
 }
 
 export function AccountAccess({
@@ -304,10 +297,7 @@ export function AccountAccess({
           undefined,
           expectedAccount,
         );
-        setMessage(
-          "If the address belongs to an eligible account, a link has been prepared. " +
-            deliveryHelp(policy),
-        );
+        setMessage("If this email matches an account, check for a link.");
       } else if (mode === "reset") {
         await prepareChange?.();
         await accountRequest(
@@ -346,10 +336,7 @@ export function AccountAccess({
           !result?.token
         ) {
           navigate("verify");
-          setMessage(
-            "Your account was created. Verify your email before signing in. " +
-              deliveryHelp(policy),
-          );
+          setMessage("Account created. Verify your email before signing in.");
         } else {
           await onAuthenticated();
           onClose?.();
@@ -386,19 +373,19 @@ export function AccountAccess({
       )}
       <p className="account-intro">
         {mode === "login"
-          ? "Open your personal work and the team workspaces you belong to."
+          ? "Sign in to open your workspaces."
           : mode === "register"
             ? policy.registration === "invite-only"
               ? "Registration is limited to approved email addresses. Your account starts with a private workspace."
-              : "Your account starts with a private workspace. Join a team when you are ready to share."
+              : "Your account includes a private workspace. You can join teams later."
             : mode === "forgot"
               ? "Enter the email address used for your ProjectAnvil account."
               : mode === "verify"
-                ? "Request a fresh verification link for your account email."
+                ? "Request a verification link for your email address."
                 : mode === "reset"
                   ? "Choose a new ProjectAnvil password. Resetting signs out previous sessions."
                   : error
-                    ? "Request a fresh verification link to continue."
+                    ? "Request a new verification link to continue."
                     : "Your email has been verified. You can now sign in."}
       </p>
       {message && (
@@ -470,7 +457,7 @@ export function AccountAccess({
                 minLength={3}
                 maxLength={30}
                 pattern="[A-Za-z0-9_.]{3,30}"
-                placeholder="Your display name"
+                placeholder="e.g. alex"
                 disabled={busy}
               />
               {mode === "register" && (
@@ -547,9 +534,9 @@ export function AccountAccess({
               {mode === "register"
                 ? "Create account"
                 : mode === "forgot"
-                  ? "Prepare reset link"
+                  ? "Request reset link"
                   : mode === "verify"
-                    ? "Send verification link"
+                    ? "Request verification link"
                     : mode === "reset"
                       ? "Save new password"
                       : "Sign in"}
@@ -609,7 +596,6 @@ export function AccountAccess({
         <p className="account-intro">{deliveryHelp(policy)}</p>
       )}
       <p className="account-footnote">
-        <ShieldCheck size={15} />
         {policy.mode === "local"
           ? "Guest work stays in its existing workspace when you sign in."
           : "Sign-in is required. Each account opens only its private and authorized team workspaces."}
@@ -632,7 +618,7 @@ export function AccountAccess({
       <section className="account-dialog" aria-labelledby={heading}>
         <header className="account-dialog-heading">
           <div className="account-dialog-mark">
-            <ShieldCheck size={22} />
+            <UserRound size={22} aria-hidden="true" />
           </div>
           <h1 id={heading}>{title}</h1>
         </header>
@@ -686,7 +672,7 @@ export function AccountSecurity({
         accountId,
       );
       if (!Array.isArray(result?.sessions))
-        throw new Error("Signed-in sessions could not be read. Try again.");
+        throw new Error("Couldn't load your sessions. Try again.");
       if (active.current) setSessions(result.sessions);
     },
     [accountId],
@@ -789,7 +775,7 @@ export function AccountSecurity({
                 })
               }
             >
-              <Busy busy={busy === "verify"}>Send verification link</Busy>
+              <Busy busy={busy === "verify"}>Request verification link</Busy>
             </button>
           )}
         </section>
@@ -848,8 +834,8 @@ export function AccountSecurity({
         <section aria-labelledby={`${id}-sessions`}>
           <h3 id={`${id}-sessions`}>Signed-in sessions</h3>
           <p>
-            End access on a browser you no longer use. Device recovery copies
-            may remain readable while disconnected.
+            Sign out browsers you no longer use. Saved offline copies can still
+            be read while disconnected.
           </p>
           {loading ? (
             <p role="status">Loading sessions…</p>
@@ -900,7 +886,7 @@ export function AccountSecurity({
                     }
                   >
                     <Busy busy={busy === session.id}>
-                      {session.current ? "Sign out here" : "Revoke session"}
+                      {session.current ? "Sign out here" : "Sign out"}
                     </Busy>
                   </button>
                 </li>

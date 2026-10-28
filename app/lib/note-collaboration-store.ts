@@ -205,7 +205,7 @@ async function responseState(
         update = Y.diffUpdate(binary, decodeDocumentUpdate(vector));
       } catch {
         throw new WorkspaceError(
-          "The shared note synchronization vector is invalid.",
+          "This shared editing connection could not be read. Reopen the note to reconnect.",
         );
       }
     }
@@ -234,7 +234,7 @@ async function responseState(
     };
   }
   throw new WorkspaceError(
-    "The note or its permissions changed while synchronization completed. Retry in a moment.",
+    "The note or your access changed while syncing. Try again in a moment.",
     503,
   );
 }
@@ -246,7 +246,7 @@ export async function readNoteCollaboration(
   const noteId = identifier.safeParse(url.searchParams.get("note")),
     tab = identifier.safeParse(url.searchParams.get("tab"));
   if (!noteId.success || !tab.success)
-    throw new WorkspaceError("Choose a valid shared note and browser tab.");
+    throw new WorkspaceError("This shared editing connection is invalid. Reopen the note to reconnect.");
   return responseState(
     request,
     noteId.data,
@@ -285,7 +285,7 @@ export async function updateNoteCollaboration(
       return responseState(request, note.id, update.tabId);
     if (row.generation !== update.generation)
       throw new WorkspaceError(
-        "This note was replaced or restored after your editing session began. Your unfinished text is kept; review the latest version before starting a new session.",
+        "This note was replaced or restored while you were editing. Your unfinished text is kept. Review the saved version before starting a new session.",
         409,
       );
     const doc = restarting ? createTextDocument(note.content) : new Y.Doc();
@@ -360,7 +360,7 @@ export async function updateNoteCollaboration(
       return responseState(request, note.id, update.tabId);
   }
   throw new WorkspaceError(
-    "Other edits arrived while your note was saving. Your text is kept; retry synchronization.",
+    "The note changed while your text was saving. Your text is kept. Try syncing again.",
     503,
   );
 }

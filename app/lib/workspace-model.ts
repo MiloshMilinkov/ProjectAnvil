@@ -10,6 +10,7 @@ import {
 } from "./types";
 import { createSignatureReader, entityKey } from "./relationships";
 import { normalizeSourceExcerpt } from "./source-excerpts";
+import { fieldLabel } from "./collaboration-model";
 import { planningError } from "./planning-model";
 import {
   isCalendarDate,
@@ -673,7 +674,7 @@ export function validateWorkspace(value: unknown): Workspace {
     1_500_000
   ) {
     throw new WorkspaceError(
-      "This workspace has reached its 1.5 MB active text limit. Export a backup and move or remove unused records. Note history and media files are stored separately.",
+      "This workspace has reached its 1.5 MB text limit. Export a backup, then move unused items to Trash. Note history and uploaded files do not count toward this limit.",
     );
   }
   return workspace;
@@ -759,7 +760,7 @@ function assertMutationBase(current: Workspace, mutation: Mutation): void {
   }
   if (!existing)
     throw new WorkspaceError(
-      "This item was removed while you were editing. Your draft was not saved over the deletion.",
+      "This item was removed while you were editing. Your changes were not saved.",
       409,
     );
   const base = mutation.base;
@@ -786,7 +787,7 @@ function assertMutationBase(current: Workspace, mutation: Mutation): void {
         comparableField(entity, key, item[key]);
     if (!unchanged && !alreadyApplied)
       throw new WorkspaceError(
-        `This item’s ${key} changed in another tab. Review the latest version before saving your draft.`,
+        `This item’s ${fieldLabel(key, entity).toLowerCase()} changed since you opened it. Review the latest version before saving your draft.`,
         409,
       );
   }
@@ -953,7 +954,7 @@ export function applyMutation(
   if (mutation.action === "import") {
     if (mutation.workspace!.revision !== current.revision)
       throw new WorkspaceError(
-        "The workspace changed since this backup was opened. Refresh, export the current version, and retry the import with the latest revision.",
+        "The workspace changed while this backup was open. Refresh, export a fresh backup, then review the import again.",
         409,
       );
     const imported = validateWorkspace({
@@ -985,7 +986,7 @@ export function applyMutation(
   if (mutation.action === "vote-idea") {
     if (!actorId)
       throw new WorkspaceError(
-        "Voting requires a verified workspace identity.",
+        "Your voting identity could not be confirmed. Reopen this board and try again.",
         403,
       );
     const board = next.brainstorms.find((board) => board.id === mutation.id);
@@ -1022,7 +1023,7 @@ export function applyMutation(
         mutation.expectedToSignature !== toSignature)
     ) {
       throw new WorkspaceError(
-        "This relationship changed after you opened it. Refresh and review the latest content before acknowledging it.",
+        "The connected items changed since you opened this relationship. Review their latest content before marking it reviewed.",
         409,
       );
     }
@@ -1192,7 +1193,7 @@ export function applyMutation(
         )
       )
         throw new WorkspaceError(
-          "Archive a milestone instead of removing it so its plan remains recoverable.",
+          "Archive this milestone to keep its details and assigned tasks.",
         );
     }
     if (existing) values[values.indexOf(existing)] = parsed;

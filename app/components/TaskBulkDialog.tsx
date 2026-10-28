@@ -321,21 +321,19 @@ export default function TaskBulkDialog({
           </button>
         </header>
         <p className="muted" id={`${id}-description`}>
-          Select up to 100 tasks from the view you opened. Only fields you
-          choose will change. Each task saves independently; conflicts and
-          invalid changes stay visible for review.
+          Select up to 100 tasks from this view. Only selected fields change.
+          Tasks save individually; review any conflicts or failed changes below.
         </p>
         {recovered && (
           <p className="bulk-recovery" role="status">
-            Your previous selection and choices are recovered. Only tasks in
-            this view are included.
+            Your previous selection and changes have been restored for tasks in
+            this view.
           </p>
         )}
         {replacing && (
           <p className="bulk-recovery" role="status">
-            Apply changes will replace the remaining queued changes from this
-            batch with your new choices. The previous intent will stay in
-            recovery copies.
+            Apply changes replaces pending changes in this batch with your new
+            choices. The previous changes remain in recovery copies.
           </p>
         )}
         {(error || draftError) && (
@@ -409,7 +407,7 @@ export default function TaskBulkDialog({
             </div>
             {shown.length > 100 && (
               <p className="muted">
-                Search or use the task board filters to narrow the batch to 100
+              Search or use task filters to narrow the batch to 100
                 tasks.
               </p>
             )}

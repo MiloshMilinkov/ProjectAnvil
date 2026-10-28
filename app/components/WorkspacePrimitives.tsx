@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Users, Circle, CircleCheck, CircleDashed, Layers } from "lucide-react";
+import { Users, Circle, CircleCheck, CircleDashed } from "lucide-react";
 import { initials, type Person, type Status } from "../lib/types";
 export function Avatar({
   person,
@@ -22,7 +22,7 @@ export function Avatar({
       aria-label={person?.name || label || "Unassigned"}
       title={person?.name || label || "Unassigned"}
     >
-      {person ? initials(person.name) : <Users size={12} />}
+      {person ? initials(person.name) : <Users size={12} aria-hidden="true" />}
     </span>
   );
 }
@@ -48,7 +48,6 @@ export function Empty({
 }) {
   return (
     <div className="empty-state">
-      <Layers size={30} />
       <h3>{title}</h3>
       <p>{text}</p>
       {action}

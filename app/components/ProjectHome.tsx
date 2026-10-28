@@ -10,6 +10,7 @@ import {
 import {
   Archive,
   ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   BookOpen,
   CalendarDays,
@@ -350,7 +351,7 @@ export default function ProjectHome({
       </button>
       <header className="project-home-heading">
         <div>
-          <span className="eyebrow">PROJECT HOME · {project.key}</span>
+          <span className="eyebrow">{project.key}</span>
           <h1>{project.name}</h1>
           <p>
             {project.description ||
@@ -428,7 +429,7 @@ export default function ProjectHome({
               <Flag size={19} />
               Milestones
             </h2>
-            <p>Clear outcomes along the way, with progress from their tasks.</p>
+            <p>Track target dates and task progress for each milestone.</p>
           </div>
           <button
             className="btn btn-secondary"
@@ -447,7 +448,7 @@ export default function ProjectHome({
         <div
           className="project-milestone-tabs"
           role="group"
-          aria-label="Milestone collection"
+          aria-label="Milestone view"
         >
           <button
             ref={!archived ? collectionButton : undefined}
@@ -555,7 +556,7 @@ export default function ProjectHome({
               <CheckSquare size={19} />
               Project tasks <span>{tasks.length}</span>
             </h2>
-            <p>Open a task to plan its work, milestones, or child tasks.</p>
+            <p>Open a task to edit its details, milestone, or child tasks.</p>
           </div>
         </header>
         <div className="project-task-list">
@@ -611,10 +612,7 @@ export default function ProjectHome({
         {!tasks.length && (
           <div className="project-planning-empty">
             <CheckSquare size={24} />
-            <p>
-              Your project tasks will appear here. Start with one clear next
-              step.
-            </p>
+            <p>Tasks assigned to this project appear here.</p>
           </div>
         )}
         {tasks.length > taskLimit && (
@@ -647,7 +645,7 @@ export default function ProjectHome({
                   <strong>{note.title}</strong>
                   <small>{note.folder || "Notes"}</small>
                 </span>
-                <ArrowUpRight size={16} />
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
             ))}
           </div>
@@ -696,7 +694,7 @@ export default function ProjectHome({
                     connections
                   </small>
                 </span>
-                <ArrowUpRight size={16} />
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
             ))}
           </div>

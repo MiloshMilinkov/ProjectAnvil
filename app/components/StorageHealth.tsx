@@ -68,14 +68,11 @@ export default function StorageHealth() {
   return (
     <section className="panel settings-section" data-tour="storage-health">
       <h2>Storage & recovery</h2>
-      <p>
-        Check the active workspace allowance, archived history, and attachment
-        references. Complete backups preserve the database and files together.
-      </p>
+      <p>Check workspace data, saved note versions, and uploaded files.</p>
       {report && (
         <>
           <label className="storage-meter-label">
-            Active records: {size(report.activeBytes)} of{" "}
+            Workspace text: {size(report.activeBytes)} of{" "}
             {size(report.limitBytes)}
             <meter
               className="storage-meter"
@@ -88,29 +85,30 @@ export default function StorageHealth() {
             />
           </label>
           <p className="small-text muted">
-            {report.history.versions} archived note versions (
-            {size(report.history.bytes)}), stored outside the active allowance.{" "}
-            {report.media.active} active attachments; {report.media.retained}{" "}
-            retained files ({size(report.media.retainedBytes)}).
+            {report.history.versions} saved note versions (
+            {size(report.history.bytes)}), stored separately.{" "}
+            {report.media.active} attachments; {report.media.retained} files
+            kept for recovery ({size(report.media.retainedBytes)}).
           </p>
           {report.media.missing.length > 0 && (
             <div className="warning-box" role="alert">
               Missing attachment files:{" "}
               {report.media.missing.map((file) => file.name).join(", ")}.
-              Restore their files from a complete backup, or re-upload them.
+              Restore the missing files from a complete backup or upload them
+              again.
             </div>
           )}
           {(report.media.pending > 0 || report.media.untracked > 0) && (
             <p>
               {report.media.pending} incomplete uploads and{" "}
-              {report.media.untracked} untracked files found. Files are retained
-              for recovery.
+              {report.media.untracked} other stored files found. These files are
+              kept for recovery.
             </p>
           )}
           {report.media.partial && (
             <p>
-              The file scan reached its limit. The totals may exclude additional
-              retained files.
+              The scan reached its limit. Some files kept for recovery may not
+              be included in these totals.
             </p>
           )}
           <p className="small-text muted">{report.retention}</p>
@@ -122,7 +120,7 @@ export default function StorageHealth() {
         </p>
       )}
       <button className="btn" disabled={busy} onClick={() => void check()}>
-        <RefreshCw size={15} />
+        <RefreshCw size={15} aria-hidden="true" />
         {busy ? "Checking storage…" : "Check storage"}
       </button>
     </section>

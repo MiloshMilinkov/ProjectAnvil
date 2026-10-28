@@ -126,7 +126,7 @@ module.exports = async function checkConnectedThinking({
   invalid(
     "noteTypes",
     { id: "other-type", name: "reference", fields: [] },
-    /names must be unique/,
+    /name already exists/,
   );
   invalid(
     "noteTypes",
@@ -308,7 +308,7 @@ module.exports = async function checkConnectedThinking({
         },
         now,
       ),
-    /changed in another tab/,
+    /changed since you opened/,
   );
   invalid("brainstorms", { id: "ideas", groups: [] }, /group is missing/);
   invalid(

@@ -45,7 +45,7 @@ export async function hasReceipt(
 ): Promise<boolean> {
   if (!operationId) return false;
   if (!/^[a-zA-Z0-9_-]{1,120}$/.test(operationId))
-    throw new WorkspaceError("Choose a valid operation ID.");
+    throw new WorkspaceError("This change has an invalid save reference. Reopen the item and try again.");
   const row = await database()
     .prepare(
       "SELECT payload_hash FROM workspace_receipts WHERE workspace_id = ? AND actor_key = ? AND operation_id = ?",

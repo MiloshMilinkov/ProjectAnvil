@@ -104,13 +104,13 @@ export function unpackPortableZip(bytes: Uint8Array): PortableFile[] {
       break;
     }
   if (end < 0 || u16(end + 4) || u16(end + 6) || u16(end + 8) !== u16(end + 10))
-    throw new Error("Choose an ordinary, single-volume ZIP archive.");
+    throw new Error("Choose a standard ZIP file saved as a single archive.");
   const count = u16(end + 10),
     size = u32(end + 12),
     start = u32(end + 16);
   if (!count || count > portableLimits.files + 30 || start + size !== end)
     throw new Error(
-      "Use a ZIP with at most 400 files and ordinary ZIP headers.",
+      "Choose a standard ZIP archive with 1–400 files.",
     );
   const expected = new Map<string, { size: number; crc: number }>();
   const names = new Set<string>();
@@ -151,7 +151,7 @@ export function unpackPortableZip(bytes: Uint8Array): PortableFile[] {
     const path = portablePath(directory ? raw.slice(0, -1) : raw);
     const key = path.toLocaleLowerCase("en-US");
     if (names.has(key))
-      throw new Error("The ZIP contains duplicate or case-colliding paths.");
+      throw new Error("The ZIP contains duplicate file paths or paths that differ only by letter case.");
     names.add(key);
     if (
       local + 30 > start ||

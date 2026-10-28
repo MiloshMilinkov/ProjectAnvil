@@ -2,7 +2,7 @@
   "id": "/",
   "name": "ProjectAnvil",
   "short_name": "ProjectAnvil",
-  "description": "Your projects, tasks, notes, and plans. Connected.",
+  "description": "Project planning, tasks, notes, and visual workspaces.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

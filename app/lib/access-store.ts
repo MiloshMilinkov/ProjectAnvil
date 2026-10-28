@@ -354,7 +354,7 @@ export async function getAccountContext(
       .prepare("SELECT data FROM workspaces WHERE id = ?")
       .bind("main")
       .first<{ data: string }>();
-    let name = "Local guest workspace";
+    let name = createSeedWorkspace().name;
     if (row) {
       try {
         name = JSON.parse(row.data).name || name;

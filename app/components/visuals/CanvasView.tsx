@@ -494,12 +494,11 @@ export function CanvasView(props: CanvasViewProps) {
     <div className="visual-feature canvas-feature">
       <div className="visual-heading">
         <div>
-          <div className="visual-eyebrow">ROOM TO THINK</div>
           <h1>
             Canvas{" "}
             <span className="visual-count">{workspace.canvases.length}</span>
           </h1>
-          <p>Arrange your ideas. Connect the pieces. Plan your next step.</p>
+          <p>Arrange notes, tasks, and references on a canvas.</p>
         </div>
         <button
           className="btn btn-primary"
@@ -520,7 +519,7 @@ export function CanvasView(props: CanvasViewProps) {
             value={canvasId}
             onChange={(e) => switchCanvas(e.target.value)}
           >
-            {!canvasId && <option value="">Your first canvas</option>}
+            {!canvasId && <option value="">No canvas selected</option>}
             {canvasOptions.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.title}
@@ -633,11 +632,12 @@ export function CanvasView(props: CanvasViewProps) {
             >
               Unsaved · Save now
             </button>
-          ) : (
+          ) : canvasId ? (
             <>
-              <Check size={13} /> Saved
+              <Check size={13} aria-hidden="true" />
+              {props.saveTarget === "device" ? "On device" : "Saved"}
             </>
-          )}
+          ) : null}
         </div>
         <button
           className={`btn-icon ${showInspector ? "canvas-button-active" : ""}`}
@@ -964,7 +964,7 @@ export function CanvasView(props: CanvasViewProps) {
                           : card.type === "task"
                             ? task?.key || "Task"
                             : card.type === "text"
-                              ? "Thought"
+                              ? "Text"
                               : card.type === "url"
                                 ? "Reference"
                                 : "Attachment"}
@@ -1064,7 +1064,7 @@ export function CanvasView(props: CanvasViewProps) {
                                   loading="lazy"
                                 />
                                 <small>
-                                  Some websites require opening the reference
+                                  If the preview is unavailable, open the link
                                   above.
                                 </small>
                               </div>
@@ -1129,11 +1129,11 @@ export function CanvasView(props: CanvasViewProps) {
               <div className="canvas-empty-icon">
                 <Layers3 size={32} />
               </div>
-              <h3>Give your ideas some space.</h3>
+              <h3>This canvas is empty</h3>
               <p>
-                Bring notes, tasks, references, and loose thoughts together.
+                Add notes, tasks, text, files, or websites.
                 <br />
-                Connect them to see what comes next.
+                Drag cards to arrange them and add connections.
               </p>
               <button
                 className="btn btn-primary"
@@ -1169,7 +1169,7 @@ export function CanvasView(props: CanvasViewProps) {
             <button
               aria-label="Add text card"
               disabled={!writable}
-              title="Add a thought"
+              title="Add text card"
               onClick={() => {
                 setAddType("text");
                 setShowAdd(true);

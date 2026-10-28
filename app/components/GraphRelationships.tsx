@@ -167,7 +167,7 @@ export default function GraphRelationships({
       setComposing(false);
       onSelect(from);
       notify(
-        "Relationship saved. Future source changes can flag connected work for review.",
+        "Relationship saved",
       );
     } catch (error) {
       setError(
@@ -191,7 +191,7 @@ export default function GraphRelationships({
         expectedFromSignature: entitySignature(workspace, relationship.from),
         expectedToSignature: entitySignature(workspace, relationship.to),
       });
-      notify("Relationship reviewed for this workspace.");
+      notify("Relationship reviewed");
     } catch (error) {
       setError(
         error instanceof Error
@@ -270,11 +270,10 @@ export default function GraphRelationships({
         <div>
           <h2 id="relationship-heading">
             <Link2 size={19} />
-            Meaningful relationships
+            Relationships
           </h2>
           <p>
-            Explain what relies on an idea, supports a plan, or challenges a
-            decision.
+            Connect notes, tasks, and projects with a relationship and a reason.
           </p>
         </div>
         <button
@@ -291,7 +290,7 @@ export default function GraphRelationships({
         data-tour="relationship-presets"
       >
         <p className="muted">
-          Reuse the meaning and suggested explanation of a connection.
+          Use presets for relationships you add often.
         </p>
         <button
           className="btn"
@@ -317,17 +316,21 @@ export default function GraphRelationships({
         aria-label="Change impact"
       >
         <div className="relationship-impact-summary" role="status">
-          <TriangleAlert size={20} />
+          {impact.relationshipIds.size ? (
+            <TriangleAlert size={20} aria-hidden="true" />
+          ) : (
+            <Check size={20} aria-hidden="true" />
+          )}
           <div>
             <strong>
               {impact.relationshipIds.size
                 ? `${impact.affected.size} connected ${impact.affected.size === 1 ? "item needs" : "items need"} review`
-                : "Connected work is up to date"}
+                : "No changes to review"}
             </strong>
             <p>
               {impact.relationshipIds.size
                 ? "A source changed since its relationship was last reviewed. Check direct and downstream effects before marking it reviewed."
-                : "New relationships start from the current content. Relevant source changes will highlight affected work here and on the graph."}
+                : "Changes to linked items will appear here for review."}
             </p>
           </div>
         </div>
@@ -509,7 +512,7 @@ export default function GraphRelationships({
         <label className="relationship-search">
           <Search size={16} />
           <input
-            aria-label="Search meaningful relationships"
+            aria-label="Search relationships"
             placeholder="Find a relationship…"
             value={query}
             onChange={(event) => {

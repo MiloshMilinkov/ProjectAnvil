@@ -164,13 +164,13 @@ async function storageChecks() {
   );
   await assert.rejects(
     store.enable(scope, account, invalidSnapshot),
-    /could not be verified/,
+    /offline workspace copy is incomplete or damaged/,
     "Explicit opt-in still verifies every snapshot",
   );
   let copy = await store.enable(scope, account, workspace);
   await assert.rejects(
     store.update(scope, account, invalidSnapshot),
-    /could not be verified/,
+    /offline workspace copy is incomplete or damaged/,
     "An enabled copy never accepts invalid snapshot data",
   );
   assert.equal(copy.workspace.notes[0].content, "Original");
@@ -212,7 +212,7 @@ async function storageChecks() {
       new Blob(["ab"], { type: "text/plain" }),
       copy.token,
     ),
-    /verified/,
+    /attachment download does not match the saved file/,
   );
   await assert.rejects(
     store.cacheMedia(scope, "file-a", data, "stale-token"),

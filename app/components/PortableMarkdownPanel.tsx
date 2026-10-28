@@ -321,9 +321,8 @@ export default function PortableMarkdownPanel({
     >
       <h2>Markdown folders</h2>
       <p>
-        Take notes and attachments between ProjectAnvil and a folder of Markdown
-        files. Import creates new copies after review; existing work stays in
-        place.
+        Import or export notes as Markdown files with attachments. Review an
+        import before adding copies to this workspace.
       </p>
       <p className="small-text">
         Requires the local server. Up to 200 notes, 400 files, 24 MB of content,
@@ -483,10 +482,10 @@ export default function PortableMarkdownPanel({
             </p>
           )}
           <p className="small-text">
-            Folders and available links travel with the notes. Matching titles
-            get a new name. Imported history, memberships, permissions, task
-            assignments, and discussion authors are not restored. Use a complete
-            backup for those records.
+            Folders and available links are included. Duplicate titles get a new
+            name. Imported history, memberships, permissions, task assignments,
+            and discussion authors are not restored. Use a complete backup for
+            those records.
           </p>
           {selection.bundle.warnings.length > 0 && (
             <ul className="portable-warnings">
@@ -525,10 +524,7 @@ export default function PortableMarkdownPanel({
                 ))}
               </ul>
               {result.warnings.length > 30 && (
-                <p>
-                  {result.warnings.length - 30} more notes received
-                  collision-safe names.
-                </p>
+                <p>{result.warnings.length - 30} more notices.</p>
               )}
             </details>
           )}

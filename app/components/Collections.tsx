@@ -730,7 +730,7 @@ export default function Collections({
             <strong>{note.title || "Untitled note"}</strong>
             <span>
               {excerpt(note.content).slice(0, 140) ||
-                "An unwritten idea, ready to grow."}
+                "Empty note"}
             </span>
             <small>
               {note.folder || "Unfiled"} <i>·</i> {projectName(note.projectId)}
@@ -773,7 +773,7 @@ export default function Collections({
             </button>
             <p>
               {excerpt(note.content).slice(0, 130) ||
-                "A blank page with room for an idea."}
+                "Empty note"}
             </p>
             <div className="base-tags">
               {note.tags.slice(0, 3).map((tag) => (
@@ -799,7 +799,6 @@ export default function Collections({
     <div className="page bases-page">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">NOTES & PROPERTIES</div>
           <h1>Collections</h1>
           <p>
             Organize notes and their properties in tables, lists, galleries, or
@@ -867,7 +866,7 @@ export default function Collections({
             aria-label="Search collection"
             value={prefs.query}
             onChange={(event) => update({ query: event.target.value })}
-            placeholder="Search your collection…"
+            placeholder="Search notes…"
           />
           {prefs.query && (
             <button
@@ -1040,7 +1039,7 @@ export default function Collections({
           </div>
           <div className="base-options-body">
             <div>
-              <label className="base-options-caption">VISIBLE COLUMNS</label>
+              <label className="base-options-caption">Visible columns</label>
               <div className="base-column-checks">
                 {properties.map((key) => (
                   <label key={key}>
@@ -1097,7 +1096,7 @@ export default function Collections({
             </div>
             <div>
               <label className="base-options-caption">
-                CALCULATE A PROPERTY
+                Calculate a property
               </label>
               <div className="base-calculation-options">
                 <select

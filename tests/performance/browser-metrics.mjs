@@ -98,7 +98,7 @@ export async function measureBrowserProfile({
           page,
           () =>
             page
-              .getByRole("button", { name: "Task board", exact: true })
+              .getByRole("button", { name: "Tasks", exact: true })
               .click(),
           () =>
             page

@@ -406,7 +406,7 @@ export default function GuidedTour({
         <div className="tour-card-top">
           <span className="tour-label">
             <Compass size={14} />
-            {libraryOpen ? "PROJECTANVIL GUIDES" : activeGuide.title}
+            {libraryOpen ? "Guides" : activeGuide.title}
           </span>
           <button
             type="button"
@@ -424,15 +424,15 @@ export default function GuidedTour({
               Choose a guide
             </h2>
             <p id="tour-library-description">
-              Start with the essentials, then explore only what you need. Guides
-              explain existing tools without creating work.
+              Follow the Quick start or choose a topic. Guides don&apos;t change
+              your work.
             </p>
             <label className="tour-guide-search">
               <Search size={17} />
               <input
                 ref={guideSearch}
                 aria-label="Search guides"
-                placeholder="Find a topic or feature…"
+                placeholder="Search topics and features…"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />

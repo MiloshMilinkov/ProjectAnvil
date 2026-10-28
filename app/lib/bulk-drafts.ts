@@ -76,7 +76,7 @@ const schema = z
           new Set(values.map((value) => value.operationId)).size ===
             values.length &&
           new Set(values.map((value) => value.item.id)).size === values.length,
-        "Each pending task and receipt must be unique.",
+        "This batch contains duplicate tasks or pending saves. Review the selection before trying again.",
       )
       .optional(),
   })

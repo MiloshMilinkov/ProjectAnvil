@@ -162,7 +162,7 @@ export default function AccountShell() {
             setError(
               cause instanceof Error
                 ? cause.message
-                : "The account connection could not finish.",
+                : "Couldn't connect to your account. Try again.",
             );
           throw cause;
         }

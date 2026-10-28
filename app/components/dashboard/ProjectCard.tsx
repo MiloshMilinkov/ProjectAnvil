@@ -1,9 +1,9 @@
 "use client";
 import {
-  ArrowUpRight,
+  ArrowRight,
   CalendarDays,
   FolderKanban,
-  MoreHorizontal,
+  Pencil,
   Target,
 } from "lucide-react";
 import { projectProgress } from "../../lib/planning-progress";
@@ -48,20 +48,21 @@ export default function ProjectCard({
         <button
           className="btn-icon"
           title={"Edit " + project.name}
+          aria-label={"Edit " + project.name}
           onClick={onEdit}
           disabled={!permissions.canEditProject(project.id)}
         >
-          <MoreHorizontal size={18} />
+          <Pencil size={18} aria-hidden="true" />
         </button>
       </div>
       <button className="project-title" onClick={onOpen}>
         <h2>{project.name}</h2>
-        <ArrowUpRight size={18} />
+        <ArrowRight size={18} aria-hidden="true" />
       </button>
       <p>{project.description}</p>
       <div className="project-goal">
         <Target size={15} />
-        {project.goal || "Set your next milestone"}
+        {project.goal || "No goal set"}
       </div>
       <div className="progress-label">
         <span>

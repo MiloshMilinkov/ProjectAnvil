@@ -10,7 +10,7 @@ import {
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { ArrowUpRight, CheckSquare, LoaderCircle, X } from "lucide-react";
+import { ArrowRight, CheckSquare, LoaderCircle, X } from "lucide-react";
 import type { Mutate, Note, Priority, Task, Workspace } from "../lib/types";
 import { priorities, uid } from "../lib/types";
 import { normalizeSourceExcerpt } from "../lib/source-excerpts";
@@ -368,9 +368,9 @@ export default function NoteTaskComposer({
           </button>
         </header>
         <p id={descriptionId} className="linked-task-intro">
-          Keep the thinking in <strong>{note.title}</strong> connected to the
-          next action. The note stays unchanged. Later changes to the note can
-          flag this task for review. Closing keeps your draft in this browser.
+          Create a task linked to <strong>{note.title}</strong>. The note stays
+          unchanged; later edits can flag the task for review. Closing keeps
+          your draft in this browser.
         </p>
         {initial && initial.excerpt !== initialExcerpt && (
           <p className="linked-task-intro">
@@ -422,9 +422,8 @@ export default function NoteTaskComposer({
               rows={4}
             />
             <small>
-              Select another paragraph or checklist item here, or close this
-              form and select text in the note. Quotes keep up to 8,000
-              characters.
+              Choose a paragraph or checklist item, or select different text in
+              the note. Source quotes keep up to 8,000 characters.
             </small>
           </label>
 
@@ -501,7 +500,7 @@ export default function NoteTaskComposer({
                   onOpenTask(duplicate.id);
                 }}
               >
-                Open existing task <ArrowUpRight size={16} />
+                Open existing task <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
           )}

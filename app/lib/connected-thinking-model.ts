@@ -177,7 +177,7 @@ export function connectedThinkingError(workspace: Workspace): string {
   const names = new Set<string>();
   for (const type of types.values()) {
     const normalized = type.name.trim().toLocaleLowerCase();
-    if (names.has(normalized)) return "Custom note type names must be unique.";
+    if (names.has(normalized)) return "A custom note type with this name already exists.";
     names.add(normalized);
   }
   for (const note of workspace.notes) {

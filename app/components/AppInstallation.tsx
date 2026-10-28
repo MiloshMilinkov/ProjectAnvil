@@ -318,7 +318,7 @@ export function InstallAppPanel({
       setError(
         cause instanceof Error
           ? cause.message
-          : "This action could not finish. Retry while the local server is running.",
+          : "Couldn't complete this action. Keep the local server running and try again.",
       );
     } finally {
       setBusy("");
@@ -333,8 +333,8 @@ export function InstallAppPanel({
         <Smartphone size={20} /> Install ProjectAnvil
       </h2>
       <p>
-        Open ProjectAnvil in its own window from your desktop or home screen.
-        The local server handles accounts and synchronization.
+        Open ProjectAnvil from your desktop or home screen. Accounts and sync
+        still need a server connection.
       </p>
       <p className="app-installation-status" role="status">
         {installation.installed && (
@@ -347,7 +347,7 @@ export function InstallAppPanel({
           : installation.availability === "development"
             ? "Development mode. Use the normal ProjectAnvil launcher to prepare the installable app."
             : installation.preparing
-              ? "Preparing public application files for offline startup…"
+              ? "Preparing app files for offline startup…"
               : installation.ready
                 ? "Application files are ready for offline startup."
                 : "Offline startup has not been prepared in this browser."}
@@ -418,8 +418,8 @@ export function InstallAppPanel({
         </p>
       )}
       <p className="app-installation-help">
-        This saves public application files. Choose which private workspaces to
-        keep offline in the offline settings below.
+        This saves the app files. Save a workspace offline separately to keep
+        its notes, tasks, and attachments on this device.
       </p>
       {installation.updateAvailable && (
         <p className="app-installation-help">

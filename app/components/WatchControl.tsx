@@ -10,8 +10,8 @@ import "./team-collaboration.css";
 export function MentionHelp() {
   return (
     <p className="mention-help" data-tour="mentions">
-      <strong>@username</strong> mentions notify registered workspace members
-      who can open this item. Use their registered username.
+      Type <strong>@username</strong> to notify a teammate who can access this
+      item. Use their account username, not an assignment label.
     </p>
   );
 }
@@ -48,7 +48,7 @@ export default function WatchControl({
       const data = (await response.json()) as WatchState & { error?: string };
       if (!response.ok)
         throw new Error(
-          data.error || "The watch preference could not be loaded.",
+          data.error || "This item's notification setting could not be loaded.",
         );
       if (alive.current && token === generation.current) {
         setWatching(data.watching);
@@ -60,7 +60,7 @@ export default function WatchControl({
         setError(
           cause instanceof Error
             ? cause.message
-            : "The watch preference could not be loaded.",
+            : "This item's notification setting could not be loaded.",
         );
       }
     } finally {
@@ -100,14 +100,12 @@ export default function WatchControl({
       const data = (await response.json()) as WatchState & { error?: string };
       if (!response.ok)
         throw new Error(
-          data.error || "The watch preference could not be saved.",
+          data.error || "This item's notification setting could not be saved.",
         );
       if (alive.current && token === generation.current) {
         setWatching(data.watching);
         notify(
-          data.watching
-            ? "Watching updates to this item"
-            : "Stopped watching this item",
+          data.watching ? "Watching this item" : "Stopped watching this item",
         );
       }
     } catch (cause) {
@@ -115,7 +113,7 @@ export default function WatchControl({
         setError(
           cause instanceof Error
             ? cause.message
-            : "The watch preference could not be saved.",
+            : "This item's notification setting could not be saved.",
         );
     } finally {
       if (alive.current && token === generation.current) setBusy(false);
@@ -137,7 +135,11 @@ export default function WatchControl({
         }
         onClick={() => void change()}
       >
-        {watching ? <BellRing size={16} /> : <BellPlus size={16} />}
+        {watching ? (
+          <BellRing size={16} aria-hidden="true" />
+        ) : (
+          <BellPlus size={16} aria-hidden="true" />
+        )}
         <span>
           {busy
             ? "Saving…"

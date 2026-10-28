@@ -5,13 +5,16 @@ const labels: Record<string, string> = {
   title: "Title",
   name: "Name",
   content: "Text",
+  type: "Type",
   description: "Description",
   status: "Status",
   priority: "Priority",
   assigneeId: "Assignment",
+  assignee: "Assignment",
   startDate: "Planned start",
   dueDate: "Due date",
   projectId: "Project",
+  project: "Project",
   folder: "Folder",
   tags: "Tags",
   kind: "Type",
@@ -28,6 +31,7 @@ const labels: Record<string, string> = {
   milestones: "Milestones",
   recurrence: "Recurrence",
   reminder: "Reminder",
+  source: "Source note",
   cards: "Cards",
   edges: "Connections",
   groups: "Groups",
@@ -43,10 +47,46 @@ const labels: Record<string, string> = {
   goal: "Goal",
   targetDate: "Target date",
   color: "Color",
-  key: "Project key",
+  key: "Task prefix",
+  role: "Role",
+  inactive: "Inactive status",
+  query: "Search",
+  dateFilter: "Date filter",
+  sort: "Sort order",
+  layout: "Layout",
+  url: "File link",
+  size: "File size",
   fromType: "First item type",
   toType: "Second item type",
 };
+
+/** The same readable field names appear in activity, conflicts, and recovery. */
+export function fieldLabel(key: string, entity?: Entity): string {
+  if (key === "key" && entity === "tasks") return "Task ID";
+  if (key === "role" && entity === "people") return "Job title";
+  return Object.hasOwn(labels, key) ? labels[key] : "Details";
+}
+
+const entityLabels: Record<Entity, string> = {
+  tasks: "Task",
+  notes: "Note",
+  projects: "Project",
+  canvases: "Canvas",
+  media: "Attachment",
+  people: "Assignment label",
+  savedViews: "Saved view",
+  relationships: "Relationship",
+  noteTypes: "Note type",
+  relationshipPresets: "Relationship preset",
+  brainstorms: "Brainstorm board",
+};
+
+export function entityLabel(entity: string): string {
+  if (entity === "workspace") return "Workspace";
+  return Object.hasOwn(entityLabels, entity)
+    ? entityLabels[entity as Entity]
+    : "Item";
+}
 const ignored = new Set([
   "id",
   "createdAt",
@@ -71,8 +111,10 @@ const entities: Entity[] = [
   "brainstorms",
 ];
 type Item = Record<string, unknown> & { id: string };
-export interface PreparedActivity
-  extends Omit<ActivityEntry, "sequence" | "reference"> {
+export interface PreparedActivity extends Omit<
+  ActivityEntry,
+  "sequence" | "reference"
+> {
   actorId: string;
   mentions: string[];
 }
@@ -131,14 +173,14 @@ function mentionText(entity: Entity, item?: Item): string {
   if (entity !== "tasks") return "";
   return `${typeof item.description === "string" ? item.description : ""}\n${Array.isArray(item.comments) ? item.comments.map((comment) => (comment && typeof comment === "object" && typeof comment.body === "string" ? comment.body : "")).join("\n") : ""}`;
 }
-function changedFields(previous: Item, next: Item): string[] {
+function changedFields(previous: Item, next: Item, entity: Entity): string[] {
   return [...new Set([...Object.keys(previous), ...Object.keys(next)])]
     .filter(
       (key) =>
         !ignored.has(key) &&
         JSON.stringify(previous[key]) !== JSON.stringify(next[key]),
     )
-    .map((key) => labels[key] || "Details");
+    .map((key) => fieldLabel(key, entity));
 }
 
 /** Event text contains labels, not old/new content or discussion bodies. */
@@ -234,7 +276,7 @@ export function prepareActivity(
             : mutation?.action === "vote-idea"
               ? "voted"
               : "updated";
-      const fields = previous && next ? changedFields(previous, next) : [];
+      const fields = previous && next ? changedFields(previous, next, entity) : [];
       if (previous && next && !fields.length && action !== "reviewed") continue;
       const oldMentions = mentionedUsers(
         mentionText(entity, previous),
