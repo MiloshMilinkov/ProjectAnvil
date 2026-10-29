@@ -21,6 +21,13 @@ export default defineConfig({
   reporter: [
     ["list"],
     [
+      "json",
+      {
+        outputFile: `outputs/browser/${process.env.PROJECTANVIL_TEST_BROWSER || "all"}/summary.json`,
+      },
+    ],
+    ...(process.env.CI ? [["github"] as const] : []),
+    [
       "html",
       {
         outputFolder: `outputs/browser/${process.env.PROJECTANVIL_TEST_BROWSER || "all"}/report`,

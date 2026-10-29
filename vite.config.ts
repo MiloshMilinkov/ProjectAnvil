@@ -1,5 +1,5 @@
 import vinext from "vinext";
-import { defineConfig } from "vite";
+import { defineConfig, type ResolveModulePreloadDependenciesFn } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
@@ -55,6 +55,16 @@ export default defineConfig(async () => {
     environments: {
       client: {
         build: {
+          modulePreload: {
+            resolveDependencies: ((filename, dependencies, context) => {
+              // import() loads the entry itself. Preloading that same file can
+              // retain a failed resource in WebKit even after an explicit retry.
+              // Keep its dependencies parallel without poisoning entry recovery.
+              return context.hostType === "js"
+                ? dependencies.filter((dependency) => dependency !== filename)
+                : dependencies;
+            }) satisfies ResolveModulePreloadDependenciesFn,
+          },
           rolldownOptions: {
             output: {
               codeSplitting: {

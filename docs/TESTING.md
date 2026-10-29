@@ -15,6 +15,16 @@ node node_modules/@playwright/test/cli.js install chromium firefox webkit
 
 The browser suite uses [Playwright's isolated browser contexts](https://playwright.dev/docs/browser-contexts) for separate sign-ins. These are disposable test sessions, independent of your everyday browser profile.
 
+If an existing browser cache cannot launch, choose a fresh project-local cache using Playwright's supported `PLAYWRIGHT_BROWSERS_PATH` setting. Keep the same setting for installation and testing; `work/` is excluded from Git. For example, in PowerShell:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD 'work/browser-runtimes'
+node node_modules/@playwright/test/cli.js install chromium firefox webkit
+npm run test:browser
+```
+
+A browser launch failure is a setup failure, not a passing application test. The original Windows Firefox cache produced a `mozglue` assembly-activation error; an unmodified copy in the project's test directory launched successfully without installing system software. This does not establish a missing Microsoft runtime as the cause.
+
 ## Run the checks
 
 ```sh
@@ -33,7 +43,9 @@ Controllable network-race fixtures temporarily suspend service-worker registrati
 
 WebKit's deliberate unregister/reinstall fixtures also clear only `projectanvil-shell-v1-*` public caches in their isolated test profile. A minimal local worker reproduced lost cache writes after unregistering; resetting that public cache passed five consecutive reinstalls. Private IndexedDB, cookies, and workspace copies remain intact. Ordinary offline and update workflows keep their worker and caches.
 
-Deferred-screen recovery uses a temporary JavaScript 503 response with `Cache-Control: no-store`. Native protocol cancellation left this Windows WebKit runtime reporting an internal resource error even after reload; actual offline and interrupted-transfer workflows still exercise transport failures. Recovery checks keep queued edits safe, verify the saved server content, and exercise the explicit reload choice when in-place retry cannot recover.
+Firefox's test request routing interferes with native offline worker navigation. A minimal worker returning constant HTML reproduces `NS_ERROR_OFFLINE` with the interceptor installed and succeeds without it, with no server requests; page-level interception can also remain active after removing its rule. The session-rotation race therefore uses origin-scoped context rules that match the intended page. `setActorOffline` enables real offline mode before suspending only the fixture's own external-request guard, then restores that guard before reconnecting. It verifies both `navigator.onLine === false` and failure of an uncached API request. Real service workers, cached startup, account copies, queued changes, and synchronization assertions remain unchanged.
+
+Deferred-screen recovery uses a temporary JavaScript 503 response with `Cache-Control: no-store`. WebKit retained the failed entry preload even after a document reload; the production build now excludes only the imported entry from its own preload list, preserving its dependency preloads. Recovery checks keep queued edits safe, block an unsafe reload, synchronize the actual note, and retry the screen without discarding work. Actual offline and interrupted-transfer workflows still exercise transport failures.
 
 Shared-edit cleanup uses the ordinary workspace switcher, avoiding an unnecessary page reload. A separate minimal local reproduction showed that WebKit can report properly caught requests started during page exit as access-control errors. Required reloads and closes mark only their explicit document-exit interval: an exact native error name/stack for this disposable origin's API is recorded as a separate browser diagnostic during that interval. All other page errors remain fatal, and every saved-content, access, queue, and offline-recovery assertion remains enforced.
 
@@ -51,9 +63,13 @@ npm run test:browser -- --headed
 
 Tests create only two accounts per run to stay within the application's normal registration limits. They do not weaken authentication, permission checks, or rate limits.
 
-### Outstanding local verification
+### Browser verification
 
-Chromium checks pass. WebKit's account, permission, offline, formatting, cleanup, paging, and update checks pass across focused runs, but one simulated deferred-screen recovery case remains unresolved: queued-work protection and synchronization pass, while Collections still cannot load after retry and an explicit reload. The runtime reports an internal module-resource error. Keep this failing assertion visible and investigate it before claiming complete cross-browser readiness. Firefox cannot launch on this Windows installation because a native runtime prerequisite is missing; its Linux CI job is configured but has not been run here.
+On **2026-10-30**, build **`966b9e2d414ef093eef8`** passed complete **23-workflow runs in Chromium, Firefox, and WebKit: 69 passed, zero failed, skipped, or retried**. After the final session-fixture adjustment, the affected account-security/offline sequence was also repeated successfully in Chromium and WebKit. Code verification passed strict types, zero-warning lint, backend/model checks, 38 native Node tests, and the production build; the final browser-only fixture change passed types and scoped lint again.
+
+Both reported failures were reproduced and fixed without reducing assertions. The screen test now requires in-place retry without reloading, while Firefox retains the complete account-security sequence before real offline reopening. The full Windows WebKit run took about 25 minutes; allow extra time locally or use the supported focused selectors during development. This is test-suite duration, not a measurement of ordinary app response time.
+
+Local engine checks do not establish physical-device Safari behavior, hosted HTTPS/email delivery, or online service capacity. The changed workflow must run again on GitHub after the fixes are pushed; a previous failed run does not change retroactively.
 
 ## Performance profiles
 
@@ -89,6 +105,7 @@ Record concrete friction: the action, what you expected, what happened, and whet
 ## Reports and privacy
 
 - `outputs/browser/`: HTML report, failure screenshots/traces, and synthetic proof screenshots.
+- Each engine's `summary.json` contains structured workflow results. Failed runs also retain a bounded, sanitized server-log tail; database files, private settings, and the account-email outbox are excluded.
 - `outputs/performance/baseline.json` and `optimized.json`: measurements and data-safety assertions.
 - `outputs/performance/note-edit-baseline.json` and `note-edit-optimized.json`: typing and save-feedback measurements.
 - `work/qa/`: disposable server configurations, logs, and local test data from each run.

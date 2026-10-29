@@ -29,7 +29,7 @@ export const tourSteps: TourStep[] = [
     page: "overview",
     title: "Overview",
     body: "Overview shows project progress, upcoming tasks, and recent notes. Create a task, open a project, or resume a work room.",
-    tip: "More tools contains work rooms, collections, and activity. If a screen fails to load, reconnect and choose Retry opening. If it still cannot open, Reload app checks for unfinished work before restarting.",
+    tip: "More tools contains work rooms, collections, and activity. If a screen cannot open, reconnect and choose Retry opening; your workspace stays open. Reload app checks unfinished work before restarting.",
     anchors: [
       '[data-tour="overview"]',
       ".view-overview .page-heading",

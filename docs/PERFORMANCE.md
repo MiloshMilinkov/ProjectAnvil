@@ -127,7 +127,15 @@ Cleanup focus now follows the committed review panel and re-enabled controls, av
 
 No dependencies were added. The final size check reports **336 maintained source files**, **1,118,091 startup JavaScript bytes**, **7,504,434 offline bytes**, and the same **20 WOFF2 math fonts**. The eight additional files contain cohesive cleanup/release code, its additive migration, and regression coverage; the existing size budgets remain unchanged.
 
-Final code verification passed strict types, zero-warning lint, backend/model/recovery checks, 34 native Node tests, and the production build. Chromium browser checks passed across complete and focused runs. WebKit's account, access, offline, cleanup, paging, and update checks passed, but its simulated deferred-screen recovery case remains unresolved; Firefox could not launch with this Windows installation's missing native prerequisite. These are [outstanding verification limits](TESTING.md#outstanding-local-verification), not complete cross-browser certification.
+At the end of that batch, strict types, zero-warning lint, backend/model/recovery checks, 34 native Node tests, and the production build passed. Browser verification still had a WebKit recovery failure and a Firefox launch failure; the follow-up below supersedes those temporary gaps.
+
+## Browser-readiness follow-up
+
+Build **`966b9e2d414ef093eef8`** excludes a dynamic entry from its own redundant preload while retaining transitive JavaScript and stylesheet preloads. This restores interrupted-screen retry in WebKit without adding runtime recovery code, dependencies, or cache-busting URLs. Collections retains 14 JavaScript and two stylesheet dependency preloads. The screen recovery regression now requires retry in the same document while preserving and synchronizing a real queued note edit.
+
+Firefox's failure was reproduced in a minimal service-worker fixture: request interception prevented native offline navigation. Context-scoped session-race fixtures and a narrowly suspended test allowlist preserve genuine offline networking without weakening cache, account, Undo, or synchronization assertions. An unmodified Firefox runtime copy also resolved the local launch issue without an operating-system installation; the earlier missing-runtime diagnosis was not established.
+
+The app remains at **336 maintained files**, **210 offline files**, and **20 WOFF2 math fonts**. Startup JavaScript is **1,117,739 bytes** (**337,187 gzip**); the complete offline package is **7,501,576 bytes**. Both existing size budgets pass. Full Chromium, Firefox, and WebKit runs pass **23 workflows each**, with no failures or skips; affected account/offline follow-ups also pass after the final fixture adjustment. Performance workloads were not rerun for this browser fix, so the preceding timings remain measurements of their stated build. See [browser verification](TESTING.md#browser-verification) for current coverage and remaining deployment checks.
 
 ## Remaining capacity work
 

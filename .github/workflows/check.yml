@@ -51,5 +51,5 @@ jobs:
         if: failure()
         with:
           name: browser-test-failures-${{ matrix.engine }}
-          path: outputs/browser/
+          path: outputs/browser/${{ matrix.engine }}/
           retention-days: 7

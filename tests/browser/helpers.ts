@@ -4,6 +4,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type Route,
 } from "@playwright/test";
 import type {
   AccountContext,
@@ -24,6 +25,47 @@ export interface BrowserAccount {
 
 export const fixtureId = () => randomUUID().replaceAll("-", "");
 const exitingDocuments = new WeakSet<Page>();
+const networkPolicies = new WeakMap<
+  BrowserContext,
+  { handler: (route: Route) => Promise<void>; suspended: boolean }
+>();
+
+/** Keep native offline networking without Firefox's interception/navigation race. */
+export async function setActorOffline(actor: BrowserAccount, offline: boolean) {
+  const { context } = actor;
+  const policy = networkPolicies.get(context);
+  if (!offline && policy?.suspended) {
+    await context.route("**/*", policy.handler);
+    policy.suspended = false;
+  }
+  await context.setOffline(offline);
+  if (
+    offline &&
+    context.browser()?.browserType().name() === "firefox" &&
+    policy &&
+    !policy.suspended
+  ) {
+    // Firefox rejects even worker-generated offline navigations while a route
+    // interceptor is installed. Native offline mode already blocks all network
+    // traffic, so suspend only our external-request guard until reconnection.
+    await context.unroute("**/*", policy.handler);
+    policy.suspended = true;
+  }
+  if (offline)
+    expect(
+      await actor.page.evaluate(async () => ({
+        online: navigator.onLine,
+        reachedNetwork: await fetch(
+          `/api/__projectanvil_offline_probe?check=${crypto.randomUUID()}`,
+          { cache: "no-store" },
+        ).then(
+          () => true,
+          () => false,
+        ),
+      })),
+      "Native offline mode must block an uncached API request.",
+    ).toEqual({ online: false, reachedNetwork: false });
+}
 
 export function isNativeDocumentExitError(
   page: Page,
@@ -84,12 +126,14 @@ export async function registerThroughUi(
       else pageErrors.push(error.message);
     }),
   );
-  await context.route("**/*", (route) => {
+  const guard = (route: Route) => {
     const url = new URL(route.request().url());
     return url.origin === origin || ["blob:", "data:"].includes(url.protocol)
       ? route.continue()
       : route.abort("blockedbyclient");
-  });
+  };
+  networkPolicies.set(context, { handler: guard, suspended: false });
+  await context.route("**/*", guard);
   const page = await context.newPage();
   const username = `browser_${label}_${fixtureId().slice(0, 10)}`;
   const password = `Fixture-${randomBytes(18).toString("base64url")}!`;

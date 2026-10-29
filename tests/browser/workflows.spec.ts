@@ -24,6 +24,7 @@ import {
   openNote,
   registerThroughUi,
   selectWorkspace,
+  setActorOffline,
   upsert,
   withDocumentExit,
   workspace,
@@ -334,6 +335,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
 
       expect((await signInExtra()).ok()).toBeTruthy();
       async function holdLive(page: Page, open: () => Promise<unknown>) {
+        const livePattern = `${base}/api/live?*`;
         let heldRequest: BrowserRequest | undefined;
         let finishedLive = () => {};
         let release = () => {};
@@ -345,6 +347,11 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         });
         releaseHeldRequests.push(release);
         const handler = async (route: Route) => {
+          if (
+            route.request().serviceWorker() ||
+            route.request().frame().page() !== page
+          )
+            return route.fallback();
           // Let the initial cursor establish access before holding a stable
           // subscription; account startup can legitimately replace that read.
           if (
@@ -368,7 +375,10 @@ test.describe("Separate accounts and recoverable everyday work", () => {
             finishedLive();
           }
         };
-        await page.route("**/api/live?*", handler);
+        // Firefox retains page-level interception after page.unroute, which
+        // prevents later native offline navigation. Keep this race fixture at
+        // context level and match its actual page before holding the request.
+        await page.context().route(livePattern, handler);
         await open();
         await appReady(page);
         // The race represents two visible app windows. WebKit backgrounds a
@@ -399,7 +409,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
           release,
           finish: async () => {
             await finished;
-            await page.unroute("**/api/live?*", handler);
+            await page.context().unroute(livePattern, handler);
             await page.evaluate(() => {
               Reflect.deleteProperty(document, "hidden");
               document.dispatchEvent(new Event("visibilitychange"));
@@ -1145,7 +1155,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     ).toBeVisible();
     await expect(ownerText).toBeEditable();
     await expect(colleagueText).toBeEditable();
-    await colleague.context.setOffline(true);
+    await setActorOffline(colleague, true);
     try {
       await colleagueText.press("Control+End");
       await colleagueText.pressSequentially(" Colleague offline addition.");
@@ -1166,7 +1176,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         )?.content,
       ).not.toContain("Colleague offline addition.");
     } finally {
-      await colleague.context.setOffline(false);
+      await setActorOffline(colleague, false);
     }
     await expect
       .poll(
@@ -1231,7 +1241,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       owner.page.getByText("Offline workspace copy saved", { exact: true }),
     ).toBeVisible();
     await openNote(owner, note.id);
-    await owner.context.setOffline(true);
+    await setActorOffline(owner, true);
     // Reload through the cached public shell also proves the account snapshot is usable.
     await withDocumentExit(owner.page, () => owner.page.reload());
     await expect(
@@ -1285,7 +1295,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await expect(owner.page.locator(".offline-banner")).toContainText(
       "3 changes kept on this device",
     );
-    await owner.context.setOffline(false);
+    await setActorOffline(owner, false);
     await navigate(owner.page, "Workspace settings");
     // Reconnection synchronizes automatically; its queue can drain between an
     // enabled check and a click. Assert the saved outcome directly below.
@@ -1511,7 +1521,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       owner.page.getByText("Offline workspace copy saved", { exact: true }),
     ).toBeVisible();
     await openNote(owner, note.id);
-    await owner.context.setOffline(true);
+    await setActorOffline(owner, true);
     try {
       await owner.page.clock.install();
       await owner.page
@@ -1537,7 +1547,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         "1 change kept on this device",
       );
     } finally {
-      await owner.context.setOffline(false);
+      await setActorOffline(owner, false);
     }
     await expect
       .poll(
@@ -3060,10 +3070,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         name: "Collections",
         exact: true,
       });
-      const recovery = await Promise.any([
-        heading.waitFor({ state: "visible" }).then(() => "opened"),
-        failure.waitFor({ state: "visible" }).then(() => "failed"),
-      ]);
+      await expect(heading).toBeVisible();
       expect(
         await page.evaluate(
           () =>
@@ -3071,24 +3078,6 @@ test.describe("Separate accounts and recoverable everyday work", () => {
               .__deferredPageIdentity,
         ),
       ).toBe("same-page");
-      if (recovery === "failed") {
-        expect(browserName).toBe("webkit");
-        await withDocumentExit(page, async () => {
-          await Promise.all([
-            page.waitForEvent("domcontentloaded"),
-            reloadApp.click(),
-          ]);
-          await appReady(page);
-        });
-        await expect(
-          page.getByRole("button", {
-            name: `Account: ${owner.username}`,
-            exact: true,
-          }),
-        ).toBeVisible();
-        await navigate(page, "Collections");
-      }
-      await expect(heading).toBeVisible();
       await expect(failure).toBeHidden();
       const restored = (await workspace(owner)).notes.filter(
         (note) => note.id === recoveryNote.id,
@@ -3333,7 +3322,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       ).toBeVisible();
       await openNote(owner, technicalId);
       await assertFormatting();
-      await owner.context.setOffline(true);
+      await setActorOffline(owner, true);
       await withDocumentExit(owner.page, () => owner.page.close());
       owner.page = await owner.context.newPage();
       await withDocumentExit(owner.page, async () =>
@@ -3348,7 +3337,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       );
     } finally {
       trackedPage.off("response", inspectScript);
-      await owner.context.setOffline(false);
+      await setActorOffline(owner, false);
       await owner.page.setViewportSize({ width: 1365, height: 900 });
     }
     expect(

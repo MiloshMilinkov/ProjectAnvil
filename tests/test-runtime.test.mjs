@@ -6,6 +6,10 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import ts from "typescript";
 import {
+  captureBrowserFailureLog,
+  sanitizeBrowserServerLog,
+} from "../scripts/run-browser-tests.mjs";
+import {
   projectRoot,
   validateDisposableTarget,
   assertLocalTestBindings,
@@ -275,3 +279,129 @@ test(
     }
   },
 );
+
+test("browser log excerpts omit credentials, account links, and URL queries", () => {
+  const secret = "fixture-private-value";
+  const input = [
+    "[wrangler:info] GET /api/state 200 OK (12ms)",
+    `Configuration value: ${secret}`,
+    "Authorization: Bearer private-value",
+    "Set-Cookie: session=private-value",
+    "Password: Fixture-private-password",
+    "Open http://127.0.0.1:5555/api/auth/verify-email?token=private-link",
+    "Reset password link: http://127.0.0.1:5555/api/auth/reset-password/private-link",
+    "Request http://127.0.0.1:5555/api/state?private=value#fragment",
+    "GET /api/state?private=value 503 Unavailable",
+    "Identifier: abcdefghijklmnopqrstuvwxyz123456",
+    "TypeError: failed to load application module",
+  ].join("\n");
+  const result = sanitizeBrowserServerLog(input, [secret]);
+  for (const privateValue of [
+    secret,
+    "private-value",
+    "private-password",
+    "private-link",
+    "private=value",
+    "fragment",
+    "abcdefghijklmnopqrstuvwxyz123456",
+  ])
+    assert.equal(result.includes(privateValue), false, privateValue);
+  assert.match(result, /GET \/api\/state 200 OK/);
+  assert.match(result, /TypeError: failed to load application module/);
+  assert.match(result, /Sensitive log line omitted/);
+});
+
+test("browser log excerpts bound line count and UTF-8 bytes", () => {
+  const input = Array.from(
+    { length: 900 },
+    (_, index) => `${index}: ${"界".repeat(100)}`,
+  ).join("\n");
+  const result = sanitizeBrowserServerLog(input);
+  assert.ok(Buffer.byteLength(result) <= 64 * 1024);
+  assert.ok(result.split("\n").length <= 500);
+  assert.match(result, /899:/);
+  assert.doesNotMatch(result, /^0:/m);
+});
+
+async function fixture(t) {
+  const parent = path.join(projectRoot, "work", "qa");
+  const reportParent = path.join(projectRoot, "outputs", "browser");
+  await fs.mkdir(parent, { recursive: true });
+  await fs.mkdir(reportParent, { recursive: true });
+  const directory = await fs.mkdtemp(path.join(parent, "browser-diagnostic-"));
+  const reportDirectory = await fs.mkdtemp(
+    path.join(reportParent, "diagnostic-test-"),
+  );
+  t.after(async () => {
+    // Delete only the exact disposable children created above.
+    assert.equal(path.dirname(directory), parent);
+    assert.equal(path.dirname(reportDirectory), reportParent);
+    await fs.rm(directory, { recursive: true, force: true });
+    await fs.rm(reportDirectory, { recursive: true, force: true });
+  });
+  const baseURL = "http://127.0.0.1:5555";
+  const marker = {
+    format: 1,
+    kind: "disposable-local-test",
+    runId: randomUUID(),
+    baseURL,
+    stateDirectory: path.join(directory, "state"),
+  };
+  await fs.writeFile(
+    path.join(directory, ".projectanvil-test-run.json"),
+    JSON.stringify(marker),
+  );
+  await fs.writeFile(
+    path.join(directory, ".dev.vars"),
+    `BETTER_AUTH_SECRET=private-fixture-key\nBETTER_AUTH_URL=${baseURL}\n`,
+  );
+  return { server: { directory, baseURL }, reportDirectory, marker };
+}
+
+test("failed browser capture reads only the bounded owned log tail", async (t) => {
+  const { server, reportDirectory, marker } = await fixture(t);
+  await fs.writeFile(
+    path.join(server.directory, "server.log"),
+    "old startup output\n".repeat(20_000) +
+      `Configuration private-fixture-key ${marker.runId}\n` +
+      "TypeError: failed to load application module\n",
+  );
+  await captureBrowserFailureLog(server, "firefox", { reportDirectory });
+  const output = await fs.readFile(
+    path.join(reportDirectory, "server.log"),
+    "utf8",
+  );
+  assert.ok(Buffer.byteLength(output) <= 64 * 1024);
+  assert.match(output, /TypeError: failed to load application module/);
+  assert.equal(output.includes("private-fixture-key"), false);
+  assert.equal(output.includes(marker.runId), false);
+});
+
+test("browser capture rejects unrelated targets and invalid run markers", async (t) => {
+  const { server, reportDirectory, marker } = await fixture(t);
+  await fs.writeFile(path.join(server.directory, "server.log"), "safe log");
+  await assert.rejects(
+    captureBrowserFailureLog({ ...server, directory: projectRoot }, "firefox", {
+      reportDirectory,
+    }),
+    /owned disposable/,
+  );
+  await assert.rejects(
+    captureBrowserFailureLog(server, "unknown", { reportDirectory }),
+    /Unknown browser/,
+  );
+  await assert.rejects(
+    captureBrowserFailureLog(server, "firefox", {
+      reportDirectory: projectRoot,
+    }),
+    /inside outputs/,
+  );
+  await fs.writeFile(
+    path.join(server.directory, ".projectanvil-test-run.json"),
+    JSON.stringify({ ...marker, kind: "ordinary-local-app" }),
+  );
+  await assert.rejects(
+    captureBrowserFailureLog(server, "firefox", { reportDirectory }),
+    /marker does not match/,
+  );
+});
