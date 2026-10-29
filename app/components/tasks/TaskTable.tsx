@@ -1,6 +1,6 @@
 "use client";
 import { Link2 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   statuses,
   type FeatureProps,
@@ -26,6 +26,12 @@ export default function TaskTable({
   referenceDate: string;
 }) {
   const permissions = useWorkspacePermissions(workspace);
+  const pageSize = 50;
+  const [page, setPage] = useState(0);
+  const lastPage = Math.max(0, Math.ceil(tasks.length / pageSize) - 1);
+  const currentPage = Math.min(page, lastPage);
+  if (page !== currentPage) setPage(currentPage);
+  const start = currentPage * pageSize;
   const peopleById = useMemo(
     () => new Map(workspace.people.map((person) => [person.id, person])),
     [workspace.people],
@@ -35,79 +41,105 @@ export default function TaskTable({
     [workspace.tasks],
   );
   return (
-    <div className="table-scroll">
-      <table className="task-table">
-        <thead>
-          <tr>
-            <th className="task-name-cell">Task</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>Assignee</th>
-            <th>Schedule</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map((task) => (
-            <tr key={task.id}>
-              <td>
-                <button
-                  className="task-title-button"
-                  onClick={() => openTask(task.id)}
-                >
-                  <StatusIcon status={task.status} />
-                  <span className="task-key">{task.key}</span>
-                  <strong>{task.title}</strong>
-                  {task.blockedBy.some(
-                    (id) => statusesByTask.get(id) !== "done",
-                  ) && (
-                    <span title="Blocked by a dependency">
-                      <Link2 size={13} />
-                    </span>
-                  )}
-                </button>
-              </td>
-              <td data-label="Status">
-                <select
-                  className={"status-select status-" + task.status}
-                  aria-label={"Status for " + task.key}
-                  value={task.status}
-                  disabled={!permissions.canEditProject(task.projectId)}
-                  onChange={(e) =>
-                    mutate({
-                      action: "upsert",
-                      entity: "tasks",
-                      item: { id: task.id, status: e.target.value },
-                    }).catch(() => {})
-                  }
-                >
-                  {statuses.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td data-label="Priority">
-                <span className="priority-inline">
-                  <PriorityMark value={task.priority} />
-                  <span>{task.priority}</span>
-                </span>
-              </td>
-              <td data-label="Assignee">
-                <span className="assignee-inline">
-                  <Avatar person={peopleById.get(task.assigneeId)} small />
-                  <span>
-                    {peopleById.get(task.assigneeId)?.name || "Unassigned"}
-                  </span>
-                </span>
-              </td>
-              <td data-label="Schedule">
-                <TaskDates task={task} referenceDate={referenceDate} />
-              </td>
+    <>
+      {tasks.length > pageSize && (
+        <nav className="task-pagination" aria-label="Task list pages">
+          <span role="status">
+            {start + 1}–{Math.min(start + pageSize, tasks.length)} of{" "}
+            {tasks.length} tasks
+          </span>
+          <div className="button-row">
+            <button
+              className="btn"
+              disabled={currentPage === 0}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Previous
+            </button>
+            <button
+              className="btn"
+              disabled={currentPage === lastPage}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </nav>
+      )}
+      <div className="table-scroll">
+        <table className="task-table">
+          <thead>
+            <tr>
+              <th className="task-name-cell">Task</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Assignee</th>
+              <th>Schedule</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {tasks.slice(start, start + pageSize).map((task) => (
+              <tr key={task.id}>
+                <td>
+                  <button
+                    className="task-title-button"
+                    onClick={() => openTask(task.id)}
+                  >
+                    <StatusIcon status={task.status} />
+                    <span className="task-key">{task.key}</span>
+                    <strong>{task.title}</strong>
+                    {task.blockedBy.some(
+                      (id) => statusesByTask.get(id) !== "done",
+                    ) && (
+                      <span title="Blocked by a dependency">
+                        <Link2 size={13} />
+                      </span>
+                    )}
+                  </button>
+                </td>
+                <td data-label="Status">
+                  <select
+                    className={"status-select status-" + task.status}
+                    aria-label={"Status for " + task.key}
+                    value={task.status}
+                    disabled={!permissions.canEditProject(task.projectId)}
+                    onChange={(e) =>
+                      mutate({
+                        action: "upsert",
+                        entity: "tasks",
+                        item: { id: task.id, status: e.target.value },
+                      }).catch(() => {})
+                    }
+                  >
+                    {statuses.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td data-label="Priority">
+                  <span className="priority-inline">
+                    <PriorityMark value={task.priority} />
+                    <span>{task.priority}</span>
+                  </span>
+                </td>
+                <td data-label="Assignee">
+                  <span className="assignee-inline">
+                    <Avatar person={peopleById.get(task.assigneeId)} small />
+                    <span>
+                      {peopleById.get(task.assigneeId)?.name || "Unassigned"}
+                    </span>
+                  </span>
+                </td>
+                <td data-label="Schedule">
+                  <TaskDates task={task} referenceDate={referenceDate} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

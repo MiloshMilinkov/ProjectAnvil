@@ -287,10 +287,20 @@ export async function resolveWorkspaceForUser(
   user: AccountUser,
   workspaceId: string,
 ): Promise<ResolvedWorkspace> {
+  return resolveUserWorkspace(user, workspaceId, true);
+}
+
+async function resolveUserWorkspace(
+  user: AccountUser,
+  workspaceId: string,
+  includeProjectPermissions: boolean,
+): Promise<ResolvedWorkspace> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const row = await accessForUser(user, workspaceId);
     const permissions =
-      row.kind === "team" ? await projectPermissions(workspaceId) : [];
+      row.kind === "team" && includeProjectPermissions
+        ? await projectPermissions(workspaceId)
+        : [];
     const latest = await accessForUser(user, workspaceId);
     if (
       row.security_revision === latest.security_revision &&
@@ -315,6 +325,22 @@ export async function resolveWorkspaceForUser(
 export async function resolveWorkspace(
   request: Request,
 ): Promise<ResolvedWorkspace> {
+  return resolveWorkspaceAccess(request, true);
+}
+
+/** Only marker fields escape this path; it cannot authorize record access. */
+export async function resolveWorkspaceMarker(request: Request) {
+  const { id, kind, role, securityRevision } = await resolveWorkspaceAccess(
+    request,
+    false,
+  );
+  return { id, kind, role, securityRevision };
+}
+
+async function resolveWorkspaceAccess(
+  request: Request,
+  includeProjectPermissions: boolean,
+): Promise<ResolvedWorkspace> {
   const user = await sessionUser(request);
   const selected =
     request.headers.get("x-workspace-id") ||
@@ -338,8 +364,8 @@ export async function resolveWorkspace(
       permissions: [],
     };
   }
-  const personal = await ensurePersonalWorkspace(user);
-  return resolveWorkspaceForUser(user, selected || personal);
+  const workspaceId = selected || (await ensurePersonalWorkspace(user));
+  return resolveUserWorkspace(user, workspaceId, includeProjectPermissions);
 }
 export async function getAccountContext(
   request: Request,

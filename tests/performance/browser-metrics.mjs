@@ -97,18 +97,34 @@ export async function measureBrowserProfile({
         const taskOpenMs = await timed(
           page,
           () =>
-            page
-              .getByRole("button", { name: "Tasks", exact: true })
-              .click(),
+            page.getByRole("button", { name: "Tasks", exact: true }).click(),
           () =>
             page
               .getByRole("textbox", { name: "Filter tasks", exact: true })
               .waitFor(),
         );
-        await page.getByRole("button", { name: "List", exact: true }).click();
-        await page.locator(".task-table tbody tr").first().waitFor();
-        await nextPaint(page);
+        const initialBoardCards = await page.locator(".task-card").count();
+        const taskListOpenMs = await timed(
+          page,
+          () => page.getByRole("button", { name: "List", exact: true }).click(),
+          () => page.locator(".task-table tbody tr").first().waitFor(),
+        );
         const taskRows = await page.locator(".task-table tbody tr").count();
+        assert.equal(taskRows, Math.min(profile.tasks, 50));
+        if (profile.tasks > 50) {
+          const firstTitle = await page
+            .locator(".task-title-button")
+            .first()
+            .innerText();
+          await page
+            .getByRole("navigation", { name: "Task list pages" })
+            .getByRole("button", { name: "Next", exact: true })
+            .click();
+          assert.notEqual(
+            await page.locator(".task-title-button").first().innerText(),
+            firstTitle,
+          );
+        }
         const namespace = index === 0 ? "alpha" : "beta";
         const needle = `${namespace} Task ${String(Math.floor(profile.tasks / 2) + 1).padStart(4, "0")}`;
         const filterMs = await timed(
@@ -205,6 +221,63 @@ export async function measureBrowserProfile({
           () => page.locator(".canvas-card").first().waitFor(),
         );
         const renderedCanvasCards = await page.locator(".canvas-card").count();
+        let idleUpdates;
+        if (profile.name === "large" && index === 0) {
+          await page.waitForTimeout(1_000);
+          const idle = {
+            accountReads: 0,
+            stateReads: 0,
+            conditionalStateReads: 0,
+            liveRequests: 0,
+            abortedLiveRequests: 0,
+          };
+          const countRequest = (request) => {
+            const pathname = new URL(request.url()).pathname;
+            if (pathname === "/api/account") idle.accountReads++;
+            if (pathname === "/api/state") {
+              idle.stateReads++;
+              if (request.headers()["if-none-match"])
+                idle.conditionalStateReads++;
+            }
+            if (pathname === "/api/live") idle.liveRequests++;
+          };
+          const countFailure = (request) => {
+            if (new URL(request.url()).pathname === "/api/live")
+              idle.abortedLiveRequests++;
+          };
+          page.on("request", countRequest);
+          page.on("requestfailed", countFailure);
+          const idleStart = performance.now();
+          await page.waitForTimeout(21_000);
+          page.off("request", countRequest);
+          page.off("requestfailed", countFailure);
+          idleUpdates = {
+            ...idle,
+            durationMs: round(performance.now() - idleStart),
+          };
+          assert(
+            idle.accountReads >= 2,
+            "The idle study must cross two normal account refreshes",
+          );
+          assert.equal(
+            idle.abortedLiveRequests,
+            0,
+            "Unchanged account polls must not restart live subscriptions",
+          );
+          assert.equal(
+            idle.conditionalStateReads,
+            idle.stateReads,
+            "Settled workspace polls must retain their cache validators",
+          );
+          assert(
+            idle.stateReads <= 3,
+            "Idle workspace reads should retain their normal polling cadence",
+          );
+          assert(
+            idle.liveRequests <= 2,
+            "Idle live updates should retain their long-poll cadence",
+          );
+        }
         const health = await page.evaluate(() => ({
           pageElements: document.querySelectorAll("*").length,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
@@ -224,6 +297,7 @@ export async function measureBrowserProfile({
           account: index ? "independentB" : "independentA",
           startupMs,
           taskOpenMs,
+          taskListOpenMs,
           taskFilterMs: filterMs,
           globalSearchMs: searchMs,
           notesOpenMs: notesMs,
@@ -232,9 +306,11 @@ export async function measureBrowserProfile({
           graphSearchMs,
           canvasOpenMs: canvasMs,
           renderedTaskRows: taskRows,
+          initialBoardCards,
           renderedNotes,
           renderedGraphNodes: graphNodes,
           renderedCanvasCards,
+          ...(idleUpdates ? { idleUpdates } : {}),
           pageElements: health.pageElements,
           longTaskCount: health.longTasks.length,
           longestTaskMs: round(Math.max(0, ...health.longTasks)),

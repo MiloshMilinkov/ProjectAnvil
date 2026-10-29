@@ -1,4 +1,8 @@
-import { database, resolveWorkspace } from "../../lib/access-store";
+import {
+  database,
+  resolveWorkspace,
+  resolveWorkspaceMarker,
+} from "../../lib/access-store";
 import { readRawWorkspace, routeError } from "../../lib/workspace-store";
 import { WorkspaceError } from "../../lib/workspace-model";
 
@@ -10,14 +14,20 @@ export async function GET(request: Request) {
     const wait = url.searchParams.get("wait") === "0" ? 0 : 18_000;
     const deadline = Date.now() + wait;
     while (!request.signal.aborted) {
-      const access = await resolveWorkspace(request);
+      // Markers contain no records. Recheck the session, membership and security
+      // revision each tick; normal state reads still load all project grants.
+      const access = await resolveWorkspaceMarker(request);
       const row =
         (await database()
           .prepare("SELECT revision FROM workspaces WHERE id = ?")
           .bind(access.id)
           .first<{ revision: number }>()) ||
         (access.kind === "guest"
-          ? { revision: (await readRawWorkspace(access)).revision }
+          ? {
+              revision: (
+                await readRawWorkspace(await resolveWorkspace(request))
+              ).revision,
+            }
           : null);
       if (!row) throw new WorkspaceError("This workspace is unavailable.", 404);
       const securityRevision = access.securityRevision || 0;

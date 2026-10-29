@@ -275,10 +275,20 @@ export async function startDisposableServer({
     recursive: true,
     errorOnExist: true,
   });
+  // Keep cache fingerprints and their files together if another build starts.
+  const clientDirectory = path.join(directory, "client");
+  await fs.cp(path.join(builtRoot, "client"), clientDirectory, {
+    recursive: true,
+    errorOnExist: true,
+  });
   const workerPath = path.join(serverDirectory, "test-worker.mjs");
+  const updateWorker = await fs.readFile(
+    path.join(clientDirectory, "service-worker.js"),
+    "utf8",
+  );
   await fs.writeFile(
     workerPath,
-    `import application from "./index.js";\nexport default {\n  fetch(request, env, context) {\n    if (new URL(request.url).pathname === "/__projectanvil_test_health")\n      return Response.json({ runId: ${JSON.stringify(runId)} }, { headers: { "Cache-Control": "no-store" } });\n    return application.fetch(request, env, context);\n  },\n};\n`,
+    `import application from "./index.js";\nexport default {\n  fetch(request, env, context) {\n    const url = new URL(request.url);\n    if (url.pathname === "/__projectanvil_test_health")\n      return Response.json({ runId: ${JSON.stringify(runId)} }, { headers: { "Cache-Control": "no-store" } });\n    if (url.pathname === "/__projectanvil_test_service_worker.js" && url.searchParams.get("runId") === ${JSON.stringify(runId)})\n      return new Response(${JSON.stringify(updateWorker + `\n// Disposable update rehearsal ${runId}\n`)}, { headers: { "Content-Type": "application/javascript", "Cache-Control": "no-store", "Service-Worker-Allowed": "/" } });\n    return application.fetch(request, env, context);\n  },\n};\n`,
   );
   configuration.name = `projectanvil-test-${runId.slice(0, 8)}`;
   configuration.main = workerPath;
@@ -286,7 +296,7 @@ export async function startDisposableServer({
   delete configuration.build;
   configuration.assets = {
     ...configuration.assets,
-    directory: path.join(builtRoot, "client"),
+    directory: clientDirectory,
   };
   configuration.observability = { enabled: false };
   const configPath = path.join(directory, "wrangler.json");

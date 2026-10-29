@@ -9,6 +9,7 @@ import {
 import { prepareNoteDocumentStatements } from "./note-collaboration-reset";
 import { prepareCollaborationStatements } from "./collaboration-store";
 import type { TrashCommit } from "./trash-types";
+import { referencedMediaIds } from "./media-store";
 
 const entities: Entity[] = [
   "people",
@@ -45,7 +46,9 @@ export async function hasReceipt(
 ): Promise<boolean> {
   if (!operationId) return false;
   if (!/^[a-zA-Z0-9_-]{1,120}$/.test(operationId))
-    throw new WorkspaceError("This change has an invalid save reference. Reopen the item and try again.");
+    throw new WorkspaceError(
+      "This change has an invalid save reference. Reopen the item and try again.",
+    );
   const row = await database()
     .prepare(
       "SELECT payload_hash FROM workspace_receipts WHERE workspace_id = ? AND actor_key = ? AND operation_id = ?",
@@ -137,6 +140,23 @@ export async function commitWorkspace(
   const token = crypto.randomUUID();
   const now = new Date().toISOString();
   const active = activeWorkspace(updated);
+  const mediaReferences = referencedMediaIds(active);
+  for (const file of active.media) mediaReferences.add(file.id);
+  const mediaReferenceJSON = JSON.stringify([...mediaReferences]);
+  const purged = mediaReferences.size
+    ? await db
+        .prepare(
+          `SELECT media_id FROM storage_media_purges WHERE workspace_id = ?
+    AND media_id IN (SELECT value FROM json_each(?)) LIMIT 1`,
+        )
+        .bind(access.id, mediaReferenceJSON)
+        .first()
+    : null;
+  if (purged)
+    throw new WorkspaceError(
+      "This change refers to a permanently deleted attachment. Remove its link or upload the file again before saving.",
+      409,
+    );
   const archives = new Map<string, ArchivedSnapshot>();
   for (const workspace of [current, updated])
     for (const note of workspace.notes) {
@@ -178,6 +198,8 @@ export async function commitWorkspace(
   const snapshot = permissionsSnapshotSQL(access);
   const authorization = ` AND (${snapshot.sql})`;
   const authorizationValues = snapshot.bindings;
+  const mediaAvailable =
+    " AND NOT EXISTS (SELECT 1 FROM storage_media_purges WHERE workspace_id = ? AND media_id IN (SELECT value FROM json_each(?)))";
   const restoreCondition = trash.restore
     ? " AND EXISTS (SELECT 1 FROM workspace_trash WHERE workspace_id = ? AND trash_id = ? AND deleted_at = ? AND restored_at IS NULL AND invalidated_at IS NULL)"
     : "";
@@ -190,7 +212,7 @@ export async function commitWorkspace(
   const statements = [
     db
       .prepare(
-        `INSERT OR IGNORE INTO workspace_write_guards (workspace_id, token) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = ? AND revision = ?${authorization})${restoreCondition}`,
+        `INSERT OR IGNORE INTO workspace_write_guards (workspace_id, token) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = ? AND revision = ?${authorization})${restoreCondition}${mediaAvailable}`,
       )
       .bind(
         access.id,
@@ -199,6 +221,8 @@ export async function commitWorkspace(
         current.revision,
         ...authorizationValues,
         ...restoreValues,
+        access.id,
+        mediaReferenceJSON,
       ),
     db
       .prepare(

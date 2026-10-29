@@ -18,6 +18,8 @@ const { applyMutation } = require("./compiled/app/lib/workspace-model");
 const {
   AccountRefreshRequests,
   accountResponseStatus,
+  retainUnchangedAccount,
+  workspacePermissionKey,
 } = require("./compiled/app/lib/account-refresh");
 const {
   canonicalMediaAddress,
@@ -710,6 +712,132 @@ function queueAcknowledgementChecks() {
 }
 
 async function accountRefreshChecks() {
+  const account = {
+    user: {
+      id: "owner",
+      username: "owner",
+      name: "Owner",
+      email: "owner@example.test",
+      emailVerified: false,
+    },
+    policy: {
+      mode: "local",
+      registration: "open",
+      emailDelivery: "local",
+      verificationRequired: false,
+    },
+    workspaces: [
+      {
+        id: "personal",
+        name: "Personal",
+        kind: "personal",
+        role: "owner",
+        securityRevision: 0,
+        projectRoles: { project: "editor" },
+      },
+    ],
+    invitations: [],
+  };
+  assert.equal(
+    retainUnchangedAccount(account, structuredClone(account)),
+    account,
+    "Equivalent complete account polls retain identity and existing live subscriptions",
+  );
+  assert.equal(retainUnchangedAccount(null, account), account);
+  for (const role of ["owner", "admin", "editor", "viewer"]) {
+    const current = structuredClone(account);
+    current.workspaces[0].role = role;
+    const changed = structuredClone(current);
+    changed.workspaces[0].projectRoles.extra = "editor";
+    const original = workspacePermissionKey(current, "personal");
+    const withProject = workspacePermissionKey(changed, "personal");
+    if (role === "owner" || role === "admin")
+      assert.equal(
+        withProject,
+        original,
+        "Manager project-map updates preserve the view",
+      );
+    else
+      assert.notEqual(
+        withProject,
+        original,
+        "Changed project grants invalidate member views",
+      );
+    changed.workspaces[0].securityRevision++;
+    assert.notEqual(workspacePermissionKey(changed, "personal"), withProject);
+    changed.workspaces[0].securityRevision = current.workspaces[0].securityRevision;
+    changed.workspaces[0].role = role === "viewer" ? "editor" : "viewer";
+    assert.notEqual(workspacePermissionKey(changed, "personal"), withProject);
+  }
+  const reordered = structuredClone(account);
+  reordered.workspaces[0].role = "editor";
+  reordered.workspaces[0].projectRoles = { b: "viewer", a: "editor" };
+  const otherOrder = structuredClone(reordered);
+  otherOrder.workspaces[0].projectRoles = { a: "editor", b: "viewer" };
+  assert.equal(
+    workspacePermissionKey(reordered, "personal"),
+    workspacePermissionKey(otherOrder, "personal"),
+  );
+  assert.notEqual(
+    workspacePermissionKey(account, "other"),
+    workspacePermissionKey(account, "personal"),
+  );
+  assert.notEqual(
+    workspacePermissionKey({ ...account, user: null }, "personal"),
+    workspacePermissionKey(account, "personal"),
+  );
+  for (const change of [
+    (next) => {
+      next.user.emailVerified = true;
+    },
+    (next) => {
+      next.user.name = "Renamed owner";
+    },
+    (next) => {
+      next.user.username = "renamed";
+    },
+    (next) => {
+      next.policy.registration = "invite-only";
+    },
+    (next) => {
+      next.policy.emailDelivery = "disabled";
+    },
+    (next) => {
+      next.workspaces[0].name = "Renamed workspace";
+    },
+    (next) => {
+      next.workspaces[0].role = "viewer";
+    },
+    (next) => {
+      next.workspaces[0].securityRevision++;
+    },
+    (next) => {
+      next.workspaces[0].projectRoles.project = "viewer";
+    },
+    (next) => {
+      next.workspaces = [];
+    },
+    (next) => {
+      next.invitations.push({
+        id: "invite",
+        workspaceId: "team",
+        workspaceName: "Team",
+        invitedBy: "colleague",
+        role: "editor",
+      });
+    },
+    (next) => {
+      next.user = null;
+    },
+  ]) {
+    const changed = structuredClone(account);
+    change(changed);
+    assert.equal(
+      retainUnchangedAccount(account, changed),
+      changed,
+      "Changed public identity, policy, invitations, and access must still apply",
+    );
+  }
   const requests = new AccountRefreshRequests();
   let finishFirst,
     finishSecond,

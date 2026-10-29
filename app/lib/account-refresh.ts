@@ -1,3 +1,40 @@
+import type { AccountContext } from "./access-types";
+
+/** Only changes to effective access should replace the current workspace view. */
+export function workspacePermissionKey(
+  account: AccountContext,
+  activeId: string,
+) {
+  const access = account.workspaces.find(
+    (workspace) => workspace.id === activeId,
+  );
+  // Owners and admins always have every project; their map also grows when a
+  // project is created, without changing what they are allowed to see or edit.
+  const projectRoles =
+    access?.role === "owner" || access?.role === "admin"
+      ? []
+      : Object.entries(access?.projectRoles || {}).sort(([left], [right]) =>
+          left.localeCompare(right),
+        );
+  return JSON.stringify([
+    account.user?.id || "guest",
+    activeId,
+    access?.role,
+    access?.securityRevision || 0,
+    projectRoles,
+  ]);
+}
+
+/** Unchanged polls keep request callbacks stable; all public account fields count. */
+export function retainUnchangedAccount(
+  current: AccountContext | null,
+  next: AccountContext,
+): AccountContext {
+  return current && JSON.stringify(current) === JSON.stringify(next)
+    ? current
+    : next;
+}
+
 export interface AccountRequestTicket {
   signal: AbortSignal;
   isCurrent: () => boolean;

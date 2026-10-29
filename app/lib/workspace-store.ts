@@ -685,6 +685,31 @@ export async function mutateWorkspaceResult(
   );
 }
 
+let failureLogWindow = 0;
+let failureLogCount = 0;
+
+/** Keep operational evidence without recording request data or exception contents. */
+function reportOperationalFailure(
+  category: "storage-schema" | "unexpected",
+  status: number,
+) {
+  const now = Date.now();
+  if (now - failureLogWindow >= 60_000) {
+    failureLogWindow = now;
+    failureLogCount = 0;
+  }
+  if (failureLogCount >= 5) return;
+  failureLogCount++;
+  console.error(
+    JSON.stringify({
+      event: "workspace-request-failed",
+      category,
+      status,
+      timestamp: new Date(now).toISOString(),
+    }),
+  );
+}
+
 export function routeError(error: unknown): Response {
   if (error instanceof WorkspaceError)
     return Response.json(
@@ -701,7 +726,8 @@ export function routeError(error: unknown): Response {
     error instanceof Error && error.cause instanceof Error
       ? error.cause.message
       : "";
-  if (`${message} ${cause}`.includes("no such table"))
+  if (`${message} ${cause}`.includes("no such table")) {
+    reportOperationalFailure("storage-schema", 503);
     return Response.json(
       {
         error:
@@ -709,11 +735,11 @@ export function routeError(error: unknown): Response {
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
-  console.error("Workspace request failed:", error);
+  }
+  reportOperationalFailure("unexpected", 500);
   return Response.json(
     {
-      error:
-        "The workspace could not be loaded or saved. Try again.",
+      error: "The workspace could not be loaded or saved. Try again.",
     },
     { status: 500, headers: { "Cache-Control": "no-store" } },
   );

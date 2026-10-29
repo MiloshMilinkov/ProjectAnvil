@@ -99,6 +99,13 @@ function TaskWorkspace(
     setFilters(emptyTaskFilters);
     setProjectFilter("");
   }
+  const resultScope = JSON.stringify([
+    filters,
+    projectFilter,
+    mine,
+    currentPerson,
+    sort,
+  ]);
   return (
     <div className="page tasks-page">
       <PageHeader
@@ -240,6 +247,7 @@ function TaskWorkspace(
       )}
       {view === "board" && (
         <TaskBoard
+          key={resultScope}
           {...props}
           tasks={tasks}
           filtered={filtered}
@@ -249,7 +257,12 @@ function TaskWorkspace(
       )}
       {view === "list" && (
         <section className="panel">
-          <TaskTable {...props} tasks={tasks} referenceDate={referenceDate} />
+          <TaskTable
+            key={resultScope}
+            {...props}
+            tasks={tasks}
+            referenceDate={referenceDate}
+          />
           {!tasks.length && (
             <Empty
               title={filtered ? "No tasks match" : "No tasks yet"}

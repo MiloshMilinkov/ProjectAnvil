@@ -2294,7 +2294,7 @@ export default function Knowledge({
                     {recordError}
                     <button
                       onClick={() => setRecordError("")}
-                      aria-label="Dismiss microphone message"
+                      aria-label="Dismiss attachment or recording message"
                     >
                       <X size={13} />
                     </button>

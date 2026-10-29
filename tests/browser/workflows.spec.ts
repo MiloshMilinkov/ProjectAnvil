@@ -5,6 +5,7 @@ import {
   type Request as BrowserRequest,
   type Route,
   type Page,
+  type TestInfo,
 } from "@playwright/test";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { validateDisposableTarget } from "../../scripts/test-runtime.mjs";
@@ -18,14 +19,23 @@ import {
   createTaskUi,
   createTeam,
   fixtureId,
+  isNativeDocumentExitError,
   navigate,
   openNote,
   registerThroughUi,
   selectWorkspace,
   upsert,
+  withDocumentExit,
   workspace,
   type BrowserAccount,
 } from "./helpers";
+
+// Chromium owns the full visual matrix. Other engines repeat every workflow
+// at both sizes in Focus; the dedicated appearance workflow covers all themes.
+const detailedThemes = (info: TestInfo) =>
+  info.project.name === "chromium"
+    ? ["Light", "Dark", "Warp", "Focus", "Soft"]
+    : ["Focus"];
 
 test.describe("Separate accounts and recoverable everyday work", () => {
   test.describe.configure({ mode: "serial" });
@@ -33,6 +43,8 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   let colleague: BrowserAccount;
   let base: string;
   let stateDirectory: string;
+  let runId: string;
+  const restoreNetworkFixtures: (() => Promise<void>)[] = [];
 
   test.beforeAll(async ({ browser, baseURL }) => {
     if (!baseURL) throw new Error("The disposable test origin is missing.");
@@ -41,6 +53,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       process.env.PROJECTANVIL_TEST_MANIFEST,
     );
     stateDirectory = marker.stateDirectory;
+    runId = marker.runId;
     base = baseURL;
     owner = await registerThroughUi(browser, base, "owner");
     colleague = await registerThroughUi(browser, base, "peer");
@@ -53,7 +66,55 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     ]);
   });
 
+  test.beforeEach(async ({ browserName }, testInfo) => {
+    if (browserName !== "webkit") return;
+    const actors =
+      /account recovery|delayed saves|interrupted attachments|storage cleanup/.test(
+        testInfo.title,
+      )
+        ? [owner]
+        : /genuine concurrent conflict/.test(testInfo.title)
+          ? [colleague]
+          : [];
+    for (const actor of actors) {
+      // WebKit cannot intercept requests owned by a controlling worker. Suspend
+      // registration only for deliberate network fixtures, then restore it.
+      const unavailable = (route: Route) => route.fulfill({ status: 404 });
+      await actor.context.route("**/app-assets.json", unavailable);
+      await actor.page.evaluate(async () => {
+        await Promise.all(
+          (await navigator.serviceWorker.getRegistrations()).map(
+            (registration) => registration.unregister(),
+          ),
+        );
+        // Windows WebKit can lose writes when a newly registered worker reuses
+        // an unregistered worker's cache. Reset only the fixture's public shell.
+        await Promise.all(
+          (await caches.keys())
+            .filter((name) => name.startsWith("projectanvil-shell-v1-"))
+            .map((name) => caches.delete(name)),
+        );
+      });
+      restoreNetworkFixtures.push(async () => {
+        await actor.context.unroute("**/app-assets.json", unavailable);
+        await withDocumentExit(actor.page, () => actor.page.reload());
+        await appReady(actor.page);
+      });
+      await withDocumentExit(actor.page, () => actor.page.reload());
+      await appReady(actor.page);
+    }
+  });
+
   test.afterEach(async ({}, testInfo) => {
+    for (const restore of restoreNetworkFixtures.splice(0)) await restore();
+    const nativeExits = [owner, colleague]
+      .filter(Boolean)
+      .flatMap((actor) => actor.nativeExitErrors.splice(0));
+    if (nativeExits.length)
+      await testInfo.attach("native-document-exit-errors", {
+        body: nativeExits.join("\n\n"),
+        contentType: "text/plain",
+      });
     const errors = [owner, colleague]
       .filter(Boolean)
       .flatMap((actor) => actor.pageErrors.splice(0));
@@ -165,12 +226,15 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   test("account recovery and session controls keep credentials private and preserve workspace access", async ({
     browser,
   }, testInfo) => {
-    const extra = await browser.newContext({ baseURL: base });
+    const extra = await browser.newContext({
+      baseURL: base,
+      serviceWorkers: "block",
+    });
     extra.on("page", (page) =>
       page.on("pageerror", (error) => owner.pageErrors.push(error.message)),
     );
     const sibling = await owner.context.newPage();
-    const releaseHeldRequests: (() => void)[] = [];
+    const releaseHeldRequests: (() => void | Promise<void>)[] = [];
     const email = `${owner.username}@example.test`;
     const accountHeaders = { "X-Account-Id": owner.userId };
     const security = () =>
@@ -249,7 +313,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       await expect(security().getByRole("status")).toContainText(
         "doesn't send email",
       );
-      await owner.page.goto(await mailLink("verification"));
+      await withDocumentExit(owner.page, async () =>
+        owner.page.goto(await mailLink("verification")),
+      );
       const verification = owner.page.getByRole("dialog", {
         name: "Email verification",
         exact: true,
@@ -269,12 +335,8 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       expect((await signInExtra()).ok()).toBeTruthy();
       async function holdLive(page: Page, open: () => Promise<unknown>) {
         let heldRequest: BrowserRequest | undefined;
-        let capturedLive = () => {};
         let finishedLive = () => {};
         let release = () => {};
-        const captured = new Promise<void>((resolve) => {
-          capturedLive = resolve;
-        });
         const released = new Promise<void>((resolve) => {
           release = resolve;
         });
@@ -283,9 +345,14 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         });
         releaseHeldRequests.push(release);
         const handler = async (route: Route) => {
-          if (heldRequest) return route.continue();
+          // Let the initial cursor establish access before holding a stable
+          // subscription; account startup can legitimately replace that read.
+          if (
+            heldRequest ||
+            !new URL(route.request().url()).searchParams.get("since")
+          )
+            return route.continue();
           heldRequest = route.request();
-          capturedLive();
           await released;
           try {
             await route.fulfill({
@@ -304,22 +371,57 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         await page.route("**/api/live?*", handler);
         await open();
         await appReady(page);
-        await captured;
-        const aborted = page.waitForEvent("requestfailed", {
-          predicate: (request) => request === heldRequest,
+        // The race represents two visible app windows. WebKit backgrounds a
+        // sibling page in headless runs, which correctly pauses normal polling.
+        await page.evaluate(() => {
+          Object.defineProperty(document, "hidden", {
+            configurable: true,
+            get: () => false,
+          });
+          document.dispatchEvent(new Event("visibilitychange"));
         });
+        await expect
+          .poll(() => !!heldRequest, {
+            timeout: 15_000,
+            message: "The visible race window should start live polling.",
+          })
+          .toBeTruthy();
         return {
-          aborted,
-          request: heldRequest!,
+          aborted: () =>
+            expect
+              .poll(() => heldRequest!.failure(), {
+                timeout: 5_000,
+                message:
+                  "Session rotation should abort the held live request before its stale reply is released.",
+              })
+              .not.toBeNull(),
+          failure: () => heldRequest!.failure(),
           release,
           finish: async () => {
             await finished;
             await page.unroute("**/api/live?*", handler);
+            await page.evaluate(() => {
+              Reflect.deleteProperty(document, "hidden");
+              document.dispatchEvent(new Event("visibilitychange"));
+            });
           },
         };
       }
       const siblingLive = await holdLive(sibling, () => sibling.goto("/"));
-      const primaryLive = await holdLive(owner.page, () => owner.page.reload());
+      const primaryLive = await holdLive(owner.page, () =>
+        withDocumentExit(owner.page, () => owner.page.reload()),
+      );
+      // Ordinary account refreshes must preserve both subscriptions. Explicit
+      // session rotation below must still abort them before a stale reply.
+      for (const page of [owner.page, sibling]) {
+        const response = page.waitForResponse(
+          (value) =>
+            new URL(value.url()).pathname === "/api/account" &&
+            value.status() === 200,
+        );
+        await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+        await (await response).finished();
+      }
       const siblingTrigger = await sibling
         .getByRole("button", {
           name: `Account: ${owner.username}`,
@@ -345,17 +447,16 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       await security()
         .getByLabel("Confirm new password", { exact: true })
         .fill(changedPassword);
-      expect(primaryLive.request.failure()).toBeNull();
-      expect(siblingLive.request.failure()).toBeNull();
+      expect(await primaryLive.failure()).toBeNull();
+      expect(await siblingLive.failure()).toBeNull();
       await security()
         .getByRole("button", { name: "Change password", exact: true })
         .click();
       await expect(security().getByRole("status")).toContainText(
         "Password changed",
       );
-      await Promise.all([primaryLive.aborted, siblingLive.aborted]);
-      primaryLive.release();
-      siblingLive.release();
+      await Promise.all([primaryLive.aborted(), siblingLive.aborted()]);
+      await Promise.all([primaryLive.release(), siblingLive.release()]);
       await Promise.all([primaryLive.finish(), siblingLive.finish()]);
       expect(
         await siblingTrigger?.evaluate((node) => node.isConnected),
@@ -375,7 +476,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         .click();
       for (const width of [1365, 320]) {
         await owner.page.setViewportSize({ width, height: 900 });
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           await owner.page
             .getByRole("button", { name: /^Appearance:/ })
             .click();
@@ -428,7 +529,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
           .getByRole("status"),
       ).toContainText("check for a link");
       const resetLink = await mailLink("reset");
-      await owner.page.goto(resetLink);
+      await withDocumentExit(owner.page, async () =>
+        owner.page.goto(resetLink),
+      );
       const reset = owner.page.getByRole("dialog", {
         name: "Choose a new password",
         exact: true,
@@ -463,7 +566,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         }),
       ).toBeVisible();
       owner.password = resetPassword;
-      await owner.page.goto(resetLink);
+      await withDocumentExit(owner.page, async () =>
+        owner.page.goto(resetLink),
+      );
       const expired = owner.page.getByRole("dialog", {
         name: "Choose a new password",
         exact: true,
@@ -500,7 +605,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       });
       for (const width of [1365, 320]) {
         await gate.setViewportSize({ width, height: 900 });
-        for (const theme of ["light", "dark", "warp", "focus", "soft"]) {
+        for (const theme of detailedThemes(testInfo).map((value) =>
+          value.toLowerCase(),
+        )) {
           await gate.goto(`/?test_theme=${theme}`);
           await expect(
             gate.getByRole("heading", {
@@ -553,7 +660,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         }
       }
     } finally {
-      for (const release of releaseHeldRequests) release();
+      await Promise.all(releaseHeldRequests.map((release) => release()));
       await sibling.close();
       await extra.close();
       await owner.page.setViewportSize({ width: 1365, height: 900 });
@@ -587,7 +694,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await expect(
       owner.page.getByText("Invitation sent in ProjectAnvil", { exact: true }),
     ).toBeVisible();
-    await colleague.page.reload();
+    await withDocumentExit(colleague.page, () => colleague.page.reload());
     await appReady(colleague.page);
     await navigate(colleague.page, /^Teams & workspaces/);
     await colleague.page
@@ -744,6 +851,141 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       limited.tasks.some((task) => task.title === "Shared role-check task"),
     ).toBeFalsy();
     await selectWorkspace(owner, owner.personal);
+    await selectWorkspace(colleague, colleague.personal);
+  });
+
+  test("an old workspace denial cannot clear a refreshed role or its offline copy", async () => {
+    const team = await createTeam(
+      owner,
+      colleague,
+      `Stale read ${fixtureId().slice(0, 8)}`,
+      "viewer",
+    );
+    await upsert(owner, team.id, "tasks", {
+      id: fixtureId(),
+      title: "Retained after role refresh",
+    });
+    await selectWorkspace(colleague, team);
+    await navigate(colleague.page, "Workspace settings");
+    await colleague.page
+      .getByRole("button", { name: "Save workspace offline", exact: true })
+      .click();
+    await expect(
+      colleague.page.getByText("Offline workspace copy saved", { exact: true }),
+    ).toBeVisible();
+    await navigate(colleague.page, "Tasks");
+    const create = colleague.page
+      .locator(".page-heading .heading-actions")
+      .getByRole("button", { name: "Create task", exact: true });
+    await expect(create).toBeDisabled();
+    await colleague.page.evaluate(() => {
+      const original = window.fetch;
+      const state = {
+        held: false,
+        signal: undefined as AbortSignal | undefined,
+        release: () => {},
+        restore: () => {
+          window.fetch = original;
+        },
+      };
+      Reflect.set(window, Symbol.for("projectanvil-test-old-state"), state);
+      window.fetch = (input, init) => {
+        const address =
+          typeof input === "string" || input instanceof URL
+            ? String(input)
+            : input.url;
+        const method =
+          init?.method || (input instanceof Request ? input.method : "GET");
+        if (
+          new URL(address, location.href).pathname !== "/api/state" ||
+          method.toUpperCase() !== "GET" ||
+          state.held
+        )
+          return original.call(window, input, init);
+        state.held = true;
+        state.signal =
+          init?.signal || (input instanceof Request ? input.signal : undefined);
+        // Body processing may settle after cancellation. Deliberately ignore
+        // the signal here so the stale-response guard is tested independently.
+        return new Promise<Response>((resolve) => {
+          state.release = () =>
+            resolve(
+              new Response(
+                JSON.stringify({
+                  error: "This earlier access check was denied.",
+                }),
+                {
+                  status: 403,
+                  headers: { "Content-Type": "application/json" },
+                },
+              ),
+            );
+        });
+      };
+      window.dispatchEvent(new Event("focus"));
+    });
+    try {
+      await expect
+        .poll(() =>
+          colleague.page.evaluate(
+            () =>
+              !!Reflect.get(window, Symbol.for("projectanvil-test-old-state"))
+                ?.held,
+          ),
+        )
+        .toBeTruthy();
+      await api(owner, "/api/teams", {
+        action: "set-role",
+        workspaceId: team.id,
+        userId: colleague.userId,
+        role: "editor",
+        expectedRole: "viewer",
+      });
+      await colleague.page.evaluate(() =>
+        window.dispatchEvent(new Event("focus")),
+      );
+      await expect(create).toBeEnabled({ timeout: 30_000 });
+      const refreshedControl = await create.elementHandle();
+      await expect
+        .poll(() =>
+          colleague.page.evaluate(
+            () =>
+              !!Reflect.get(window, Symbol.for("projectanvil-test-old-state"))
+                ?.signal?.aborted,
+          ),
+        )
+        .toBeTruthy();
+      await colleague.page.evaluate(() =>
+        Reflect.get(
+          window,
+          Symbol.for("projectanvil-test-old-state"),
+        )?.release(),
+      );
+      await expect(create).toBeEnabled();
+      expect(
+        await refreshedControl!.evaluate((node) => node.isConnected),
+      ).toBeTruthy();
+      await expect(
+        colleague.page.getByRole("button", {
+          name: /Retained after role refresh/,
+        }),
+      ).toBeVisible();
+      await navigate(colleague.page, "Workspace settings");
+      await expect(
+        colleague.page.getByRole("button", {
+          name: "Refresh offline copy",
+          exact: true,
+        }),
+      ).toBeVisible();
+    } finally {
+      await colleague.page.evaluate(() => {
+        const key = Symbol.for("projectanvil-test-old-state");
+        const state = Reflect.get(window, key);
+        state?.release();
+        state?.restore();
+        Reflect.deleteProperty(window, key);
+      });
+    }
     await selectWorkspace(colleague, colleague.personal);
   });
 
@@ -952,6 +1194,17 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   });
 
   test("offline edits survive a new window, retain order, Undo safely, and synchronize once", async () => {
+    const origin = new URL(base).origin;
+    const ordinary = new Error(
+      `/${origin.slice("http://".length)}/api/account due to access control checks.`,
+    );
+    ordinary.stack = `Fetch API cannot load ${origin}/api/account due to access control checks.`;
+    await withDocumentExit(owner.page, async () => {
+      expect(
+        isNativeDocumentExitError(owner.page, ordinary, "webkit", origin),
+        "An ordinary application exception remains fatal even with native-looking text.",
+      ).toBe(false);
+    });
     const title = `Offline planning ${fixtureId().slice(0, 8)}`;
     const note = await createNoteUi(
       owner,
@@ -980,7 +1233,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await openNote(owner, note.id);
     await owner.context.setOffline(true);
     // Reload through the cached public shell also proves the account snapshot is usable.
-    await owner.page.reload();
+    await withDocumentExit(owner.page, () => owner.page.reload());
     await expect(
       owner.page.getByRole("textbox", { name: "Note content", exact: true }),
     ).toHaveValue("Confirmed before interruption.");
@@ -1002,9 +1255,11 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await expect(owner.page.locator(".note-save-state")).toHaveText(
       "On device",
     );
-    await owner.page.close();
+    await withDocumentExit(owner.page, () => owner.page.close());
     owner.page = await owner.context.newPage();
-    await owner.page.goto(`${base}/?note=${note.id}`);
+    await withDocumentExit(owner.page, async () =>
+      owner.page.goto(`${base}/?note=${note.id}`),
+    );
     await expect(
       owner.page.getByRole("textbox", { name: "Note content", exact: true }),
     ).toHaveValue("Latest offline revision.");
@@ -1032,11 +1287,8 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     );
     await owner.context.setOffline(false);
     await navigate(owner.page, "Workspace settings");
-    const sync = owner.page.getByRole("button", {
-      name: "Synchronize now",
-      exact: true,
-    });
-    if (await sync.isEnabled()) await sync.click();
+    // Reconnection synchronizes automatically; its queue can drain between an
+    // enabled check and a click. Assert the saved outcome directly below.
     await expect
       .poll(
         async () =>
@@ -1056,11 +1308,253 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await expect(owner.page.locator(".offline-banner")).toBeHidden({
       timeout: 30_000,
     });
-    await owner.page.reload();
+    await withDocumentExit(owner.page, () => owner.page.reload());
     await appReady(owner.page);
     expect(
       (await workspace(owner)).tasks.filter((task) => task.title === taskTitle),
     ).toHaveLength(1);
+  });
+
+  test("delayed saves preserve the latest text and report completion only after acknowledgement", async () => {
+    await selectWorkspace(owner, owner.personal);
+    const note = await createNoteUi(
+      owner,
+      "Slow connection reference",
+      "Before the slow save.",
+    );
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let intercepted = 0;
+    const delaySave = async (route: Route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      intercepted++;
+      await gate;
+      await route.continue();
+    };
+    await owner.page.route("**/api/state", delaySave);
+    try {
+      const text = owner.page.getByRole("textbox", {
+        name: "Note content",
+        exact: true,
+      });
+      await text.fill("First revision on a slow connection.");
+      await expect.poll(() => intercepted).toBeGreaterThan(0);
+      await expect(owner.page.locator(".note-save-state")).not.toHaveText(
+        "Saved",
+      );
+      expect(
+        (await workspace(owner)).notes.find((item) => item.id === note.id)
+          ?.content,
+      ).toBe("Before the slow save.");
+      await text.fill("Latest revision while the first save is still waiting.");
+      await expect(text).toHaveValue(
+        "Latest revision while the first save is still waiting.",
+      );
+      release();
+      await expect
+        .poll(
+          async () =>
+            (await workspace(owner)).notes.find((item) => item.id === note.id)
+              ?.content,
+        )
+        .toBe("Latest revision while the first save is still waiting.");
+      await expect(owner.page.locator(".note-save-state")).toHaveText("Saved");
+      await openNote(owner, note.id);
+      await expect(text).toHaveValue(
+        "Latest revision while the first save is still waiting.",
+      );
+    } finally {
+      release();
+      await owner.page.unroute("**/api/state", delaySave);
+    }
+  });
+
+  test("interrupted attachments leave no broken note link and uncertain responses do not retry automatically", async ({
+    browserName,
+  }) => {
+    const note = await createNoteUi(
+      owner,
+      "Attachment interruption reference",
+      "Keep this text while uploading.",
+    );
+    const before = await workspace(owner);
+    const file = {
+      name: `interrupted-${fixtureId().slice(0, 8)}.png`,
+      mimeType: "image/png",
+      buffer: await readFile(
+        new URL("../../public/icons/projectanvil-192.png", import.meta.url),
+      ),
+    };
+    const input = owner.page.locator(
+      'input[type="file"][accept="image/*,audio/*,video/*,application/pdf,.txt,.md"]',
+    );
+    let requests = 0;
+    const interrupt = async (route: Route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      requests++;
+      await route.abort("failed");
+    };
+    await owner.page.route("**/api/media", interrupt);
+    try {
+      await input.setInputFiles(file);
+      await expect(owner.page.locator(".note-inline-error")).toBeVisible();
+      await expect(
+        owner.page.getByRole("button", {
+          name: "Attach an image, PDF, audio, or video",
+          exact: true,
+        }),
+      ).toBeEnabled();
+      expect(requests).toBe(1);
+      const failed = await workspace(owner);
+      expect(failed.media).toHaveLength(before.media.length);
+      expect(failed.notes.find((item) => item.id === note.id)?.content).toBe(
+        note.content,
+      );
+    } finally {
+      await owner.page.unroute("**/api/media", interrupt);
+    }
+    await input.setInputFiles(file);
+    await expect
+      .poll(
+        async () =>
+          (await workspace(owner)).media.filter(
+            (item) => item.name === file.name,
+          ).length,
+      )
+      .toBe(1);
+    await expect
+      .poll(
+        async () =>
+          (await workspace(owner)).notes.find((item) => item.id === note.id)
+            ?.content,
+      )
+      .toContain(file.name);
+    const linked = (await workspace(owner)).notes.find(
+      (item) => item.id === note.id,
+    )!.content;
+
+    // A lost response after server commit is deliberately not retried blindly.
+    const uncertain = {
+      ...file,
+      name: `unconfirmed-${fixtureId().slice(0, 8)}.png`,
+    };
+    requests = 0;
+    const loseResponse = async (route: Route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      requests++;
+      // WebKit does not retain the binary multipart body for route.fetch.
+      // Commit the identical fixture over its authenticated HTTP context.
+      const committed =
+        browserName === "webkit"
+          ? await owner.context.request.post("/api/media", {
+              headers: {
+                Origin: base,
+                "X-Account-Id": owner.userId,
+                "X-Workspace-Id": owner.personal.id,
+              },
+              multipart: { file: uncertain, projectId: note.projectId },
+            })
+          : await route.fetch();
+      expect(
+        committed.ok(),
+        `Upload fixture returned ${committed.status()}`,
+      ).toBeTruthy();
+      await route.abort("failed");
+    };
+    await owner.page.route("**/api/media", loseResponse);
+    try {
+      await input.setInputFiles(uncertain);
+      await expect(owner.page.locator(".note-inline-error")).toBeVisible();
+      await expect(
+        owner.page.getByRole("button", {
+          name: "Attach an image, PDF, audio, or video",
+          exact: true,
+        }),
+      ).toBeEnabled();
+      await navigate(owner.page, "Workspace settings");
+      await owner.page
+        .getByRole("button", { name: "Check storage", exact: true })
+        .click();
+      const current = await workspace(owner);
+      expect(requests).toBe(1);
+      expect(
+        current.media.filter((item) => item.name === uncertain.name),
+      ).toHaveLength(1);
+      expect(current.notes.find((item) => item.id === note.id)?.content).toBe(
+        linked,
+      );
+    } finally {
+      await owner.page.unroute("**/api/media", loseResponse);
+    }
+  });
+
+  test("device edits survive a simulated 36-hour outage and a new window before synchronizing once", async () => {
+    const note = await createNoteUi(
+      owner,
+      "Extended offline reference",
+      "Before the extended interruption.",
+    );
+    await navigate(owner.page, "Workspace settings");
+    await expect(
+      owner.page.getByText("Application files are ready for offline startup.", {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30_000 });
+    await owner.page
+      .getByRole("button", {
+        name: /^(Save workspace offline|Refresh offline copy)$/,
+      })
+      .click();
+    await expect(
+      owner.page.getByText("Offline workspace copy saved", { exact: true }),
+    ).toBeVisible();
+    await openNote(owner, note.id);
+    await owner.context.setOffline(true);
+    try {
+      await owner.page.clock.install();
+      await owner.page
+        .getByRole("textbox", { name: "Note content", exact: true })
+        .fill("Kept through the extended outage.");
+      await expect(owner.page.locator(".note-save-state")).toHaveText(
+        "On device",
+      );
+      // Advance browser time without spending real hours or changing the server clock.
+      await owner.page.clock.fastForward(36 * 60 * 60 * 1000);
+      await expect(
+        owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+      ).toHaveValue("Kept through the extended outage.");
+      await withDocumentExit(owner.page, () => owner.page.close());
+      owner.page = await owner.context.newPage();
+      await withDocumentExit(owner.page, async () =>
+        owner.page.goto(`${base}/?note=${note.id}`),
+      );
+      await expect(
+        owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+      ).toHaveValue("Kept through the extended outage.");
+      await expect(owner.page.locator(".offline-banner")).toContainText(
+        "1 change kept on this device",
+      );
+    } finally {
+      await owner.context.setOffline(false);
+    }
+    await expect
+      .poll(
+        async () =>
+          (await workspace(owner)).notes.find((item) => item.id === note.id)
+            ?.content,
+        { timeout: 30_000 },
+      )
+      .toBe("Kept through the extended outage.");
+    await expect(owner.page.locator(".offline-banner")).toBeHidden({
+      timeout: 30_000,
+    });
+    await withDocumentExit(owner.page, () => owner.page.reload());
+    await appReady(owner.page);
+    await expect(
+      owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+    ).toHaveValue("Kept through the extended outage.");
   });
 
   test("Markdown import preview and export preserve linked notes and an attachment", async ({}, testInfo) => {
@@ -1149,7 +1643,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       title: searchTitle,
       content: "A small reference used only by this keyboard test.",
     });
-    await owner.page.reload();
+    await withDocumentExit(owner.page, () => owner.page.reload());
     await appReady(owner.page);
     await owner.page.setViewportSize({ width: 320, height: 900 });
     await navigate(owner.page, "Workspace settings");
@@ -1287,7 +1781,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       },
     ])
       await upsert(owner, owner.personal.id, "notes", note);
-    await owner.page.reload();
+    await withDocumentExit(owner.page, () => owner.page.reload());
     await appReady(owner.page);
     await owner.page
       .locator(".sidebar-projects")
@@ -1338,7 +1832,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     try {
       for (const width of [1365, 320]) {
         await owner.page.setViewportSize({ width, height: 900 });
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           await owner.page
             .getByRole("button", { name: /^Appearance:/ })
             .click();
@@ -1474,7 +1968,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     try {
       for (const width of [1365, 320]) {
         await owner.page.setViewportSize({ width, height: 900 });
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           await owner.page
             .getByRole("radio", { name: new RegExp(`^${theme} `) })
             .check();
@@ -1578,10 +2072,12 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await owner.page.setViewportSize({ width: 1365, height: 900 });
     await selectWorkspace(owner, owner.personal);
     await navigate(owner.page, "Tasks");
-    const newTask = owner.page.locator(".page-heading .heading-actions").getByRole("button", {
-      name: "Create task",
-      exact: true,
-    });
+    const newTask = owner.page
+      .locator(".page-heading .heading-actions")
+      .getByRole("button", {
+        name: "Create task",
+        exact: true,
+      });
     const dialog = owner.page.getByRole("dialog", {
       name: "Create task",
       exact: true,
@@ -1589,7 +2085,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     try {
       for (const width of [1365, 320]) {
         await owner.page.setViewportSize({ width, height: 900 });
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           await owner.page
             .getByRole("button", { name: /^Appearance:/ })
             .click();
@@ -1766,7 +2262,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       name: "Start guided tour",
       exact: true,
     });
-    const beforeGuides = await workspace(owner);
+    let beforeGuides = await workspace(owner);
     await trigger.click();
     const guide = owner.page.getByTestId("guided-tour");
     await expect(guide).toContainText("Step 1 of 8");
@@ -1796,6 +2292,42 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       name: "Search guides",
       exact: true,
     });
+    const retainedLibrary = await guideSearch.elementHandle();
+    const addedProjectId = `guide_refresh_${fixtureId()}`;
+    const accountRefresh = owner.page.waitForResponse(async (response) => {
+      if (
+        new URL(response.url()).pathname !== "/api/account" ||
+        response.status() !== 200
+      )
+        return false;
+      const raw = await response.json();
+      const current = (raw.account || raw) as AccountContext;
+      return !!current.workspaces.find((item) => item.id === owner.personal.id)
+        ?.projectRoles?.[addedProjectId];
+    });
+    // Creating another project expands the owner's role map without changing
+    // their access. Its real account refresh must preserve the open guide.
+    await upsert(owner, owner.personal.id, "projects", {
+      id: addedProjectId,
+      name: "Guide refresh reference",
+      key: "REF",
+    });
+    await owner.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await accountRefresh;
+    await owner.page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    await expect(
+      guide.getByRole("heading", { name: "Choose a guide", exact: true }),
+    ).toBeVisible();
+    expect(
+      await retainedLibrary!.evaluate((element) => element.isConnected),
+    ).toBeTruthy();
+    // Both projects are intentional setup; the tour must leave them unchanged.
+    beforeGuides = await workspace(owner);
     await guideSearch.fill("unmatched feature name");
     await expect(guide.locator(".tour-guide-option")).toHaveCount(0);
     await guide
@@ -1849,7 +2381,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     try {
       for (const width of [1365, 320]) {
         await owner.page.setViewportSize({ width, height: 900 });
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           await owner.page
             .getByRole("button", { name: /^Appearance:/ })
             .click();
@@ -1925,7 +2457,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     }
   });
 
-  test("note details cannot cover account menus or note dialogs in any theme", async () => {
+  test("note details cannot cover account menus or note dialogs in any theme", async ({}, testInfo) => {
     await selectWorkspace(owner, owner.personal);
     const id = `layering_note_${fixtureId()}`;
     await upsert(owner, owner.personal.id, "notes", {
@@ -1943,7 +2475,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         });
         if ((await details.getAttribute("aria-expanded")) !== "true")
           await details.click();
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           await owner.page
             .getByRole("button", { name: /^Appearance:/ })
             .click();
@@ -1956,11 +2488,23 @@ test.describe("Separate accounts and recoverable everyday work", () => {
               exact: true,
             })
             .click();
+          await expect(
+            owner.page.getByRole("menuitem", {
+              name: "Account security",
+              exact: true,
+            }),
+          ).toBeFocused();
           // Trial performs normal pointer hit-testing without signing out ten times.
           await owner.page
             .getByRole("menuitem", { name: "Sign out", exact: true })
             .click({ trial: true });
           await owner.page.keyboard.press("Escape");
+          await expect(
+            owner.page.getByRole("menu", {
+              name: "Account options",
+              exact: true,
+            }),
+          ).toBeHidden();
           const newNote = owner.page.getByRole("button", {
             name: "New note",
             exact: true,
@@ -2088,7 +2632,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       archived: true,
       fields: [field],
     });
-    await owner.page.reload();
+    await withDocumentExit(owner.page, () => owner.page.reload());
     await appReady(owner.page);
     await owner.page
       .locator(".sidebar-projects")
@@ -2242,7 +2786,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     try {
       for (const width of [1365, 320]) {
         await owner.page.setViewportSize({ width, height: 900 });
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           await owner.page
             .getByRole("button", { name: /^Appearance:/ })
             .click();
@@ -2283,8 +2827,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     ).toBeFalsy();
   });
 
-  test("a failed deferred feature can be retried without signing out or reloading", async ({
+  test("a failed deferred feature preserves queued work and supports explicit recovery", async ({
     browser,
+    browserName,
   }, testInfo) => {
     // Reuse the same account with no existing service worker/cache interception.
     const context = await browser.newContext({
@@ -2294,9 +2839,32 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       viewport: { width: 1365, height: 900 },
       reducedMotion: "reduce",
     });
+    await context.route("**/*", (route) => {
+      const address = new URL(route.request().url());
+      return address.origin === new URL(base).origin ||
+        ["blob:", "data:"].includes(address.protocol)
+        ? route.continue()
+        : route.abort("blockedbyclient");
+    });
     const page = await context.newPage();
     const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    const nativeExits: string[] = [];
+    page.on("pageerror", (error) => {
+      if (
+        isNativeDocumentExitError(
+          page,
+          error,
+          browserName,
+          new URL(base).origin,
+        )
+      )
+        nativeExits.push(error.stack!);
+      else errors.push(error.message);
+    });
     const manifest = JSON.parse(
       await readFile(
         new URL("../../dist/client/.vite/manifest.json", import.meta.url),
@@ -2311,17 +2879,72 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       // Module preload and its subsequent import can request the same chunk.
       // Keep the connection unavailable until the failure is visible.
       blocked++;
-      await route.abort("failed");
+      await route.fulfill({
+        status: 503,
+        contentType: "application/javascript",
+        headers: { "Cache-Control": "no-store" },
+        body: "// Temporary fixture outage.",
+      });
     };
     await page.route(chunk, blockChunk);
     try {
       await page.goto("/");
       await appReady(page);
+      const recoveryActor = { ...owner, context, page };
+      const recoveryTitle = `Feature recovery ${fixtureId().slice(0, 8)}`;
+      const recoveryNote = await createNoteUi(
+        recoveryActor,
+        recoveryTitle,
+        "Confirmed before the feature interruption.",
+      );
+      await navigate(page, "Workspace settings");
+      await page
+        .getByRole("button", {
+          name: /^(Save workspace offline|Refresh offline copy)$/,
+        })
+        .click();
+      await expect(
+        page.getByText("Offline workspace copy saved", { exact: true }),
+      ).toBeVisible();
       await page.evaluate(() => {
         (
           window as unknown as { __deferredPageIdentity: string }
         ).__deferredPageIdentity = "same-page";
       });
+      await navigate(page, "Notes");
+      await page
+        .locator(".note-list-item")
+        .filter({ hasText: recoveryTitle })
+        .click();
+      await expect(
+        page.getByRole("textbox", { name: "Note content", exact: true }),
+      ).toHaveValue("Confirmed before the feature interruption.");
+      await context.setOffline(true);
+      await page
+        .getByRole("textbox", { name: "Note content", exact: true })
+        .fill("Kept through explicit feature recovery.");
+      await expect(page.locator(".note-save-state")).toHaveText("On device");
+      await expect(page.locator(".offline-banner")).toContainText(
+        "1 change kept on this device",
+      );
+      let heldWrites = 0;
+      const holdQueuedWrites = async (route: Route) => {
+        if (route.request().method() !== "POST") return route.continue();
+        heldWrites++;
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          headers: { "Cache-Control": "no-store" },
+          body: JSON.stringify({
+            error: "Temporary fixture save interruption.",
+          }),
+        });
+      };
+      await page.route("**/api/state", holdQueuedWrites);
+      // Keep a real queued change while testing the module outage online.
+      // Native offline emulation must not abort its separate preload graph.
+      await context.setOffline(false);
+      await expect.poll(() => heldWrites).toBeGreaterThanOrEqual(1);
       await navigate(page, "Collections");
       const failure = page
         .getByRole("alert")
@@ -2339,14 +2962,65 @@ test.describe("Separate accounts and recoverable everyday work", () => {
           exact: true,
         }),
       ).toBeVisible();
-      await page.unroute(chunk, blockChunk);
-      await failure
-        .getByRole("button", { name: "Retry opening", exact: true })
-        .click();
-      await expect(
-        page.getByRole("heading", { name: "Collections", exact: true }),
-      ).toBeVisible();
-      await expect(failure).toBeHidden();
+      const reloadApp = failure.getByRole("button", {
+        name: "Reload app",
+        exact: true,
+      });
+      await reloadApp.click();
+      await expect(failure).toContainText(
+        "Save, synchronize, or review unfinished work before reloading.",
+      );
+      await expect(reloadApp).toBeEnabled();
+      await expect(reloadApp).toBeFocused();
+      try {
+        for (const width of [1365, 320]) {
+          await page.setViewportSize({ width, height: 900 });
+          for (const theme of detailedThemes(testInfo)) {
+            await page.getByRole("button", { name: /^Appearance:/ }).click();
+            await page
+              .getByRole("menuitemradio", {
+                name: new RegExp(`^${theme} `),
+              })
+              .click();
+            await expect(failure).toContainText(
+              "Save, synchronize, or review unfinished work before reloading.",
+            );
+            const bounds = await failure.boundingBox();
+            expect(bounds).not.toBeNull();
+            expect(bounds!.x).toBeGreaterThanOrEqual(0);
+            expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+            expect(
+              await failure.evaluate(
+                (element) => element.scrollWidth <= element.clientWidth,
+              ),
+            ).toBeTruthy();
+            expect(
+              await page.evaluate(
+                () => document.documentElement.scrollWidth <= innerWidth,
+              ),
+            ).toBeTruthy();
+            for (const name of ["Retry opening", "Reload app"]) {
+              const button = failure.getByRole("button", { name, exact: true });
+              await expect(button).toBeVisible();
+              await expect(button).toBeEnabled();
+              if (width === 320)
+                expect(
+                  (await button.boundingBox())!.height,
+                ).toBeGreaterThanOrEqual(44);
+            }
+            const screenshot = testInfo.outputPath(
+              `feature-recovery-${theme.toLowerCase()}-${width}.png`,
+            );
+            await page.screenshot({ path: screenshot });
+            await testInfo.attach(`feature-recovery-${theme}-${width}`, {
+              path: screenshot,
+              contentType: "image/png",
+            });
+          }
+        }
+      } finally {
+        await page.setViewportSize({ width: 1365, height: 900 });
+      }
       expect(
         await page.evaluate(
           () =>
@@ -2354,6 +3028,75 @@ test.describe("Separate accounts and recoverable everyday work", () => {
               .__deferredPageIdentity,
         ),
       ).toBe("same-page");
+      expect(
+        (await workspace(owner)).notes.find(
+          (note) => note.id === recoveryNote.id,
+        )?.content,
+      ).toBe("Confirmed before the feature interruption.");
+      await page.unroute("**/api/state", holdQueuedWrites);
+      await page.evaluate(() => {
+        window.dispatchEvent(new Event("online"));
+        window.dispatchEvent(new Event("focus"));
+      });
+      await expect
+        .poll(
+          async () =>
+            (await workspace(owner)).notes.find(
+              (note) => note.id === recoveryNote.id,
+            )?.content,
+          { timeout: 30_000 },
+        )
+        .toBe("Kept through explicit feature recovery.");
+      await expect(page.locator(".offline-banner")).toBeHidden();
+      await page.unroute(chunk, blockChunk);
+      const previousFailure = await failure.elementHandle();
+      await failure
+        .getByRole("button", { name: "Retry opening", exact: true })
+        .click();
+      await expect
+        .poll(() => previousFailure!.evaluate((element) => element.isConnected))
+        .toBe(false);
+      const heading = page.getByRole("heading", {
+        name: "Collections",
+        exact: true,
+      });
+      const recovery = await Promise.any([
+        heading.waitFor({ state: "visible" }).then(() => "opened"),
+        failure.waitFor({ state: "visible" }).then(() => "failed"),
+      ]);
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as { __deferredPageIdentity: string })
+              .__deferredPageIdentity,
+        ),
+      ).toBe("same-page");
+      if (recovery === "failed") {
+        expect(browserName).toBe("webkit");
+        await withDocumentExit(page, async () => {
+          await Promise.all([
+            page.waitForEvent("domcontentloaded"),
+            reloadApp.click(),
+          ]);
+          await appReady(page);
+        });
+        await expect(
+          page.getByRole("button", {
+            name: `Account: ${owner.username}`,
+            exact: true,
+          }),
+        ).toBeVisible();
+        await navigate(page, "Collections");
+      }
+      await expect(heading).toBeVisible();
+      await expect(failure).toBeHidden();
+      const restored = (await workspace(owner)).notes.filter(
+        (note) => note.id === recoveryNote.id,
+      );
+      expect(restored).toHaveLength(1);
+      expect(restored[0].content).toBe(
+        "Kept through explicit feature recovery.",
+      );
       expect(errors).toEqual([]);
     } catch (error) {
       await testInfo.attach("deferred-failure-page", {
@@ -2365,11 +3108,17 @@ test.describe("Separate accounts and recoverable everyday work", () => {
           blocked,
           headings: await page.getByRole("heading").allTextContents(),
           errors,
+          consoleErrors,
         }),
         contentType: "application/json",
       });
       throw error;
     } finally {
+      if (nativeExits.length)
+        await testInfo.attach("native-feature-reload-errors", {
+          body: nativeExits.join("\n\n"),
+          contentType: "text/plain",
+        });
       await context.close();
     }
   });
@@ -2531,7 +3280,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         .click();
       for (const width of [1365, 320]) {
         await owner.page.setViewportSize({ width, height: 900 });
-        for (const theme of ["Light", "Dark", "Warp", "Focus", "Soft"]) {
+        for (const theme of detailedThemes(testInfo)) {
           const beforeTheme = await owner.page
             .locator("html")
             .getAttribute("data-theme");
@@ -2585,9 +3334,11 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       await openNote(owner, technicalId);
       await assertFormatting();
       await owner.context.setOffline(true);
-      await owner.page.close();
+      await withDocumentExit(owner.page, () => owner.page.close());
       owner.page = await owner.context.newPage();
-      await owner.page.goto(`${base}/?note=${technicalId}`);
+      await withDocumentExit(owner.page, async () =>
+        owner.page.goto(`${base}/?note=${technicalId}`),
+      );
       await expect(
         owner.page.getByRole("textbox", { name: "Note content", exact: true }),
       ).toHaveValue(technical);
@@ -2604,5 +3355,417 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       (await workspace(owner)).notes.find((note) => note.id === technicalId)
         ?.content,
     ).toBe(technical);
+  });
+  test("storage cleanup requires review, preserves empty work, and keeps stale failures recoverable in every theme", async ({}, testInfo) => {
+    test.setTimeout(180_000);
+    await selectWorkspace(owner, owner.personal);
+    const before = await workspace(owner);
+    await navigate(owner.page, "Workspace settings");
+    const panel = owner.page.locator('[data-tour="storage-health"]');
+    const options = panel.locator(".storage-cleanup");
+    await expect(options).toBeVisible();
+    await options.locator(":scope > summary").click();
+    const review = options.getByRole("button", {
+      name: "Review cleanup",
+      exact: true,
+    });
+    await expect(review).toBeDisabled();
+    await options
+      .getByRole("combobox", {
+        name: "Only remove items older than",
+        exact: true,
+      })
+      .selectOption("30");
+    for (const label of [
+      "Unused uploaded files",
+      "Items in Trash",
+      "Older note versions",
+    ])
+      await options.getByRole("checkbox", { name: label, exact: true }).check();
+    for (const theme of detailedThemes(testInfo)) {
+      await owner.page.getByRole("button", { name: /^Appearance:/ }).click();
+      await owner.page
+        .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+        .click();
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        await review.focus();
+        await review.press("Enter");
+        const preview = options.locator(".storage-cleanup-review");
+        await expect(preview).toBeFocused();
+        await expect(preview).toContainText("0 uploaded files");
+        await expect(preview).toContainText("0 items in Trash");
+        await expect(preview).toContainText("0 note versions");
+        await expect(
+          preview.getByRole("button", {
+            name: "Permanently remove reviewed items",
+            exact: true,
+          }),
+        ).toBeDisabled();
+        expect(
+          await owner.page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBeTruthy();
+        const screenshot = testInfo.outputPath(
+          `storage-cleanup-${theme.toLowerCase()}-${width}.png`,
+        );
+        await owner.page.screenshot({ path: screenshot });
+        await testInfo.attach(
+          `storage-cleanup-${theme.toLowerCase()}-${width}`,
+          { path: screenshot, contentType: "image/png" },
+        );
+        await preview
+          .getByRole("button", { name: "Cancel cleanup", exact: true })
+          .click();
+        await expect(preview).toBeHidden();
+        await expect(review).toBeFocused();
+      }
+    }
+    // Exercise the client error path without deleting any real fixture records.
+    let applied = 0;
+    const stalePreview = async (route: Route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      const body = route.request().postDataJSON() as { action: string };
+      if (body.action === "preview") {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({
+          response,
+          json: {
+            ...data,
+            counts: { ...data.counts, uploads: 1, uploadBytes: 1024 },
+            items: {
+              ...data.items,
+              uploads: [
+                {
+                  id: "fixture-stale",
+                  name: "Previously reviewed attachment.png",
+                  bytes: 1024,
+                },
+              ],
+            },
+          },
+        });
+      } else {
+        applied++;
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          json: {
+            error:
+              "Storage changed after this review. Review cleanup again before removing anything.",
+          },
+        });
+      }
+    };
+    await owner.page.route("**/api/storage", stalePreview);
+    try {
+      await review.click();
+      await options
+        .getByRole("button", {
+          name: "Permanently remove reviewed items",
+          exact: true,
+        })
+        .click();
+      await expect(panel.getByRole("alert")).toContainText(
+        "Storage changed after this review",
+      );
+      await expect(options.locator(".storage-cleanup-review")).toBeHidden();
+      await expect(review).toBeFocused();
+      await expect(review).toBeEnabled();
+      await expect(
+        options.getByRole("checkbox", {
+          name: "Unused uploaded files",
+          exact: true,
+        }),
+      ).toBeChecked();
+      expect(applied).toBe(1);
+      expect((await workspace(owner)).revision).toBe(before.revision);
+    } finally {
+      await owner.page.unroute("**/api/storage", stalePreview);
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+  });
+
+  test("large task lists page by keyboard and boards reveal more without changing totals in every theme", async ({}, testInfo) => {
+    test.setTimeout(180_000);
+    await selectWorkspace(owner, owner.personal);
+    const prefix = `Paging ${fixtureId().slice(0, 8)}`;
+    await createTaskUi(owner.page, `${prefix} 000`);
+    const current = await workspace(owner);
+    const seed = current.tasks.find((item) => item.title === `${prefix} 000`)!;
+    await api(
+      owner,
+      "/api/state",
+      {
+        action: "import",
+        workspace: {
+          ...current,
+          tasks: [
+            ...current.tasks,
+            ...Array.from({ length: 109 }, (_, index) => ({
+              ...seed,
+              id: fixtureId(),
+              key: `PAGE-${index + 1}`,
+              title: `${prefix} ${String(index + 1).padStart(3, "0")}`,
+            })),
+          ],
+        },
+        operationId: fixtureId(),
+      },
+      owner.personal.id,
+    );
+    await withDocumentExit(owner.page, () => owner.page.reload());
+    await appReady(owner.page);
+    for (const theme of detailedThemes(testInfo)) {
+      await owner.page.getByRole("button", { name: /^Appearance:/ }).click();
+      await owner.page
+        .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+        .click();
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        await navigate(owner.page, "Tasks");
+        await owner.page
+          .getByRole("group", { name: "Task layout", exact: true })
+          .getByRole("button", { name: "List", exact: true })
+          .click();
+        const search = owner.page.getByRole("textbox", {
+          name: "Filter tasks",
+          exact: true,
+        });
+        await search.fill(prefix);
+        const pagination = owner.page.getByRole("navigation", {
+          name: "Task list pages",
+          exact: true,
+        });
+        await expect(pagination).toContainText("1–50 of 110 tasks");
+        await expect(owner.page.locator(".task-table tbody tr")).toHaveCount(
+          50,
+        );
+        const next = pagination.getByRole("button", {
+          name: "Next",
+          exact: true,
+        });
+        await next.focus();
+        await next.press("Enter");
+        await expect(pagination).toContainText("51–100 of 110 tasks");
+        await pagination
+          .getByRole("button", { name: "Next", exact: true })
+          .press("Enter");
+        await expect(pagination).toContainText("101–110 of 110 tasks");
+        await expect(owner.page.locator(".task-table tbody tr")).toHaveCount(
+          10,
+        );
+        await expect(
+          pagination.getByRole("button", { name: "Next", exact: true }),
+        ).toBeDisabled();
+        await search.fill(`${prefix} 00`);
+        await expect(pagination).toBeHidden();
+        await expect(owner.page.locator(".task-table tbody tr")).toHaveCount(
+          10,
+        );
+        await search.fill(prefix);
+        await expect(pagination).toContainText("1–50 of 110 tasks");
+        await pagination.scrollIntoViewIfNeeded();
+        const listScreenshot = testInfo.outputPath(
+          `task-list-${theme.toLowerCase()}-${width}.png`,
+        );
+        await owner.page.screenshot({ path: listScreenshot });
+        await testInfo.attach(`task-list-${theme.toLowerCase()}-${width}`, {
+          path: listScreenshot,
+          contentType: "image/png",
+        });
+        await owner.page
+          .getByRole("group", { name: "Task layout", exact: true })
+          .getByRole("button", { name: "Board", exact: true })
+          .click();
+        const column = owner.page.locator(".kanban-column").filter({
+          has: owner.page.getByRole("heading", {
+            name: "To do",
+            exact: true,
+          }),
+        });
+        await expect(column.locator(".task-card")).toHaveCount(40);
+        await expect(column.locator("header")).toContainText("110");
+        const more = column.getByRole("button", {
+          name: "Show more in To do (70 remaining)",
+          exact: true,
+        });
+        await more.focus();
+        await more.press("Enter");
+        await expect(column.locator(".task-card")).toHaveCount(80);
+        await expect(column.locator(".task-card").nth(40)).toBeFocused();
+        const remaining = column.getByRole("button", {
+          name: "Show more in To do (30 remaining)",
+          exact: true,
+        });
+        await remaining.focus();
+        await remaining.press("Enter");
+        await expect(column.locator(".task-card")).toHaveCount(110);
+        await expect(remaining).toHaveCount(0);
+        await expect(column.locator(".task-card").nth(80)).toBeFocused();
+        await expect(column.locator("header")).toContainText("110");
+        await column.locator("header").scrollIntoViewIfNeeded();
+        expect(
+          await owner.page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBeTruthy();
+        const screenshot = testInfo.outputPath(
+          `task-pages-${theme.toLowerCase()}-${width}.png`,
+        );
+        await owner.page.screenshot({ path: screenshot });
+        await testInfo.attach(`task-pages-${theme.toLowerCase()}-${width}`, {
+          path: screenshot,
+          contentType: "image/png",
+        });
+      }
+    }
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+  });
+
+  test("a prepared app update waits for queued edits and preserves the saved note after restart", async ({
+    browserName,
+  }) => {
+    await selectWorkspace(owner, owner.personal);
+    const note = await createNoteUi(
+      owner,
+      "Update recovery reference",
+      "Before the application update.",
+    );
+    await navigate(owner.page, "Workspace settings");
+    await expect(
+      owner.page.getByText("Application files are ready for offline startup.", {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30_000 });
+    await owner.page
+      .getByRole("button", {
+        name: /^(Save workspace offline|Refresh offline copy)$/,
+      })
+      .click();
+    await expect(
+      owner.page.getByText("Offline workspace copy saved", { exact: true }),
+    ).toBeVisible();
+    await openNote(owner, note.id);
+    const rejectSave = async (route: Route) =>
+      route.request().method() === "POST"
+        ? route.abort("failed")
+        : route.continue();
+    if (browserName === "webkit") {
+      // Keep the real worker for this lifecycle check. WebKit's worker-owned
+      // requests bypass routing, so inject only the intended failed save.
+      await owner.page.evaluate(() => {
+        const original = window.fetch;
+        Reflect.set(window, Symbol.for("projectanvil-test-fetch"), original);
+        window.fetch = (input, init) => {
+          const address =
+            typeof input === "string" || input instanceof URL
+              ? String(input)
+              : input.url;
+          const method =
+            init?.method || (input instanceof Request ? input.method : "GET");
+          if (
+            new URL(address, location.href).pathname === "/api/state" &&
+            method.toUpperCase() === "POST"
+          )
+            return Promise.reject(
+              new TypeError("Interrupted test connection."),
+            );
+          return original.call(window, input, init);
+        };
+      });
+    }
+    await owner.page.route("**/api/state", rejectSave);
+    try {
+      await owner.page
+        .getByRole("textbox", { name: "Note content", exact: true })
+        .fill("This revision must survive the application update.");
+      await expect(owner.page.locator(".note-save-state")).toHaveText(
+        "On device",
+      );
+      await navigate(owner.page, "Workspace settings");
+      await owner.page.evaluate(async (id) => {
+        const registration = await navigator.serviceWorker.register(
+          `/__projectanvil_test_service_worker.js?runId=${encodeURIComponent(id)}`,
+          { scope: "/", updateViaCache: "none" },
+        );
+        await new Promise<void>((resolve, reject) => {
+          const deadline = setTimeout(
+            () =>
+              reject(new Error("The disposable update did not become ready.")),
+            30_000,
+          );
+          const ready = () => {
+            if (!registration.waiting) return;
+            clearTimeout(deadline);
+            resolve();
+          };
+          registration.installing?.addEventListener("statechange", ready);
+          registration.addEventListener(
+            "updatefound",
+            () =>
+              registration.installing?.addEventListener("statechange", ready),
+            { once: true },
+          );
+          ready();
+        });
+      }, runId);
+      await expect(
+        owner.page.getByRole("button", {
+          name: "Restart to update",
+          exact: true,
+        }),
+      ).toBeVisible();
+      const document = await owner.page.locator("html").elementHandle();
+      await owner.page
+        .getByRole("button", { name: "Restart to update", exact: true })
+        .click();
+      await expect(
+        owner.page.locator(".app-installation").getByRole("alert"),
+      ).toContainText("Keep this window open");
+      expect(await document!.evaluate((node) => node.isConnected)).toBeTruthy();
+      expect(
+        (await workspace(owner)).notes.find((item) => item.id === note.id)
+          ?.content,
+      ).toBe("Before the application update.");
+    } finally {
+      await owner.page.unroute("**/api/state", rejectSave);
+      if (browserName === "webkit")
+        await owner.page.evaluate(() => {
+          const key = Symbol.for("projectanvil-test-fetch");
+          const original = Reflect.get(window, key);
+          if (typeof original === "function")
+            window.fetch = original as typeof fetch;
+          Reflect.deleteProperty(window, key);
+        });
+    }
+    await expect
+      .poll(
+        async () =>
+          (await workspace(owner)).notes.find((item) => item.id === note.id)
+            ?.content,
+      )
+      .toBe("This revision must survive the application update.");
+    await expect(owner.page.locator(".offline-banner")).toBeHidden({
+      timeout: 30_000,
+    });
+    await Promise.all([
+      owner.page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      owner.page
+        .getByRole("button", { name: "Restart to update", exact: true })
+        .click(),
+    ]);
+    await appReady(owner.page);
+    await openNote(owner, note.id);
+    await expect(
+      owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+    ).toHaveValue("This revision must survive the application update.");
+    expect(
+      await owner.page.evaluate(
+        () => navigator.serviceWorker.controller?.scriptURL,
+      ),
+    ).toContain("/__projectanvil_test_service_worker.js");
   });
 });

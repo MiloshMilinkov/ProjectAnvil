@@ -308,6 +308,21 @@ export function hasUnpersistedDrafts(scope: DraftScope): boolean {
   );
 }
 
+/** Reload only after saves settle and no newer or queued work remains. */
+export async function prepareWorkspaceReload(
+  scope: DraftScope,
+): Promise<boolean> {
+  if (!(await flushDraftGuards(scope))) return false;
+  const start = scopePrefix(scope);
+  return (
+    !hasUnpersistedDrafts(scope) &&
+    ![...guards].some(
+      ([key, guard]) => key.startsWith(start) && guard.hasUnsaved(),
+    ) &&
+    listDrafts(scope, "mutations").length === 0
+  );
+}
+
 /** Only explicit user discard should remove failed writes for an editor record. */
 export function discardDraftMutations(
   scope: DraftScope,

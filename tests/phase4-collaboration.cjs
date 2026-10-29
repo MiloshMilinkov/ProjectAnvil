@@ -143,6 +143,46 @@ module.exports = async function checkCollaboration({
     restricted: true,
     members: [],
   });
+  const db = access.database(),
+    originalPrepare = db.prepare;
+  const queries = [];
+  db.prepare = (query) => {
+    queries.push(query);
+    return originalPrepare(query);
+  };
+  try {
+    const fullAccess = await access.resolveWorkspace(req(bob));
+    assert.equal(
+      fullAccess.permissions.length,
+      1,
+      "Normal reads retain restricted project grants",
+    );
+    assert.equal(queries.length, 3);
+    queries.length = 0;
+    const marker = await access.resolveWorkspaceMarker(req(bob, "/api/live"));
+    assert.deepEqual(Object.keys(marker).sort(), [
+      "id",
+      "kind",
+      "role",
+      "securityRevision",
+    ]);
+    assert.equal(marker.id, team.id);
+    assert.equal(marker.securityRevision, fullAccess.securityRevision);
+    assert.equal(marker.role, "viewer");
+    assert.equal(
+      queries.length,
+      2,
+      "Live markers only need the two consistent membership/security reads",
+    );
+    assert(!queries.some((query) => query.includes("project_permissions")));
+    assert(
+      !queries.some((query) =>
+        query.includes("SELECT id, kind, owner_user_id"),
+      ),
+    );
+  } finally {
+    db.prepare = originalPrepare;
+  }
   await save(alice, "notes", {
     id: "shared-note",
     title: "Shared note",
@@ -411,6 +451,11 @@ module.exports = async function checkCollaboration({
     workspaceId: team.id,
     userId: bob.id,
   });
+  await assert.rejects(
+    () => access.resolveWorkspaceMarker(req(bob, "/api/live")),
+    (error) => error.status === 404,
+    "The cheaper live marker must still reject revoked membership",
+  );
   await assert.rejects(
     () => collaboration.readActivity(req(bob, "/api/activity")),
     (error) => error.status === 404,

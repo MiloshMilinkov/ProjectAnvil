@@ -12,11 +12,10 @@ import { useWorkspacePermissions } from "../WorkspacePermissions";
 import { Avatar } from "../WorkspacePrimitives";
 import PriorityMark from "./PriorityMark";
 
-interface TaskBoardProps
-  extends Pick<
-    FeatureProps,
-    "workspace" | "projectFilter" | "openTask" | "mutate" | "notify"
-  > {
+interface TaskBoardProps extends Pick<
+  FeatureProps,
+  "workspace" | "projectFilter" | "openTask" | "mutate" | "notify"
+> {
   tasks: Task[];
   filtered: boolean;
   referenceDate: string;
@@ -38,6 +37,9 @@ export default function TaskBoard({
   const permissions = useWorkspacePermissions(workspace);
   const [dragging, setDragging] = useState("");
   const [dragOver, setDragOver] = useState("");
+  const [visibleCounts, setVisibleCounts] = useState<
+    Partial<Record<Status, number>>
+  >({});
   const peopleById = useMemo(
     () => new Map(workspace.people.map((person) => [person.id, person])),
     [workspace.people],
@@ -61,6 +63,7 @@ export default function TaskBoard({
     >
       {statuses.map((status) => {
         const items = tasksByStatus.get(status.id) || [];
+        const visibleCount = visibleCounts[status.id] || 40;
         return (
           <section
             className={
@@ -110,7 +113,7 @@ export default function TaskBoard({
               </button>
             </header>
             <div className="kanban-cards">
-              {items.map((task) => (
+              {items.slice(0, visibleCount).map((task) => (
                 <button
                   draggable={permissions.canEditProject(task.projectId)}
                   onDragStart={(e) => {
@@ -181,6 +184,28 @@ export default function TaskBoard({
                   </div>
                 </button>
               ))}
+              {items.length > visibleCount && (
+                <button
+                  className="btn task-show-more"
+                  onClick={(event) => {
+                    const cards = event.currentTarget.parentElement;
+                    setVisibleCounts((counts) => ({
+                      ...counts,
+                      [status.id]: visibleCount + 40,
+                    }));
+                    requestAnimationFrame(() => {
+                      if (!cards?.isConnected) return;
+                      const firstNewCard = cards
+                        .querySelectorAll<HTMLButtonElement>(".task-card")
+                        .item(visibleCount);
+                      firstNewCard?.focus();
+                    });
+                  }}
+                >
+                  Show more in {status.label} ({items.length - visibleCount}{" "}
+                  remaining)
+                </button>
+              )}
               {!items.length && (
                 <div className="column-empty">
                   <CircleDashed size={20} />

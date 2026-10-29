@@ -8,6 +8,7 @@ export const migrationSources = [
   { name: "activity", file: "db/collaboration.sql" },
   { name: "shared-notes", file: "db/note-collaboration.sql" },
   { name: "account-recovery", file: "db/release.sql" },
+  { name: "storage-cleanup", file: "db/storage.sql" },
 ] as const;
 
 type MigrationDatabase = Pick<D1Database, "prepare" | "batch">;

@@ -107,9 +107,24 @@ Local registration and sign-in do not require verification. This preserves curre
 
 The default **local** mode accepts loopback application addresses only (`127.0.0.1`, `localhost`, or IPv6 loopback). The launcher remains bound to this PC. Requests through a public hostname fail closed; changing an address/header cannot grant guest access. `BETTER_AUTH_URL`, when set, must match the actual origin, including its port.
 
-The code also supports a separately configured **online** access policy. It requires `PROJECTANVIL_MODE=online`, an explicit HTTPS `BETTER_AUTH_URL`, a private comma-separated `PROJECTANVIL_ALLOWED_EMAILS` list (up to 200 approved addresses), an `ACCOUNT_MAILER` service binding, a strong `BETTER_AUTH_SECRET`, and the current database migrations. There is no shared guest access. Registration/sign-in and each workspace access enforce approval, and sign-in/workspace access require verified email. Removing approval denies subsequent server access; it cannot erase previously downloaded device data. Only the trusted Cloudflare client-IP header is used for online authentication limits.
+The code also supports a separately configured **online** access policy. It requires `PROJECTANVIL_MODE=online`, an explicit HTTPS `BETTER_AUTH_URL`, a private comma-separated `PROJECTANVIL_ALLOWED_EMAILS` list (up to 200 approved addresses), one configured account-email transport, a strong `BETTER_AUTH_SECRET`, and the current database migrations. There is no shared guest access. Registration/sign-in and each workspace access enforce approval, and sign-in/workspace access require verified email. Removing approval denies subsequent server access; it cannot erase previously downloaded device data. Only the trusted Cloudflare client-IP header is used for online authentication limits.
 
-`ACCOUNT_MAILER` is an unconfigured service contract, not an installed email provider: it accepts an internal POST with `{email,kind,url}` and returns success only after accepting delivery. Online mode never falls back to the local outbox. Real provider configuration, delivery, proxy behavior, and HTTPS tests remain release work. No cloud resource or deployment is created by these settings or migration-plan commands. Leave the current installation in local mode.
+Account email can use either an `ACCOUNT_MAILER` service binding accepting an internal POST with `{email,kind,url}`, or the optional direct Resend adapter: `PROJECTANVIL_MAIL_PROVIDER=resend`, `PROJECTANVIL_MAIL_FROM` with a verified sender, and a private `RESEND_API_KEY`. Configure one transport only. The direct adapter uses the provider's fixed HTTPS endpoint, bounded requests, plain-text account links, and checks delivery acceptance; no SDK is added. Online mode never falls back to the local outbox. No provider/domain is configured, and real delivery, proxy behavior, and HTTPS tests remain release work. No cloud resource or deployment is created by these settings or migration-plan commands. Leave the current installation in local mode.
+
+### Local release checks
+
+These commands prepare and test code locally; they do not deploy, provision resources, or send email:
+
+```sh
+npm run release:check
+npm run release:rehearse
+```
+
+`release:check` validates the current command environment without reading secrets from files automatically. To check the normal local installation's private settings, use `node --experimental-strip-types --env-file=.dev.vars scripts/release-readiness.mjs`. The explicit TypeScript flag preserves support for the stated minimum Node version. The report contains pass/fail checks and transport names, with no secrets, email lists, or private URLs. An unconfigured shell can fail the signing-secret check; that does not change the installation. Optional `--out outputs/release/check.json` writes a new report without overwriting an existing one.
+
+`release:rehearse` creates its own temporary SQLite database, file, and signing secret. It rehearses additive migrations, failed upgrade recovery, complete backup verification, restore, and rollback together. It accepts no live database or backup path and removes only its owned fixture directory. Passing this rehearsal proves the local tools work on fixtures; it does not verify a hosted service or replace a backup of your actual work.
+
+Private `/api/health` diagnostics are disabled by default. A separately configured `PROJECTANVIL_DIAGNOSTICS_TOKEN` of 32–256 characters, different from the account signing secret, enables bearer-authenticated checks. Keep the token in private secrets and send it only in the Authorization header. Requests without the correct token receive 404. Responses contain availability checks only, with no account, file, database, or provider details. They check configuration, database access, migration state, and bucket reachability; they do not send email or prove real delivery. Keep diagnostics local until hosting is explicitly approved.
 
 ## Data and backups
 
@@ -272,7 +287,17 @@ Personal templates retain reusable decision reasoning in Markdown and begin with
 | Portable Markdown                | 200 notes, 400 files, 24 MB expanded content, 25 MB ZIP, 20 MB per attachment; normal note/workspace limits still apply                                                                 |
 | Public app cache                 | Up to 50 MB per build; the current and one earlier shell build are retained                                                                                                             |
 
-Archived note history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. Team permissions, activity, watches, Notifications, and shared editing state are stored separately too, with the limits above. Archived note versions, Trash, and unreferenced attachment files are retained without automatic deletion; complete backups preserve confirmed data. Owners and Admins can use **Workspace settings → Data & offline → Storage & recovery** to check active usage, retained files, and missing attachments without deleting files. Note history loads in pages of 20 versions. Change-impact markers indicate possible consequences; review connected content before acknowledging them.
+Archived note history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. Team permissions, activity, watches, Notifications, and shared editing state are stored separately too, with the limits above. Recovery records have no automatic expiry. Note history loads in pages of 20 versions. Change-impact markers indicate possible consequences; review connected content before acknowledging them.
+
+### Reviewed storage cleanup
+
+Owners and Admins, including the local guest owner, can open **Workspace settings → Data & offline → Storage & recovery → Clean up storage**. Choose unused uploads, Trash, and/or older note versions, then an age of **30 days**, **90 days**, or **1 year**. **Review cleanup** shows counts, sizes, examples, and exclusions before anything changes. **Cancel cleanup** leaves the records intact.
+
+Synchronize pending edits, download unresolved browser drafts, and keep a verified complete backup before choosing **Permanently remove reviewed items**. Removal has no Undo; recovery requires the matching complete backup. The review expires after ten minutes and must be repeated if records or permissions change. Each review handles at most 1,000 recovery records; repeat it for more.
+
+Current attachment-library entries, files referenced by current work or retained recovery records, in-progress uploads, files with unknown age, and each note's newest saved version are kept. Move an unwanted attachment to Trash first. Browser drafts and external backups are not scanned for references. If an old device draft refers to a permanently deleted file, upload it again or remove the link before saving. Interrupted file removals are reported and can be retried by reviewing unused uploads. There is no scheduled deletion task.
+
+Encoded or unusual paths in kept recovery records can make attachment references uncertain. Cleanup preserves those uploads and explains the exclusion. Use the ordinary attachment links before reviewing again; do not bypass this protection by editing the database.
 
 Browser storage limits can be lower than these allowances. Offline copies and application files use separate browser storage from the server's database and uploads. Complete backups restore confirmed server work; they cannot restore cleared browser copies or unsynchronized queued edits.
 
@@ -286,6 +311,7 @@ Browser storage limits can be lower than these allowances. Offline copies and ap
 | Node is missing                     | Install Node.js 22.13+ and restart your terminal or VS Code. The Windows launcher expects the standard installation path.                                           |
 | Dependencies are missing            | Run `npm run install:ci` from the repository folder. This needs internet access.                                                                                    |
 | Saving failed                       | Read the error and use Retry saves; review conflicting edits in their editor. Download a recovery copy before discarding pending work.                              |
+| A screen cannot open                | Reconnect and choose Retry opening. If it still fails, Reload app checks unfinished work before restarting. Save, synchronize, or review pending changes if reload is blocked. |
 | Old app version after source update | Stop the old server and relaunch normally; in Settings check for a prepared update, close other app windows, then restart to update.                                |
 | Offline copy does not reopen        | Use the same browser profile and exact address. Prepare application files and save the workspace copy while connected first.                                        |
 | Offline copy cleared after restore  | A restored server can have older access records. Reconnect to verify access, then explicitly save a fresh offline copy. Queued changes remain available for review. |
@@ -327,4 +353,4 @@ npm run check
 
 Checks include TypeScript, lint, backend/draft/offline/portability regressions, public-cache policy and update tests, temporary-fixture backup restoration, and a production build. Backend tests use in-memory SQLite and a fake file bucket; backup tests use temporary fixture directories. They do not modify saved workspaces. GitHub Actions runs the same checks on pushes and pull requests. Building the app does not publish it. See [GitHub setup](../GITHUB.md) for source control and [LOCAL_ONLY.md](../LOCAL_ONLY.md) for the current local-operation policy.
 
-For two-account Chromium browser checks and populated-workspace stress measurements, see [Testing](TESTING.md). Their runners create independent local databases and test accounts instead of using your saved installation.
+For two-account browser checks and populated-workspace stress measurements, see [Testing](TESTING.md). Their runners create independent local databases and test accounts instead of using your saved installation.

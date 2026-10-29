@@ -8,12 +8,74 @@ import {
   permissionsSnapshotSQL,
 } from "./permissions";
 
-interface MediaObjectRow {
+export interface MediaObjectRow {
   media_id: string;
   object_key: string;
   state: "uploading" | "active" | "retained";
   created_at: string;
   unreferenced_at: string | null;
+}
+
+/** Match browser-resolvable relative/encoded paths without throwing on malformed prose. */
+export function referencedMediaIds(value: unknown): Set<string> {
+  let serialized = JSON.stringify(value);
+  for (let pass = 0; pass < 3 && serialized.includes("%"); pass++) {
+    const decoded = serialized.replace(
+      /%([0-9a-f]{2})/gi,
+      (match, hex: string) => {
+        const character = Number.parseInt(hex, 16);
+        return character < 128 ? String.fromCharCode(character) : match;
+      },
+    );
+    if (decoded === serialized) break;
+    serialized = decoded;
+  }
+  // HTTP URLs treat backslashes as separators. This conservative scan never
+  // changes a stored note or link.
+  serialized = serialized.replace(/\\+/g, "/");
+  const ids = new Set(
+    [...serialized.matchAll(/api\/media\/([A-Za-z0-9_-]{1,120})/g)].map(
+      (match) => match[1],
+    ),
+  );
+  if (serialized.includes("/./") || serialized.includes("/../")) {
+    for (const match of serialized.matchAll(
+      /(api\/[A-Za-z0-9_./%?#=&:+-]+)/g,
+    )) {
+      try {
+        const path = new URL(match[1], "http://projectanvil.invalid/").pathname;
+        const id = /^\/api\/media\/([A-Za-z0-9_-]{1,120})(?:\/|$)/.exec(
+          path,
+        )?.[1];
+        if (id) ids.add(id);
+      } catch {
+        /* An invalid path is ordinary text, not a usable attachment. */
+      }
+    }
+  }
+  for (const match of serialized.matchAll(
+    /"entityId":"([A-Za-z0-9_-]{1,120})"/g,
+  ))
+    ids.add(match[1]);
+  return ids;
+}
+
+export interface StorageReport {
+  activeBytes: number;
+  limitBytes: number;
+  canCleanup: boolean;
+  history: { versions: number; bytes: number };
+  media: {
+    active: number;
+    retained: number;
+    retainedBytes: number;
+    pending: number;
+    pendingCleanup: number;
+    missing: { id: string; name: string }[];
+    untracked: number;
+    partial: boolean;
+  };
+  retention: string;
 }
 
 export async function recordUpload(
@@ -28,7 +90,8 @@ export async function recordUpload(
   const result = await database()
     .prepare(
       `INSERT INTO media_objects (workspace_id, media_id, object_key, state, created_at)
-    SELECT ?, ?, ?, 'uploading', ? WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = ?)${membership}`,
+    SELECT ?, ?, ?, 'uploading', ? WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = ?)${membership}
+    AND NOT EXISTS (SELECT 1 FROM storage_media_purges WHERE workspace_id = ? AND media_id = ?)`,
     )
     .bind(
       access.id,
@@ -37,11 +100,13 @@ export async function recordUpload(
       new Date().toISOString(),
       access.id,
       ...values,
+      access.id,
+      mediaId,
     )
     .run();
   if (!result.meta.changes)
     throw new WorkspaceError(
-      "Your workspace access changed before the upload started.",
+      "The upload could not start. Refresh the workspace and choose the file again.",
       409,
     );
 }
@@ -62,7 +127,7 @@ export async function retainFailedUpload(
 export async function storageHealth(
   access: ResolvedWorkspace,
   workspace: Workspace,
-) {
+): Promise<StorageReport> {
   if (!canManageWorkspace(access))
     throw new WorkspaceError(
       "Workspace storage reports are available to owners and admins.",
@@ -77,6 +142,13 @@ export async function storageHealth(
     .bind(access.id)
     .all<MediaObjectRow>();
   const activeIds = new Set(workspace.media.map((file) => file.id));
+  const purges = await database()
+    .prepare(
+      "SELECT media_id FROM storage_media_purges WHERE workspace_id = ? AND deleted_at IS NULL",
+    )
+    .bind(access.id)
+    .all<{ media_id: string }>();
+  const pendingCleanup = new Set(purges.results.map((row) => row.media_id));
   const registered = new Map(rows.results.map((row) => [row.media_id, row]));
   const objects = new Map<string, { key: string; size: number }>();
   let cursor: string | undefined;
@@ -121,6 +193,7 @@ export async function storageHealth(
     .bind(access.id)
     .first<{ versions: number; bytes: number }>();
   return {
+    canCleanup: true,
     activeBytes: new TextEncoder().encode(JSON.stringify(activeRecords))
       .byteLength,
     limitBytes: 1_500_000,
@@ -135,11 +208,14 @@ export async function storageHealth(
       pending: rows.results.filter(
         (row) => row.state === "uploading" && !activeIds.has(row.media_id),
       ).length,
+      pendingCleanup: pendingCleanup.size,
       missing,
-      untracked: retained.filter(([id]) => !registered.has(id)).length,
+      untracked: retained.filter(
+        ([id]) => !registered.has(id) && !pendingCleanup.has(id),
+      ).length,
       partial,
     },
     retention:
-      "Unused uploads and note history are kept. This check does not delete files.",
+      "Recovery data is kept until you review and confirm a cleanup. Files with unknown age are preserved.",
   };
 }

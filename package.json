@@ -12,7 +12,7 @@
     "start": "node scripts/start-built.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "test": "node scripts/check-backend.mjs && node --test tests/local-backup.test.mjs tests/pwa.test.mjs tests/build-fingerprint.test.mjs tests/test-runtime.test.mjs",
+    "test": "node scripts/check-backend.mjs && node --experimental-strip-types --test tests/local-backup.test.mjs tests/pwa.test.mjs tests/build-fingerprint.test.mjs tests/test-runtime.test.mjs tests/release-readiness.test.mjs",
     "test:browser": "node scripts/run-browser-tests.mjs",
     "test:performance": "node scripts/run-performance-tests.mjs",
     "size:report": "node scripts/report-size.mjs",
@@ -22,7 +22,9 @@
     "backup:verify": "node scripts/local-backup.mjs verify",
     "backup:restore": "node scripts/local-backup.mjs restore",
     "account-mail": "node scripts/account-mail.mjs",
-    "db:migrations:plan": "node --experimental-strip-types scripts/database-migrations.mjs"
+    "db:migrations:plan": "node --experimental-strip-types scripts/database-migrations.mjs",
+    "release:check": "node --experimental-strip-types scripts/release-readiness.mjs",
+    "release:rehearse": "node --experimental-strip-types scripts/release-readiness.mjs --rehearse"
   },
   "dependencies": {
     "better-auth": "1.7.11",

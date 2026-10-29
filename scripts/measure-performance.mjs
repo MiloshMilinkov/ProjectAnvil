@@ -54,6 +54,56 @@ async function current(client, session, workspaceId) {
     .workspace;
 }
 
+/** A stable workspace should hold one request, rather than repeatedly download records. */
+async function liveUpdates(client, session, workspaceId) {
+  const first = await client.request(session, "/api/live?wait=0", {
+    workspaceId,
+  });
+  const idle = await client.request(
+    session,
+    `/api/live?since=${encodeURIComponent(first.data.cursor)}`,
+    { workspaceId },
+  );
+  assert.equal(idle.data.cursor, first.data.cursor);
+  assert(
+    idle.elapsedMs >= 17_000 && idle.elapsedMs < 30_000,
+    "Unchanged live markers should hold for the normal long-poll window",
+  );
+  const snapshot = await current(client, session, workspaceId);
+  const task = snapshot.tasks[0];
+  const waiting = client.request(
+    session,
+    `/api/live?since=${encodeURIComponent(idle.data.cursor)}`,
+    { workspaceId },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const write = await client.request(session, "/api/state", {
+    workspaceId,
+    body: {
+      action: "upsert",
+      entity: "tasks",
+      item: { id: task.id, title: `${task.title} · live check` },
+      base: task,
+      operationId: randomUUID(),
+    },
+  });
+  const changed = await waiting;
+  assert.equal(changed.data.revision, write.data.workspace.revision);
+  assert.notEqual(changed.data.cursor, first.data.cursor);
+  assert(
+    changed.elapsedMs < 5_000,
+    "Live updates should notice an acknowledged write within five seconds locally",
+  );
+  return {
+    idleRequests: 1,
+    idleHoldMs: round(idle.elapsedMs),
+    idleBytes: idle.bytes,
+    changeObservedMs: round(changed.elapsedMs),
+    changedBytes: changed.bytes,
+    containsWorkspaceRecords: Object.hasOwn(changed.data, "workspace"),
+  };
+}
+
 async function importProfile(client, session, workspaceId, profile, namespace) {
   const before = await current(client, session, workspaceId);
   const workspace = createSyntheticWorkspace(
@@ -423,6 +473,7 @@ export async function runPerformanceBenchmark({
     await writeFile(outputPath, JSON.stringify(report, null, 2) + "\n");
   }
   report.quotaBoundary = await quotaBoundary(client, owner, teamId);
+  report.liveUpdates = await liveUpdates(client, owner, teamId);
   report.correctness = {
     personalIsolation: true,
     acceptedTeamAccess: true,

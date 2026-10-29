@@ -19,9 +19,39 @@ export interface BrowserAccount {
   userId: string;
   personal: WorkspaceAccess;
   pageErrors: string[];
+  nativeExitErrors: string[];
 }
 
 export const fixtureId = () => randomUUID().replaceAll("-", "");
+const exitingDocuments = new WeakSet<Page>();
+
+export function isNativeDocumentExitError(
+  page: Page,
+  error: Error,
+  browserName: string,
+  origin: string,
+): boolean {
+  return (
+    browserName === "webkit" &&
+    exitingDocuments.has(page) &&
+    error.name === "Fetch API cannot load http" &&
+    !!error.stack?.startsWith(`Fetch API cannot load ${origin}/api/`) &&
+    error.message.endsWith(" due to access control checks.")
+  );
+}
+
+/** Marks only an intentional document exit, never ordinary in-app navigation. */
+export async function withDocumentExit<T>(
+  page: Page,
+  action: () => Promise<T>,
+): Promise<T> {
+  exitingDocuments.add(page);
+  try {
+    return await action();
+  } finally {
+    exitingDocuments.delete(page);
+  }
+}
 
 /** Each actor gets its own cookies, storage, cache, and offline queue. */
 export async function registerThroughUi(
@@ -37,8 +67,22 @@ export async function registerThroughUi(
   });
   const origin = new URL(baseURL).origin;
   const pageErrors: string[] = [];
+  const nativeExitErrors: string[] = [];
   context.on("page", (page) =>
-    page.on("pageerror", (error) => pageErrors.push(error.message)),
+    page.on("pageerror", (error) => {
+      // Windows WebKit reports a caught pagehide fetch as a page error. Keep
+      // this proven native event separately, only during an explicit exit.
+      if (
+        isNativeDocumentExitError(
+          page,
+          error,
+          browser.browserType().name(),
+          origin,
+        )
+      )
+        nativeExitErrors.push(error.stack!);
+      else pageErrors.push(error.message);
+    }),
   );
   await context.route("**/*", (route) => {
     const url = new URL(route.request().url());
@@ -86,6 +130,7 @@ export async function registerThroughUi(
     userId: account.user.id,
     personal,
     pageErrors,
+    nativeExitErrors,
   };
 }
 
@@ -138,14 +183,22 @@ export async function navigate(page: Page, name: string | RegExp) {
 export async function selectWorkspace(
   actor: BrowserAccount,
   workspace: WorkspaceAccess,
+  { reload = false }: { reload?: boolean } = {},
 ) {
-  await actor.page.goto("/");
+  await actor.page.bringToFront();
+  if (reload) await withDocumentExit(actor.page, () => actor.page.goto("/"));
   await appReady(actor.page);
+  // Use the normal account refresh and workspace menu. Unnecessary hard
+  // navigations can make WebKit report caught pagehide fetches as page errors.
+  await actor.page.evaluate(() => window.dispatchEvent(new Event("focus")));
   const switcher = actor.page.getByRole("button", {
     name: /^Switch workspace:/,
   });
   if (!(await switcher.getAttribute("aria-label"))?.endsWith(workspace.name)) {
     await switcher.click();
+    await expect(
+      actor.page.getByRole("menuitemradio", { checked: true }),
+    ).toBeFocused();
     await actor.page
       .getByRole("menuitemradio", {
         name: `${workspace.name} ${workspace.kind === "team" ? "Team workspace" : "Private personal workspace"}`,
@@ -285,9 +338,15 @@ export async function createNoteUi(
     .getByRole("button", { name: "Create note", exact: true })
     .click();
   await expect(dialog).toBeHidden();
-  await actor.page
-    .getByRole("textbox", { name: "Note content", exact: true })
-    .fill(content);
+  const editor = actor.page.getByRole("textbox", {
+    name: "Note content",
+    exact: true,
+  });
+  await editor.focus();
+  await expect(editor).toBeFocused();
+  await editor.fill(content);
+  await expect(editor).toHaveValue(content);
+  await expect(editor).toBeFocused();
   await expect
     .poll(
       async () =>
@@ -304,7 +363,9 @@ export async function createNoteUi(
 }
 
 export async function openNote(actor: BrowserAccount, id: string) {
-  await actor.page.goto(`/?note=${encodeURIComponent(id)}`);
+  await withDocumentExit(actor.page, () =>
+    actor.page.goto(`/?note=${encodeURIComponent(id)}`),
+  );
   await appReady(actor.page);
   await expect(
     actor.page.getByRole("textbox", { name: "Note content", exact: true }),
@@ -313,7 +374,10 @@ export async function openNote(actor: BrowserAccount, id: string) {
 
 export async function createTaskUi(page: Page, title: string) {
   await navigate(page, "Tasks");
-  await page.getByRole("button", { name: "Create task", exact: true }).click();
+  await page
+    .locator(".page-heading .heading-actions")
+    .getByRole("button", { name: "Create task", exact: true })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Create task", exact: true });
   await dialog
     .getByPlaceholder("What needs to happen?", { exact: true })

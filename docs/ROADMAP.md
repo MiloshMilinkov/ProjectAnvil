@@ -14,11 +14,14 @@ All phases follow the [interface standard](UI_STANDARDS.md): readable and access
 
 ## Reliability work before an online release
 
-Two-account Chromium browser regressions and repeatable populated-workspace measurements are available through the [testing commands](TESTING.md). The [capacity review](PERFORMANCE.md) records the measured limits and next improvements.
+Two-account browser regressions for Chromium, Firefox, and WebKit and repeatable populated-workspace measurements are available through the [testing commands](TESTING.md). The [capacity review](PERFORMANCE.md) records measured limits and remaining improvements. Engine setup and local test limitations are documented there.
 
 - Local release preparation now includes loopback-only guest access, fail-closed online policies with approved/verified accounts, local account-link delivery, account recovery/session controls, and versioned migration rehearsals. Real online resources and an external email service remain unconfigured.
 - Connect and verify real account email delivery, HTTPS/proxy behavior, and authentication request limits on future staging.
-- Prepare larger-workspace storage, pagination, quotas, and retention; measure realistic loads and rehearse migrations.
+- Local readiness includes bounded task rendering, explicit reviewed recovery cleanup, redacted configuration/private health checks, an optional email adapter, and disposable migration/backup/rollback rehearsals. Services remain unconfigured; no online resources are created.
+- Resolve the outstanding WebKit deferred-screen recovery check and run Firefox on a supported runtime before claiming complete cross-browser readiness. See [outstanding local verification](TESTING.md#outstanding-local-verification).
+- Run a real project locally before beta: capture task/note friction, misleading feedback, recovery issues, and slow interactions. Fix repeated problems before expanding the feature set.
+- Larger teams still need independently stored records and incremental queries before increasing capacity limits. Keep current caps for an initial small beta and verify the intended workload in staging.
 - Review runtime/dependencies, automated browser coverage, monitoring, backup restore, and rollback. Include offline copies, queued changes, and access changes in release rehearsals.
 
 ## Future hosting sequence

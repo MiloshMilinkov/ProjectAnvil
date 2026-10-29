@@ -1715,6 +1715,25 @@ svg {
   max-width: 1000px;
   margin-left: 0;
 }
+.task-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  font-size: var(--font-size-control);
+  border-bottom: 1px solid var(--control-border);
+}
+.task-show-more {
+  width: 100%;
+  white-space: normal;
+  min-height: var(--control-height-touch);
+}
+.task-pagination > div {
+  display: flex;
+  gap: var(--space-2);
+}
 .settings-section {
   padding: 24px;
   margin-bottom: 20px;

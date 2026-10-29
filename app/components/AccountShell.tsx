@@ -5,6 +5,7 @@ import type { AccountContext, WorkspaceAccess } from "../lib/access-types";
 import {
   AccountRefreshRequests,
   accountResponseStatus,
+  retainUnchangedAccount,
 } from "../lib/account-refresh";
 import ProjectAnvil from "./ProjectAnvil";
 import { WorkspaceScope } from "./WorkspaceScope";
@@ -58,7 +59,7 @@ export default function AccountShell() {
     const sameUser = latest.current?.user?.id === next.user?.id;
     latest.current = next;
     requests.current.invalidate();
-    setAccount(next);
+    setAccount((current) => retainUnchangedAccount(current, next));
     setActiveId((current) => {
       let saved = "";
       try {

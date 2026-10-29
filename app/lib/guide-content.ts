@@ -29,7 +29,7 @@ export const tourSteps: TourStep[] = [
     page: "overview",
     title: "Overview",
     body: "Overview shows project progress, upcoming tasks, and recent notes. Create a task, open a project, or resume a work room.",
-    tip: "More tools contains work rooms, collections, and activity. If a screen fails to load, reconnect and choose Retry opening.",
+    tip: "More tools contains work rooms, collections, and activity. If a screen fails to load, reconnect and choose Retry opening. If it still cannot open, Reload app checks for unfinished work before restarting.",
     anchors: [
       '[data-tour="overview"]',
       ".view-overview .page-heading",
@@ -159,7 +159,7 @@ export const tourSteps: TourStep[] = [
     page: "tasks",
     title: "Board, list, and timeline",
     body: "Board organizes tasks into status columns; drag a card to move work forward. List shows assignments and schedules together. Timeline draws planned start through due date as a range, or a marker when only one date is known. Choose Window starts, previous/next 28 days, or Today to explore the schedule.",
-    tip: "Phones start with a readable List. Board and Timeline remain available. Use the status field as an alternative to dragging.",
+    tip: "Phones start with a readable List. Lists show 50 tasks per page; use Previous and Next for more. Board starts with 40 cards per status; Show more reveals the rest. Filters, totals, and bulk editing include all matches. Use the status field as an alternative to dragging.",
     anchors: ['[data-tour="task-layouts"]', ".task-view-toolbar .view-tabs"],
   },
   {
@@ -457,7 +457,7 @@ export const tourSteps: TourStep[] = [
     id: "people",
     page: "team",
     title: "Accounts and teams",
-    body: "Register with an email address, username, and a ProjectAnvil password. Your personal workspace is private. Create a team workspace, invite registered usernames with an access role, and let them accept. Team projects and their connected content follow workspace roles and project permissions.",
+    body: "Register with an email address, username, and a ProjectAnvil password. Your personal workspace is private. Create a team workspace, invite registered usernames with an access role, and let them accept. Team projects and their connected content follow workspace roles and project permissions. Account and workspace menus support arrow keys; Escape closes the menu and returns focus.",
     tip: "Account menu → Account security manages email verification, password changes, and sessions. Sign in also offers Forgot password? and Verify email. Local recovery links stay on this PC; see the setup guide. Online access needs an approved, verified account. Choose a team workspace before creating shared projects.",
     anchors: [
       '[data-tour="people"]',
@@ -579,7 +579,7 @@ export const tourSteps: TourStep[] = [
     page: "settings",
     title: "Exports and backups",
     body: "In Workspace settings → Data & offline, Storage & recovery reports the active workspace allowance, archived history, and attachment problems. Workspace records exports visible records or imports a replacement after confirmation, resetting relationship review markers. New imported ideas start without votes; matching ideas retain current trusted votes. JSON excludes personal rooms, archived versions, and uploaded files.",
-    tip: "Finish pending saves first. Stop the app before making a complete backup; follow the local setup guide. Browser drafts are separate, so download unfinished text you need to keep.",
+    tip: "Owners and admins can open Clean up storage, choose unused uploads, Trash, or older note versions, and review items older than 30 days, 90 days, or a year. Removal is permanent, with no Undo. Current files, referenced attachments, and each note's newest saved version are kept. Finish pending saves and keep a complete backup first; browser drafts are separate.",
     anchors: [
       '[data-tour="storage-health"]',
       '[data-tour="backups"]',

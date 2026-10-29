@@ -1124,6 +1124,102 @@ async function checkDrafts() {
     assert.equal(drafts.hasUnpersistedDrafts(scope), false);
     release();
 
+    const reloadScope = {
+      accountId: "reload-account",
+      workspaceId: "reload-workspace",
+    };
+    assert.equal(await drafts.prepareWorkspaceReload(reloadScope), true);
+    const releaseUnsaved = drafts.registerDraftGuard(
+      reloadScope,
+      "unfinished",
+      {
+        hasUnsaved: () => true,
+      },
+    );
+    assert.equal(await drafts.prepareWorkspaceReload(reloadScope), false);
+    releaseUnsaved();
+
+    storage.failWrites = true;
+    const unstored = drafts.writeDraft(
+      reloadScope,
+      "notes",
+      "unstored",
+      { content: "Keep this text" },
+      null,
+    );
+    storage.failWrites = false;
+    assert.equal(
+      await drafts.prepareWorkspaceReload(reloadScope),
+      false,
+      "Reload cannot discard a failed device-storage write",
+    );
+    drafts.removeDraft(reloadScope, "notes", "unstored", unstored.record.token);
+
+    const pending = drafts.writeDraft(
+      reloadScope,
+      "mutations",
+      "pending",
+      {
+        action: "upsert",
+        entity: "tasks",
+        item: { id: "pending-task", title: "Keep queued work" },
+      },
+      null,
+    );
+    assert.equal(await drafts.prepareWorkspaceReload(reloadScope), false);
+    assert.equal(
+      drafts.readDraft(reloadScope, "mutations", "pending").token,
+      pending.record.token,
+      "A blocked reload retains the queued operation",
+    );
+    const releaseSave = drafts.registerDraftGuard(reloadScope, "save", {
+      hasUnsaved: () => !!drafts.readDraft(reloadScope, "mutations", "pending"),
+      flush: async () => {
+        drafts.removeDraft(
+          reloadScope,
+          "mutations",
+          "pending",
+          pending.record.token,
+        );
+        return true;
+      },
+    });
+    assert.equal(
+      await drafts.prepareWorkspaceReload(reloadScope),
+      true,
+      "A confirmed flush can make a previously queued workspace ready to reload",
+    );
+    releaseSave();
+
+    let finishSave;
+    let acknowledged = false;
+    let newerEdit = false;
+    const saveBarrier = new Promise((resolve) => {
+      finishSave = resolve;
+    });
+    const releaseRace = drafts.registerDraftGuard(reloadScope, "newer-edit", {
+      hasUnsaved: () => !acknowledged || newerEdit,
+      flush: async () => {
+        await saveBarrier;
+        acknowledged = true;
+        return true;
+      },
+    });
+    const checkingReload = drafts.prepareWorkspaceReload(reloadScope);
+    newerEdit = true;
+    finishSave();
+    assert.equal(
+      await checkingReload,
+      false,
+      "An earlier save acknowledgement cannot authorize reloading over newer work",
+    );
+    releaseRace();
+    assert.equal(
+      await drafts.prepareWorkspaceReload(reloadScope),
+      true,
+      "Unrelated workspace drafts do not block a clean scope",
+    );
+
     storage.setItem("projectanvil-draft-v1:account-a:team-a:notes:%ZZ", "{}");
     storage.setItem(
       "projectanvil-draft-v1:account-a:team-a:notes:corrupt",

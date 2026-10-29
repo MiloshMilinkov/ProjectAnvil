@@ -21,6 +21,7 @@ import {
 } from "../lib/draft-store";
 import { useDraftScope } from "./useRecoverableDraft";
 import { useWorkspaceFetch, useWorkspaceScope } from "./WorkspaceScope";
+import { workspacePermissionKey } from "../lib/account-refresh";
 import { recoverPendingOperation } from "../lib/editor-mutations";
 import {
   cancelUnsentQueuedDeletion,
@@ -66,15 +67,7 @@ export function useWorkspaceData() {
     useWorkspaceScope();
   const scope = useDraftScope();
   const access = account.workspaces.find((item) => item.id === activeId);
-  const permissionEpoch = JSON.stringify([
-    account.user?.id || "guest",
-    activeId,
-    access?.role,
-    access?.securityRevision || 0,
-    Object.entries(access?.projectRoles || {}).sort(([left], [right]) =>
-      left.localeCompare(right),
-    ),
-  ]);
+  const permissionEpoch = workspacePermissionKey(account, activeId);
   const epoch = useRef(permissionEpoch);
   useLayoutEffect(() => {
     if (epoch.current !== permissionEpoch) {
@@ -238,19 +231,44 @@ export function useWorkspaceData() {
 
   const load = useCallback((): Promise<void> => {
     if (inFlightRead.current) return inFlightRead.current;
+    const controller = reads.current;
+    const isCurrentRead = () =>
+      alive.current &&
+      reads.current === controller &&
+      !controller.signal.aborted &&
+      epoch.current === permissionEpoch;
     const operation = (async () => {
       const readBase = confirmed.current;
       try {
-        const response = await scopedFetch("/api/state", {
+        if (!isCurrentRead()) return;
+        let response = await scopedFetch("/api/state", {
           cache: "no-store",
-          signal: reads.current.signal,
-          headers: etag.current ? { "If-None-Match": etag.current } : {},
+          signal: controller.signal,
+          headers:
+            readBase && etag.current ? { "If-None-Match": etag.current } : {},
         });
+        if (!isCurrentRead()) return;
+        // A cache validator is useful only while its confirmed data still exists.
+        // Access/offline changes may clear that data while a request is pending.
+        if (response.status === 304 && !confirmed.current) {
+          etag.current = "";
+          response = await scopedFetch("/api/state", {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          if (!isCurrentRead()) return;
+          if (response.status === 304)
+            throw new SaveError(
+              "The workspace needs a full refresh. Try again.",
+              503,
+            );
+        }
         if (response.status !== 304) {
           const data = (await response.json()) as {
             workspace?: Workspace;
             error?: string;
           };
+          if (!isCurrentRead()) return;
           if (!response.ok || !data.workspace) {
             if ([401, 403, 404, 409].includes(response.status)) {
               confirmed.current = null;
@@ -269,12 +287,12 @@ export function useWorkspaceData() {
           // queued editor intent or new private snapshot becomes authoritative.
           if (isOffline || offline.current) {
             await refreshAccount();
-            if (epoch.current !== permissionEpoch) return;
+            if (!isCurrentRead()) return;
           }
           receive(data.workspace, confirmed.current === readBase);
           etag.current = response.headers.get("etag") || "";
         }
-        if (alive.current) {
+        if (isCurrentRead()) {
           offline.current = false;
           onConnectionChange(false);
           setLoadError("");
@@ -284,7 +302,7 @@ export function useWorkspaceData() {
         }
       } catch (error) {
         if (
-          alive.current &&
+          isCurrentRead() &&
           !(error instanceof Error && error.name === "AbortError")
         ) {
           setLoadError(messageOf(error));

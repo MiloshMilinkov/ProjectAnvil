@@ -639,6 +639,7 @@ async function main() {
     "db/reliability.sql",
     "db/collaboration.sql",
     "db/note-collaboration.sql",
+    "db/storage.sql",
   ])
     sql.exec(fs.readFileSync(path.join(root, relative), "utf8"));
   const requiredTables = [
@@ -657,6 +658,7 @@ async function main() {
     "entity_tombstones",
     "note_history",
     "media_objects",
+    "storage_media_purges",
     "workspace_trash",
     "personal_templates",
     "appmember_roles",
@@ -1049,6 +1051,7 @@ async function main() {
     request,
     objects,
   });
+  await require("./storage-cleanup.cjs")({ sql, store: rawStore, request, objects, users, BUCKET, DB });
   await require("./phase1-trash.cjs")({ sql, store: rawStore, request });
   await require("./personal-templates.cjs")({
     sql,

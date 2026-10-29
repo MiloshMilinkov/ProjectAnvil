@@ -100,12 +100,41 @@ The interface copy review retains **328 source files** and adds no dependencies.
 
 The finished build passed the project checks, 31 Node tests, and all 16 browser workflows, including invalid-import feedback without changing saved data. A disposable visual review checked 70 page/theme/viewport cases and captured 95 screenshots; representative images were inspected after correcting guest naming, empty-canvas status, and board readability. Startup JavaScript is **1,114,607 bytes** and the complete offline app **7,495,301 bytes**, within the existing budgets. These measurements describe size and workflow preservation, not a latency improvement.
 
+## Local readiness and bounded task rendering
+
+The fresh comparison uses baseline build `8ff3c3b2a6d786a0aa5e` and final measured build `7d7e30b6abd57ea47769`. Both completed the same three populated profiles, with every access, conflict, retry, quota, and acknowledged-write assertion passing and no browser exceptions. Earlier reports are preserved in ignored `outputs/performance/before-readiness/`.
+
+Task lists now render **50 rows per page** instead of every match. Boards start with **40 cards per status**, revealing more on request. Filtering, saved-view settings, totals, and bulk editing still use the complete result. Live revision checks skip unrelated personal-workspace initialization and project-grant loading; only marker fields leave this resolver. Normal record reads still load all grants, and each live tick rechecks sessions and consistent membership.
+
+| Large-workspace operation | Before this batch | After |
+| --- | ---: | ---: |
+| Open Tasks | 1,067–1,134 ms | 233–234 ms |
+| Filter a known task | 196–212 ms | 50–57 ms |
+| Open global search and find a note | 305–307 ms | 50–101 ms |
+| Owner full read, median | 101 ms | 60 ms |
+| Ten concurrent saves, batch p95 | 1,950 ms | 1,368 ms |
+| Initial list rows | 1,000 | 50 |
+
+The new list-open measurement was 212–213 ms; the previous report did not time that action separately. These observations include automation overhead, host variation, and the other readiness changes, so they do not isolate every cause or establish online capacity. The rendering reduction is directly verified, including page navigation, matching counts, filters, all five themes, and keyboard/mobile controls.
+
+The live study held **one unchanged request for 18.02 seconds**, returned a **73-byte marker**, and observed an actual save in **1.02 seconds** from the beginning of its held request. No workspace records were included. A separate **21.01-second browser observation** recorded two account refreshes, two conditional workspace reads, one live request, and no aborted live requests. A backend regression verifies two consistent membership/security queries for the marker path, compared with four workspace-access queries in the previous team path; session verification and revision reads remain separate and enforced.
+
+Broader browser checks also exposed an account-refresh problem: a fresh but unchanged account object restarted read/live effects every ten seconds. `AccountShell` now retains identical complete payloads while still applying actual account/access changes. Session rotation retains its separate cancellation generation. Workspace responses also verify their captured request and permission scope before updating cache markers or recovery state; a late access denial cannot clear a newly authorized view. Owner/Admin project-map updates preserve open editors and guides because those roles already have every project; actual role, security, and member-grant changes still invalidate the scope. Regressions cover unchanged refreshes, changed verification/policy/permissions/invitations, explicit password/session cancellation, late responses across role changes, and creating a project while a guide is open.
+
+Menu checks also found that WebKit pointer clicks can leave focus outside an opened account menu. Account/workspace menus now focus their selected or first enabled item; Escape closes the menu, restores its trigger, and leaves underlying editor panels alone. Pointer, keyboard, layering, theme, and narrow-layout regressions cover this behavior.
+
+Cleanup focus now follows the committed review panel and re-enabled controls, avoiding a race with asynchronous rendering. Failed optional screens retain in-place retry and offer an explicit Reload app fallback when retry cannot recover. The shared reload guard flushes saves and rechecks newer edits, failed device writes, and queued operations before either feature recovery or an app update; reload is never automatic.
+
+No dependencies were added. The final size check reports **336 maintained source files**, **1,118,091 startup JavaScript bytes**, **7,504,434 offline bytes**, and the same **20 WOFF2 math fonts**. The eight additional files contain cohesive cleanup/release code, its additive migration, and regression coverage; the existing size budgets remain unchanged.
+
+Final code verification passed strict types, zero-warning lint, backend/model/recovery checks, 34 native Node tests, and the production build. Chromium browser checks passed across complete and focused runs. WebKit's account, access, offline, cleanup, paging, and update checks passed, but its simulated deferred-screen recovery case remains unresolved; Firefox could not launch with this Windows installation's missing native prerequisite. These are [outstanding verification limits](TESTING.md#outstanding-local-verification), not complete cross-browser certification.
+
 ## Remaining capacity work
 
 1. **Storage granularity:** active records still share one workspace snapshot and revision. Larger teams would benefit from independently stored/queryable records and incremental updates. Design and rehearse that migration before increasing limits.
-2. **Large lists:** the current task list renders all matching rows. Evaluate accessible pagination or virtualization with keyboard, touch, saved views, bulk selection, and mobile layout before changing that interaction.
+2. **Large lists:** task lists now render 50 rows per page and boards initially render 40 cards per status. Continue profiling long note lists, bulk-selection dialogs, and larger timelines before increasing record limits. Filters and bulk editing retain every match.
 3. **Notes and visual views:** profile long note lists, large relationship networks, and canvases beyond this workload; retain meaningful link/access checks while reducing repeated preview and impact calculations.
-4. **Broader environments:** add Firefox/WebKit and physical mobile checks, slower CPU/network profiles, and longer offline queues. Chromium viewport testing does not represent every device.
+4. **Broader environments:** browser projects and CI now include Chromium, Firefox, and WebKit, with delayed-save, upload interruption, and simulated long-offline recovery checks. Physical mobile devices, hardware endurance, and slower CPU profiles still need review; viewport and clock simulation do not establish those results.
 5. **Hosted load:** repeat the workload in a future approved staging environment. Local timings do not establish online service capacity.
 
 Raw reports remain under ignored `outputs/performance/`. See [Testing](TESTING.md) for the same workload and report labels when comparing another build.

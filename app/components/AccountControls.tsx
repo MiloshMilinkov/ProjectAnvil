@@ -83,6 +83,15 @@ function useDismiss(
 ) {
   useEffect(() => {
     if (!open) return;
+    // Pointer clicks do not focus buttons in every browser. Give the opened
+    // menu a keyboard target instead of leaving focus in the editor behind it.
+    const selected = ref.current?.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-checked="true"]:not([disabled])',
+    );
+    const first = ref.current?.querySelector<HTMLButtonElement>(
+      '[role="menu"] button:not([disabled])',
+    );
+    (selected || first)?.focus();
     const outside = (event: PointerEvent) => {
       if (!ref.current?.contains(event.target as Node)) close();
     };
@@ -90,6 +99,7 @@ function useDismiss(
       if (!ref.current?.contains(event.target as Node)) return;
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         close();
         ref.current
           ?.querySelector<HTMLButtonElement>("[aria-expanded]")

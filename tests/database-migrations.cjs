@@ -140,7 +140,7 @@ async function run() {
   assert.equal(exists(interrupted, "account_mail_outbox"), false, "DDL and ledger entry must roll back together");
   confirmLegacy(interrupted);
   await ensureDatabaseSchema(interrupted, "local", sources);
-  assert.equal(history(interrupted).length, 8);
+  assert.equal(history(interrupted).length, migrationSources.length);
   confirmLegacy(interrupted);
   interrupted.sql.close();
 
@@ -173,7 +173,7 @@ async function run() {
   }
   const plan = await databaseMigrationPlan(sources, 7);
   assert.equal(plan.expectedHistory.length, 7);
-  assert.equal(plan.migrations.length, 1);
+  assert.equal(plan.migrations.length, migrationSources.length - 7);
   assert.equal(plan.migrations[0].version, 8);
   assert.equal(plan.migrations[0].batch.at(-1).bindings[0], 8);
   assert.match(plan.migrations[0].batch.at(-1).sql, /^INSERT INTO app_migrations/);

@@ -1,12 +1,13 @@
 import type { AccountPolicy } from "./access-types";
 import { WorkspaceError } from "./workspace-model";
+import {
+  resolveAccountConfiguration,
+  ReleaseConfigurationError,
+} from "./release-config";
+import type { ReleaseEnvironment } from "./release-config";
+export { isLoopback } from "./release-config";
 
-export interface AccountEnvironment {
-  PROJECTANVIL_MODE?: string;
-  PROJECTANVIL_ALLOWED_EMAILS?: string;
-  BETTER_AUTH_URL?: string;
-  ACCOUNT_MAILER?: { fetch: typeof fetch };
-}
+export type AccountEnvironment = ReleaseEnvironment;
 
 export interface RuntimeAccountPolicy {
   origin: string;
@@ -14,90 +15,18 @@ export interface RuntimeAccountPolicy {
   public: AccountPolicy;
 }
 
-export function isLoopback(hostname: string): boolean {
-  return ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
-}
-
 /** Configuration is authoritative; a request header can never enable guest access. */
 export function accountPolicy(
   configuration: AccountEnvironment,
   requestURL: string,
 ): RuntimeAccountPolicy {
-  const mode = configuration.PROJECTANVIL_MODE || "local";
-  if (mode !== "local" && mode !== "online")
-    throw new WorkspaceError("Choose a valid application access mode.", 503);
-  const requested = new URL(requestURL);
-  let configured: URL;
   try {
-    configured = new URL(configuration.BETTER_AUTH_URL || requested.origin);
-  } catch {
-    throw new WorkspaceError(
-      "Configure a valid account address before starting.",
-      503,
-    );
+    return resolveAccountConfiguration(configuration, requestURL);
+  } catch (error) {
+    if (error instanceof ReleaseConfigurationError)
+      throw new WorkspaceError(error.message, error.status);
+    throw error;
   }
-  if (
-    configured.username ||
-    configured.password ||
-    configured.search ||
-    configured.hash ||
-    configured.pathname !== "/" ||
-    !["http:", "https:"].includes(configured.protocol)
-  )
-    throw new WorkspaceError(
-      "The account address must be an application origin.",
-      503,
-    );
-  if (
-    mode === "local" &&
-    (!isLoopback(requested.hostname) || !isLoopback(configured.hostname))
-  )
-    throw new WorkspaceError(
-      "Local mode is available only on this computer. Online access must be configured separately.",
-      503,
-    );
-  if (configured.origin !== requested.origin)
-    throw new WorkspaceError(
-      "Open ProjectAnvil at its configured account address.",
-      403,
-    );
-  const approvedEmails = new Set(
-    (configuration.PROJECTANVIL_ALLOWED_EMAILS || "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  if (
-    approvedEmails.size > 200 ||
-    [...approvedEmails].some(
-      (email) => !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(email),
-    )
-  )
-    throw new WorkspaceError(
-      "Configure up to 200 valid approved email addresses.",
-      503,
-    );
-  if (
-    mode === "online" &&
-    (!configuration.BETTER_AUTH_URL ||
-      configured.protocol !== "https:" ||
-      !approvedEmails.size ||
-      !configuration.ACCOUNT_MAILER)
-  )
-    throw new WorkspaceError(
-      "Online mode needs an HTTPS account address, approved email addresses, and an account email service.",
-      503,
-    );
-  return {
-    origin: configured.origin,
-    approvedEmails,
-    public: {
-      mode,
-      registration: mode === "local" ? "open" : "invite-only",
-      emailDelivery: mode === "local" ? "local" : "external",
-      verificationRequired: mode === "online",
-    },
-  };
 }
 
 export function emailApproved(

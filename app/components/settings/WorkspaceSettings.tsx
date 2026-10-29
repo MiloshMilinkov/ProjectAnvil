@@ -13,11 +13,7 @@ import {
 import { useId, useRef, useState } from "react";
 import SettingsGroup from "./SettingsGroup";
 import "./workspace-settings.css";
-import {
-  flushDraftGuards,
-  hasUnpersistedDrafts,
-  listDrafts,
-} from "../../lib/draft-store";
+import { prepareWorkspaceReload } from "../../lib/draft-store";
 import { today, type FeatureProps, type Person } from "../../lib/types";
 import {
   parseWorkspacePreferences,
@@ -259,12 +255,7 @@ export default function WorkspaceSettings(
       >
         <InstallAppPanel
           canReload={async () => {
-            const flushed = await flushDraftGuards(settingsScope);
-            if (
-              !flushed ||
-              hasUnpersistedDrafts(settingsScope) ||
-              listDrafts(settingsScope, "mutations").length
-            ) {
+            if (!(await prepareWorkspaceReload(settingsScope))) {
               notify(
                 "Synchronize or review queued changes before restarting to update.",
               );

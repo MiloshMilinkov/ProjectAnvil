@@ -75,6 +75,12 @@ Each account has a private personal workspace. Team owners and admins invite reg
 
 New workspaces start empty. Guest work stays separate from account and team workspaces.
 
+Account and workspace menus support arrow keys; Escape closes them and returns focus to the menu button.
+
+Large task lists show 50 rows per page, and boards start with 40 cards per status with **Show more**. Filters, totals, and bulk editing still cover all matching tasks.
+
+**Storage cleanup:** owners and admins can review unused uploads, Trash, and older note versions after 30 days, 90 days, or a year. Removal requires a separate confirmation and is permanent. Current attachments, referenced recovery files, and each note's newest saved version are protected; nothing expires automatically. Keep a complete backup before cleanup.
+
 ## Developer setup
 
 Requires **Node.js 22.13+** and npm. Clone or download the repository, open its folder, then run:
@@ -118,8 +124,10 @@ npm run test:performance
 
 Repeatable browser checks use two separate accounts in a disposable local installation. Performance profiles populate private and shared workspaces with up to 40 projects, 1,000 tasks, and 200 notes each. See [testing and measurements](docs/TESTING.md) for browser setup, reports, and safe reruns.
 
+Local release tools check configuration without contacting services and rehearse migrations, complete backup restores, and rollback using disposable data. Optional private health checks and a Resend account-email adapter are implemented but unconfigured. See [release preparation](docs/LOCAL_SETUP.md#local-release-checks); these tools do not host the app or send test emails.
+
 The [capacity review](docs/PERFORMANCE.md) records measured behavior and remaining work for larger teams. The [project structure guide](docs/ARCHITECTURE.md) explains feature ownership, data boundaries, and where new code belongs.
 
 Note browsing supports combined filters, matching counts, and **Clear note filters** without leaving the current project or note. Note details open on demand, giving writing more space. Workspace settings groups everyday controls first, with Data & offline and People & access available when needed. Feature modules separate tasks, dashboard, settings, notes, graph, and canvas responsibilities; unused starter components and packages are removed.
 
-Optional screens and technical formatting load when used. Failed screen loading offers **Retry opening** without reloading the workspace; unavailable formatting keeps readable source. Collections reuse search/property indexes and save property edits with revision checks. The app retains math, syntax colors, diagrams, and its existing planning tools while removing unused connector scaffolding and a redundant framework installation. Use `npm run size:report` to review the [size measurements](docs/PERFORMANCE.md#size-and-maintenance-review).
+Optional screens and technical formatting load when used. Failed screens offer **Retry opening** and an explicit **Reload app** fallback that checks unfinished work first. Unavailable formatting keeps readable source. Collections reuse search/property indexes and save property edits with revision checks. The app retains math, syntax colors, diagrams, and its existing planning tools while removing unused connector scaffolding and a redundant framework installation. Use `npm run size:report` to review the [size measurements](docs/PERFORMANCE.md#size-and-maintenance-review).

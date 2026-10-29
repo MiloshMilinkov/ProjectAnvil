@@ -13,6 +13,24 @@ import reliabilitySQL from "../../db/reliability.sql?raw";
 import collaborationSQL from "../../db/collaboration.sql?raw";
 import noteCollaborationSQL from "../../db/note-collaboration.sql?raw";
 import releaseSQL from "../../db/release.sql?raw";
+import storageSQL from "../../db/storage.sql?raw";
+
+const runtimeMigrationSQL = [
+  workspaceSQL,
+  authSQL,
+  accessSQL,
+  workroomSQL,
+  reliabilitySQL,
+  collaborationSQL,
+  noteCollaborationSQL,
+  releaseSQL,
+  storageSQL,
+];
+
+/** Read-only release verification: online mode never bootstraps or applies SQL. */
+export async function verifyDatabaseRelease(database: D1Database) {
+  await ensureDatabaseSchema(database, "online", runtimeMigrationSQL);
+}
 
 let schemaReady: Promise<unknown> | undefined;
 const instances = new Map<string, ReturnType<typeof betterAuth>>();
@@ -25,16 +43,11 @@ export async function getAuth(request: Request) {
         ? "Run the local launcher to initialize the account signing secret."
         : "Configure the production account signing secret before starting.",
     );
-  schemaReady ??= ensureDatabaseSchema(env.DB, policy.public.mode, [
-    workspaceSQL,
-    authSQL,
-    accessSQL,
-    workroomSQL,
-    reliabilitySQL,
-    collaborationSQL,
-    noteCollaborationSQL,
-    releaseSQL,
-  ]).catch((error) => {
+  schemaReady ??= ensureDatabaseSchema(
+    env.DB,
+    policy.public.mode,
+    runtimeMigrationSQL,
+  ).catch((error) => {
     schemaReady = undefined;
     throw error;
   });
