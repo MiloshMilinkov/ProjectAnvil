@@ -17,7 +17,7 @@
     "test:performance": "node scripts/run-performance-tests.mjs",
     "size:report": "node scripts/report-size.mjs",
     "check": "tsc --noEmit --incremental false && npm run lint -- --max-warnings 0 && npm test && npm run build",
-    "security:audit": "npm audit --omit=dev --audit-level=high",
+    "security:audit": "npm audit --audit-level=high",
     "backup:create": "node scripts/local-backup.mjs create",
     "backup:verify": "node scripts/local-backup.mjs verify",
     "backup:restore": "node scripts/local-backup.mjs restore",
@@ -92,6 +92,9 @@
     "brace-expansion@^5.0.0": "5.0.12",
     "@esbuild-kit/core-utils": {
       "esbuild": "0.25.12"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.3"
     },
     "esbuild@>=0.27.3 <0.28.1": "0.28.1"
   }

@@ -458,7 +458,7 @@ export const tourSteps: TourStep[] = [
     page: "team",
     title: "Accounts and teams",
     body: "Register with an email address, username, and a ProjectAnvil password. Your personal workspace is private. Create a team workspace, invite registered usernames with an access role, and let them accept. Team projects and their connected content follow workspace roles and project permissions. Account and workspace menus support arrow keys; Escape closes the menu and returns focus.",
-    tip: "Account menu → Account security manages email verification, password changes, and sessions. Sign in also offers Forgot password? and Verify email. Local recovery links stay on this PC; see the setup guide. Online access needs an approved, verified account. Choose a team workspace before creating shared projects.",
+    tip: "Account menu → Account security manages verification, passwords, and sessions. Sign in also offers Forgot password? and Verify email. Repeated account attempts are limited. Local recovery links stay on this PC; see the setup guide. Online access needs an approved, verified account. Choose a team workspace before creating shared projects.",
     anchors: [
       '[data-tour="people"]',
       ".view-team .page-heading",

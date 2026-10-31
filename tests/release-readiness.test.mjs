@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import {
   releaseConfigurationReport,
   accountMailTransport,
@@ -20,6 +21,29 @@ const online = {
   PROJECTANVIL_MAIL_FROM: "ProjectAnvil <accounts@example.test>",
   RESEND_API_KEY: "re_fixture_not_a_real_provider_key",
 };
+
+test("the patched lint-parser matcher preserves glob matching and bounds expansion", () => {
+  const require = createRequire(import.meta.url);
+  const parserRequire = createRequire(
+    require.resolve("@typescript-eslint/typescript-estree"),
+  );
+  const { minimatch, Minimatch } = parserRequire("minimatch");
+  for (const [filename, pattern, expected] of [
+    ["app/.private/note.ts", "**/*.ts", true],
+    ["app/page.tsx", "**/*.ts", false],
+    ["scripts/start-local.mjs", "**/*.{mjs,ts}", true],
+    ["README.md", "**/*.{mjs,ts}", false],
+    ["app/notes/東京.ts", "**/*.ts", true],
+  ])
+    assert.equal(minimatch(filename, pattern, { dot: true }), expected);
+  // Exercise the advisory's optimizer with a deliberately bounded fixture.
+  // Eight splits are safe to test even if an older matcher is reintroduced.
+  const expanded = new Minimatch(Array(8).fill("**/../a/b").join("/"), {
+    optimizationLevel: 2,
+    braceExpandMax: 64,
+  });
+  assert(expanded.set.length <= 64);
+});
 
 test("release configuration is redacted, offline, explicit, and fail-closed", () => {
   assert.equal(

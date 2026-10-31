@@ -357,6 +357,79 @@ module.exports = async function checkPortability({
     beforeRevocation,
     "Revoked access prevents the whole batch commit",
   );
+
+  const activeSource =
+    '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>';
+  const activeForm = new FormData();
+  activeForm.append(
+    "file",
+    new Blob([activeSource], { type: "image/svg+xml" }),
+    'vector".svg',
+  );
+  activeForm.append("projectId", "portable_private");
+  const activeUpload = await uploadRoute.POST(
+    req(owner, "/api/media", { method: "POST", body: activeForm }),
+  );
+  assert.equal(activeUpload.status, 201);
+  const activeMedia = (await activeUpload.json()).media;
+  const downloadRoute = require("./compiled/app/api/media/[id]/route");
+  const fileContext = { params: Promise.resolve({ id: activeMedia.id }) };
+  const activeDownload = await downloadRoute.GET(
+    req(owner, activeMedia.url),
+    fileContext,
+  );
+  assert.equal(activeDownload.status, 200);
+  assert.equal(
+    activeDownload.headers.get("Content-Type"),
+    "application/octet-stream",
+  );
+  assert.match(
+    activeDownload.headers.get("Content-Disposition"),
+    /^attachment;/,
+  );
+  assert.match(
+    activeDownload.headers.get("Content-Security-Policy"),
+    /^sandbox;/,
+  );
+  assert.equal(activeDownload.headers.get("X-Content-Type-Options"), "nosniff");
+  assert.equal(await activeDownload.text(), activeSource);
+  assert.equal(
+    (await downloadRoute.GET(req(viewer, activeMedia.url), fileContext)).status,
+    404,
+    "Guessing an attachment identifier cannot cross project access boundaries",
+  );
+  for (const id of [
+    "../fixture",
+    "..%2Ffixture",
+    "other/file",
+    "file?workspace=main",
+  ])
+    assert.equal(
+      (
+        await downloadRoute.GET(req(owner, "/api/media/invalid"), {
+          params: Promise.resolve({ id }),
+        })
+      ).status,
+      404,
+      "Attachment paths are identifiers, never storage paths or query selectors",
+    );
+  await write("media", {
+    id: activeMedia.id,
+    name: "Imported \ud800 filename(').svg",
+  });
+  const unicodeDownload = await downloadRoute.GET(
+    req(owner, activeMedia.url),
+    fileContext,
+  );
+  assert.equal(
+    unicodeDownload.status,
+    200,
+    "Malformed UTF-16 in imported metadata cannot make an authorized download fail",
+  );
+  assert.match(
+    unicodeDownload.headers.get("Content-Disposition"),
+    /filename\*=UTF-8''Imported%20%EF%BF%BD%20filename%28%27%29\.svg/,
+  );
   console.log(
     "PASS: authorized Markdown exports with attachments, additive atomic imports, retry receipts, concurrent naming, suppressed import alerts, retained upload failures, and mid-upload access revocation.",
   );

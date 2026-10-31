@@ -51,6 +51,7 @@ export function portablePath(value: string): string {
   const segments = path.split("/");
   if (
     !path ||
+    !path.isWellFormed() ||
     path.length > 240 ||
     segments.length > 12 ||
     segments.some(
@@ -109,9 +110,7 @@ export function unpackPortableZip(bytes: Uint8Array): PortableFile[] {
     size = u32(end + 12),
     start = u32(end + 16);
   if (!count || count > portableLimits.files + 30 || start + size !== end)
-    throw new Error(
-      "Choose a standard ZIP archive with 1–400 files.",
-    );
+    throw new Error("Choose a standard ZIP archive with 1–400 files.");
   const expected = new Map<string, { size: number; crc: number }>();
   const names = new Set<string>();
   let offset = start,
@@ -151,7 +150,9 @@ export function unpackPortableZip(bytes: Uint8Array): PortableFile[] {
     const path = portablePath(directory ? raw.slice(0, -1) : raw);
     const key = path.toLocaleLowerCase("en-US");
     if (names.has(key))
-      throw new Error("The ZIP contains duplicate file paths or paths that differ only by letter case.");
+      throw new Error(
+        "The ZIP contains duplicate file paths or paths that differ only by letter case.",
+      );
     names.add(key);
     if (
       local + 30 > start ||
@@ -512,7 +513,7 @@ export function readPortableBundle(files: PortableFile[]): PortableBundle {
   return bundle;
 }
 
-function safeSegment(value: string) {
+function safeSegment(value: string, maximumLength = 90) {
   const cleaned =
     value
       .normalize("NFC")
@@ -520,7 +521,8 @@ function safeSegment(value: string) {
       .replace(/[\\/:*?"<>|#^()[\]!\x00-\x1f\x7f]/g, "_")
       .replace(/[. ]+$/g, "")
       .trim()
-      .slice(0, 90) || "Untitled";
+      .slice(0, maximumLength)
+      .toWellFormed() || "Untitled";
   try {
     portablePath(cleaned);
     return cleaned;
@@ -581,7 +583,7 @@ export function exportPortableNotes(workspace: Workspace): {
       .split(/[\\/]/)
       .filter(Boolean)
       .slice(0, 6)
-      .map(safeSegment);
+      .map((segment) => safeSegment(segment));
     let path = [...folder, `${safeSegment(note.title)}.md`].join("/");
     let counter = 2;
     while (used.has(path.toLocaleLowerCase("en-US")))
@@ -596,7 +598,10 @@ export function exportPortableNotes(workspace: Workspace): {
   for (const media of workspace.media)
     attachmentPaths.set(
       media.id,
-      `attachments/${media.id}-${safeSegment(media.name.replace(/\.[A-Za-z0-9]{1,10}$/, "")).slice(0, 75)}${/\.[A-Za-z0-9]{1,10}$/.exec(media.name)?.[0] || ""}`,
+      `attachments/${media.id}-${safeSegment(
+        media.name.replace(/\.[A-Za-z0-9]{1,10}$/, ""),
+        75,
+      )}${/\.[A-Za-z0-9]{1,10}$/.exec(media.name)?.[0] || ""}`,
     );
   const notesByTitle = new Map(
     workspace.notes.map((note) => [

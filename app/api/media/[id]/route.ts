@@ -99,6 +99,13 @@ export async function GET(
       );
     const isInline = inlineTypes.has(media.type.toLowerCase());
     const filename = media.name.replace(/[^\x20-\x7E]|["\\]/g, "_");
+    // JSON metadata can contain lone surrogates; RFC 5987 also reserves these punctuation marks.
+    const encodedFilename = encodeURIComponent(
+      media.name.toWellFormed(),
+    ).replace(
+      /['()*]/g,
+      (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    );
     return new Response(object.body, {
       status: range ? 206 : 200,
       headers: {
@@ -110,7 +117,7 @@ export async function GET(
               "Content-Range": `bytes ${range.offset}-${range.offset + range.length - 1}/${object.size}`,
             }
           : {}),
-        "Content-Disposition": `${isInline ? "inline" : "attachment"}; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(media.name)}`,
+        "Content-Disposition": `${isInline ? "inline" : "attachment"}; filename="${filename}"; filename*=UTF-8''${encodedFilename}`,
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "sandbox; default-src 'none'",

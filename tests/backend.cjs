@@ -349,6 +349,305 @@ function checkSchedulingModel() {
     );
 }
 
+/** Exercise injection payloads through real SQLite stores and HTTP handlers. */
+async function checkSqlInjectionBoundaries({ sql, DB, store, users, request }) {
+  const owner = {
+    id: "sql-audit-owner",
+    username: "sql_audit_owner",
+    email: "sql-owner@example.test",
+    name: "SQL audit owner",
+  };
+  const reader = {
+    id: "sql-audit-reader",
+    username: "sql_audit_reader",
+    email: "sql-reader@example.test",
+    name: "SQL audit reader",
+  };
+  for (const user of [owner, reader]) {
+    users.set(user.id, user);
+    sql
+      .prepare(
+        "INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,username) VALUES (?,?,?,0,?,?,?)",
+      )
+      .run(
+        user.id,
+        user.name,
+        user.email,
+        Date.now(),
+        Date.now(),
+        user.username,
+      );
+  }
+  const access = require("./compiled/app/lib/access-store");
+  const stateRoute = require("./compiled/app/api/state/route");
+  const teamRoute = require("./compiled/app/api/teams/route");
+  const activityRoute = require("./compiled/app/api/activity/route");
+  const historyRoute = require("./compiled/app/api/history/route");
+  const trashRoute = require("./compiled/app/api/trash/route");
+  const templateRoute = require("./compiled/app/api/templates/route");
+  const roomsRoute = require("./compiled/app/api/rooms/route");
+  const watchRoute = require("./compiled/app/api/watch/route");
+  const personal = await access.resolveWorkspace(
+    request("/api/state", owner.id),
+  );
+  const peer = await access.resolveWorkspace(request("/api/state", reader.id));
+  const ownRequest = (route, options = {}) =>
+    request(route, owner.id, personal.id, options);
+  const post = (route, input) =>
+    ownRequest(route, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  const payloads = [
+    "SQL_AUDIT_0' OR 1=1 --",
+    "SQL_AUDIT_1'); DROP TABLE workspaces; --",
+    'SQL_AUDIT_2" UNION SELECT email FROM user --',
+    "SQL_AUDIT_3'; UPDATE appmembers SET role='owner'; --",
+    "SQL_AUDIT_4%_[]' /* comment */; SELECT 1; --",
+    "SQL_AUDIT_5 – Unicode 'quoted' text; --",
+  ];
+  const schema = () =>
+    sql
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+      )
+      .all();
+  const tablesBefore = schema();
+  const queries = [],
+    bindings = [];
+  const originalPrepare = DB.prepare;
+  DB.prepare = function (query) {
+    queries.push(query);
+    const wrap = (statement) => ({
+      ...statement,
+      bind(...values) {
+        bindings.push(...values);
+        return wrap(statement.bind(...values));
+      },
+    });
+    return wrap(originalPrepare.call(this, query));
+  };
+  try {
+    for (const [index, literal] of payloads.entries()) {
+      await store.mutateWorkspace(ownRequest("/api/state"), {
+        action: "upsert",
+        entity: "notes",
+        item: {
+          id: `sql-note-${index}`,
+          title: literal,
+          content: literal,
+          properties: { "quote'key": literal },
+        },
+      });
+      await store.mutateWorkspace(ownRequest("/api/state"), {
+        action: "upsert",
+        entity: "tasks",
+        item: { id: `sql-task-${index}`, title: literal, description: literal },
+      });
+      const template = await templateRoute.POST(
+        post("/api/templates", {
+          action: "save",
+          base: null,
+          template: {
+            id: `sql-template-${index}`,
+            name: literal,
+            kind: "note",
+            content: {
+              title: literal,
+              content: literal,
+              kind: "note",
+              folder: "",
+              tags: [],
+              properties: { "quote'key": literal },
+            },
+          },
+        }),
+      );
+      assert.equal(template.status, 200);
+      assert.equal(
+        (await template.json()).templates.find(
+          (item) => item.id === `sql-template-${index}`,
+        ).content.content,
+        literal,
+      );
+      const room = await roomsRoute.POST(
+        post("/api/rooms", {
+          action: "upsert",
+          room: {
+            id: `sql-room-${index}`,
+            name: literal,
+            checkpoint: {
+              summary: literal,
+              nextStep: literal,
+              question: literal,
+            },
+          },
+        }),
+      );
+      assert.equal(room.status, 200);
+      assert.equal(
+        (await room.json()).rooms.find(
+          (item) => item.id === `sql-room-${index}`,
+        ).checkpoint.summary,
+        literal,
+      );
+    }
+    await access.teamAction(request("/api/teams", owner.id), {
+      action: "create",
+      name: payloads[1],
+    });
+    assert.equal(
+      (
+        await access.getAccountContext(request("/api/account", owner.id))
+      ).workspaces.find((item) => item.kind === "team").name,
+      payloads[1],
+    );
+    const saved = await store.readWorkspace(ownRequest("/api/state"));
+    for (const [index, literal] of payloads.entries()) {
+      assert.equal(
+        saved.notes.find((item) => item.id === `sql-note-${index}`).content,
+        literal,
+      );
+      assert.equal(
+        saved.tasks.find((item) => item.id === `sql-task-${index}`).description,
+        literal,
+      );
+      assert.equal(
+        saved.notes.find((item) => item.id === `sql-note-${index}`).properties[
+          "quote'key"
+        ],
+        literal,
+      );
+    }
+    const peerBefore = sql
+      .prepare("SELECT data,revision FROM workspaces WHERE id=?")
+      .get(peer.id);
+    const memberships = () =>
+      sql
+        .prepare(
+          "SELECT workspace_id,user_id,role FROM appmembers ORDER BY workspace_id,user_id",
+        )
+        .all();
+    const membershipsBefore = memberships();
+    for (const literal of payloads) {
+      const encoded = encodeURIComponent(literal);
+      const invalidLookups = [
+        [stateRoute, request(`/api/state?workspace=${encoded}`, owner.id), 400],
+        [teamRoute, ownRequest(`/api/teams?workspaceId=${encoded}`), 400],
+        [activityRoute, ownRequest(`/api/activity?cursor=${encoded}`), 400],
+        [activityRoute, ownRequest(`/api/activity?limit=${encoded}`), 400],
+        [
+          historyRoute,
+          ownRequest(`/api/history?note=sql-note-0&cursor=${encoded}`),
+          400,
+        ],
+        [trashRoute, ownRequest(`/api/trash?cursor=${encoded}`), 400],
+        [trashRoute, ownRequest(`/api/trash?limit=${encoded}`), 400],
+        [stateRoute, request("/api/state", reader.id, personal.id), 404],
+      ];
+      for (const [route, input, status] of invalidLookups) {
+        const response = await route.GET(input);
+        assert.equal(
+          response.status,
+          status,
+          `Hostile lookup must be rejected: ${input.url}`,
+        );
+        assert.doesNotMatch(
+          await response.text(),
+          /SQLITE_|syntax error|no such table|SQL_AUDIT_/i,
+        );
+      }
+      // This trusted-recipient helper accepts an arbitrary lookup value. Its
+      // SQL must remain safe independently of HTTP identifier validation.
+      await assert.rejects(
+        () => access.resolveWorkspaceForUser(owner, literal),
+        (error) => error.status === 404,
+      );
+      const rejectedWrites = [
+        [
+          stateRoute,
+          "/api/state",
+          {
+            action: "upsert",
+            entity: literal,
+            item: { id: "sql-note-0" },
+            base: null,
+          },
+        ],
+        [
+          stateRoute,
+          "/api/state",
+          { action: "delete", entity: "notes", id: literal, base: null },
+        ],
+        [
+          stateRoute,
+          "/api/state",
+          {
+            action: "rename",
+            name: "Uncommitted",
+            base: { name: saved.name },
+            operationId: literal,
+          },
+        ],
+        [
+          teamRoute,
+          "/api/teams",
+          { action: "invite", workspaceId: personal.id, username: literal },
+        ],
+        [
+          watchRoute,
+          "/api/watch",
+          { type: "note", id: literal, watching: true },
+        ],
+      ];
+      for (const [route, url, input] of rejectedWrites) {
+        const response = await route.POST(post(url, input));
+        assert.equal(response.status, 400);
+      }
+    }
+    assert.deepEqual(
+      schema(),
+      tablesBefore,
+      "Injected text must not change the database schema",
+    );
+    assert.deepEqual(
+      memberships(),
+      membershipsBefore,
+      "Injected identifiers must not elevate membership roles",
+    );
+    assert.deepEqual(
+      sql
+        .prepare("SELECT data,revision FROM workspaces WHERE id=?")
+        .get(peer.id),
+      peerBefore,
+    );
+    assert.equal(
+      (await store.readWorkspace(request("/api/state", reader.id))).notes
+        .length,
+      0,
+    );
+    for (let index = 0; index < payloads.length; index++) {
+      const marker = `SQL_AUDIT_${index}`;
+      assert(
+        queries.every((query) => !query.includes(marker)),
+        "User text must never become executable SQL",
+      );
+      assert(
+        bindings.some(
+          (value) => typeof value === "string" && value.includes(marker),
+        ),
+        "Allowed SQL-like content must be passed as bound data",
+      );
+    }
+  } finally {
+    DB.prepare = originalPrepare;
+  }
+  console.log(
+    "PASS: real-SQL injection payloads stay literal across tasks, notes, properties, templates, rooms, and team names; hostile IDs/cursors/limits/actions are rejected without schema changes, membership escalation, or cross-account disclosure.",
+  );
+}
+
 async function main() {
   checkSchedulingModel();
   const empty = createSeedWorkspace();
@@ -1040,6 +1339,7 @@ async function main() {
     users,
     request,
   });
+  await checkSqlInjectionBoundaries({ sql, DB, store, users, request });
   await require("./connected-work.cjs")({
     store,
     access: require("./compiled/app/lib/access-store"),

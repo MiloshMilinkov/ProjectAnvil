@@ -1,6 +1,14 @@
 # Dependency security
 
-Reviewed **2026-10-28**. The current lockfile reports **zero vulnerabilities in both the full and production dependency trees**. Audit results can change when advisories are published. Exact versions and targeted overrides are in [package.json](../package.json) and [package-lock.json](../package-lock.json).
+Reviewed **2026-10-31**. The production dependency audit reports **zero vulnerabilities**. The full audit retains **12 moderate entries derived from one legacy linting-dependency advisory**, reviewed below; there are no high or critical findings. Audit results can change when advisories are published. Exact versions and targeted overrides are in [package.json](../package.json) and [package-lock.json](../package-lock.json).
+
+## Current tooling advisory
+
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) describes pattern amplification in Minimatch's advanced optimizer and declares versions below 11.0.1 affected. The TypeScript parser's Minimatch 10.2.5 contained that implementation; a narrowly scoped override now selects **11.0.3**. Its consumer uses the named `minimatch()` API, retained in the patched major. Regression coverage checks representative source globs, dot files, Unicode paths, and bounded advanced-pattern expansion; full lint remains required.
+
+ESLint and the React/accessibility plugins still require the callable CommonJS API from **Minimatch 3.1.5**. That installed legacy branch has neither `firstPhasePreProcess`, `secondPhasePreProcess`, nor the `optimizationLevel` option described in this advisory. The maintainer's [version history](https://github.com/isaacs/minimatch/blob/v11.0.3/changelog.md) places those optimizations in later majors. This source review supports treating the remaining broad-range match as inapplicable to that branch, while keeping the raw audit findings visible. These are development tools, with no app note, search, upload, or API path passing user content to the matcher.
+
+Do not replace every legacy consumer with Minimatch 11: its exports and regular-expression APIs differ. Revisit this finding when upstream updates its affected range or releases compatible dependency changes. `security:audit` now checks **the full dependency tree**, failing at high severity; a passing threshold check does not mean the raw moderate count is zero.
 
 ## Runtime security update
 
@@ -17,6 +25,16 @@ The worker adds MIME sniffing protection, same-origin framing, a no-referrer pol
 The base Content Security Policy restricts document bases, form destinations, and framing. It is not a complete script-source policy; tightening that boundary requires explicit compatibility work for streamed React rendering, diagrams, uploads, and media previews. Existing raw-HTML restrictions and attachment access checks remain necessary.
 
 Mutation, transfer, and account handlers share a bounded stream reader. Limits are enforced while bytes arrive, including when `Content-Length` is missing or inaccurate; oversized streams are cancelled and the reader is released. Authentication additionally needs its configured rate limits and access policy. Response headers and body limits do not replace per-record permission checks.
+
+## Application security review
+
+- SQL values use prepared bindings, including JSON collections. Dynamic predicates are internal permission/revision checks or fixed choices; runtime input does not select SQL identifiers, expressions, or migration sources. Real SQLite regressions store quote/comment/semicolon/UNION payloads literally and verify schema, membership, and other accounts' records remain intact. This follows [OWASP's parameterization guidance](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html).
+- Account, workspace, and project access is resolved on the server, independently of display names and assignment labels. Tests cover forged identity/workspace headers, restricted projects, withdrawn access, cross-session revocation, and stale permission responses. No additional bypass was found in the reviewed paths.
+- Online account-policy refusals now execute after Better Auth's native database rate limiter. Denied registration and sign-in attempts consume the same limits; disallowed usernames use the native unknown-account response and password-hash work. Malformed passwords and optional sign-in fields retain native validation responses without revealing a withdrawn username. Regressions use the real library and SQLite, rather than a simulated limiter.
+- Markdown does not enable raw HTML; math rendering disables trusted commands, and diagram security settings cannot be relaxed by note directives. Browser regressions exercise script/HTML/SVG, unsafe links, code highlighting, math, and diagram payloads while connected and offline.
+- Upload/download checks retain origin, account/project authorization, streaming size limits, MIME restrictions, attachment sandboxing, and no-sniff headers. Malformed Unicode filename metadata is normalized before header encoding. Archive regressions include traversal, links, encrypted entries, conflicting headers, and prototype-shaped metadata.
+
+These local source and regression checks are not an independent penetration test or proof that every vulnerability is absent. Before online staging, configure and verify aggregate attachment-storage budgets and upload throttling: the 20 MB per-file limit does not cap total object storage or repeated authorized uploads. Full script-source CSP compatibility, real HTTPS/proxy behavior, external email delivery, hosted load, monitoring, and recovery also remain deployment checks. The app remains local.
 
 ## Maintenance choices
 

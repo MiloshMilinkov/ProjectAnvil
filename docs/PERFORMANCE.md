@@ -137,6 +137,26 @@ Firefox's failure was reproduced in a minimal service-worker fixture: request in
 
 The app remains at **336 maintained files**, **210 offline files**, and **20 WOFF2 math fonts**. Startup JavaScript is **1,117,739 bytes** (**337,187 gzip**); the complete offline package is **7,501,576 bytes**. Both existing size budgets pass. Full Chromium, Firefox, and WebKit runs pass **23 workflows each**, with no failures or skips; affected account/offline follow-ups also pass after the final fixture adjustment. Performance workloads were not rerun for this browser fix, so the preceding timings remain measurements of their stated build. See [browser verification](TESTING.md#browser-verification) for current coverage and remaining deployment checks.
 
+## Final local verification
+
+On **31 October 2026**, build **`333981ce96b637fdd8ca`** completed both performance studies after browser testing stopped. Application and test/configuration fingerprints stayed unchanged. The previous workspace and typing reports are retained in ignored `outputs/performance/before-step2/`.
+
+All three profiles passed with two accounts and three populated workspaces. The large profile has **40 projects, 1,000 tasks, 200 notes, 10 canvases, and 800 relationships per workspace**. Personal isolation, shared and restricted project access, concurrent acknowledgements, explicit conflicts, idempotent retries, and rejected oversized imports all held. Every ten-way distinct-task save batch succeeded; browser errors remained zero.
+
+| Large-workspace operation | Current observation |
+| --- | ---: |
+| Owner full read, median / p95 | 106 / 140 ms |
+| Restricted editor full read, median / p95 | 121 / 191 ms |
+| Ten concurrent saves, batch p95 | 2,057 ms |
+| Open Tasks, two account observations | 300–317 ms |
+| Global search, two account observations | 104–123 ms |
+
+The typing study verified **30 edits** and both accounts' final server content across connected and disconnected modes. Median input-to-paint was **23–30 ms**; median save feedback was **878–1,017 ms**, including the intentional autosave delay. The live marker held one idle request for **18.03 seconds**, returned **73 bytes** without workspace records, and observed a real save after **1.05 seconds** from its held request's start.
+
+Several timings are higher than the earlier recorded build. These runs include host variation and automation overhead and do not isolate a code-level cause; no general speed improvement or hosted capacity is claimed. Keep the current record limits and the remaining profiling work below.
+
+The candidate retains **336 maintained files**, **210 offline files**, **1,117,765 startup JavaScript bytes** (**337,197 gzip**), **7,501,621 offline bytes**, and **20 WOFF2 math fonts**. Existing size budgets pass. Code/security and migration/backup/restore/rollback checks passed on this candidate. [Browser verification](TESTING.md#browser-verification) records all engine results and the unchanged focused WebKit follow-up after its full-run click timeout. The local evidence manifest is `outputs/release/step2-final-verification.json`; reports remain excluded from Git.
+
 ## Remaining capacity work
 
 1. **Storage granularity:** active records still share one workspace snapshot and revision. Larger teams would benefit from independently stored/queryable records and incremental updates. Design and rehearse that migration before increasing limits.

@@ -1,10 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getAuth, getSessionUser } from "../../../lib/auth";
-import {
-  accountCallback,
-  accountPolicy,
-  emailApproved,
-} from "../../../lib/account-policy";
+import { accountCallback, accountPolicy } from "../../../lib/account-policy";
 import { assertSameOrigin } from "../../../lib/access-store";
 import { readBoundedBody } from "../../../lib/request-body";
 import { WorkspaceError } from "../../../lib/workspace-model";
@@ -104,11 +100,6 @@ export async function POST(request: Request) {
           "Choose a username with 3–30 letters, numbers, underscores, or dots.",
           400,
         );
-      if (typeof body.email !== "string" || !emailApproved(policy, body.email))
-        throw new WorkspaceError(
-          "Registration is available to approved email addresses only.",
-          403,
-        );
       body.name = body.username;
       delete body.displayUsername;
       body.callbackURL = accountCallback(
@@ -119,21 +110,6 @@ export async function POST(request: Request) {
     }
     if (path === "sign-in/username") {
       delete body.callbackURL;
-      if (
-        policy.public.mode === "online" &&
-        typeof body.username === "string"
-      ) {
-        await getAuth(request);
-        const user = await env
-          .DB!.prepare('SELECT email FROM "user" WHERE lower(username) = ?')
-          .bind(body.username.toLowerCase())
-          .first<{ email: string }>();
-        if (user && !emailApproved(policy, user.email))
-          throw new WorkspaceError(
-            "Unable to sign in with these account details.",
-            401,
-          );
-      }
     }
     if (path === "request-password-reset")
       body.redirectTo = accountCallback(

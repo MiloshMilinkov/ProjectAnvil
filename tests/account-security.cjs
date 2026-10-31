@@ -34,9 +34,10 @@ async function nativeAuthChecks(root, policy) {
   sql.exec(await fs.readFile(path.join(root, "db/auth.sql"), "utf8"));
   const secret = "fixture-only-native-auth-secret-at-least-32-characters";
   const mail = [];
+  const approvedEmails = new Set(policy.approvedEmails);
   const auth = betterAuth({
     ...authOptions(sql, secret, onlineOrigin, {
-      policy,
+      policy: { ...policy, approvedEmails },
       send: async (email, url, kind) => { mail.push({ email, url, kind }); },
     }),
     logger: { disabled: true },
@@ -116,6 +117,53 @@ async function nativeAuthChecks(root, policy) {
     assert.equal(limited.status, 429, "The fourth recovery request is rate-limited");
     assert.match((await limited.json()).message, /too many|rate limit|try again/i);
     assert.equal(mail.filter((message) => message.email === "missing@example.test").length, 0);
+
+    const policyRegistration = (index) => post("sign-up/email", {
+      username: `deniedpolicy${index}`, name: "Denied policy fixture",
+      email: `denied${index}@example.test`, password,
+      callbackURL: `${onlineOrigin}/?account=verified`,
+    }, "198.51.100.40");
+    const usersBeforeDenials = sql.prepare('SELECT count(*) AS count FROM "user"').get().count;
+    const mailBeforeDenials = mail.length;
+    for (let index = 0; index < 5; index++)
+      assert.equal((await policyRegistration(index)).status, 403);
+    assert.equal((await policyRegistration(5)).status, 429, "Policy-rejected registrations consume the native account rate limit");
+    assert.equal(sql.prepare('SELECT count(*) AS count FROM "user"').get().count, usersBeforeDenials);
+    assert.equal(mail.length, mailBeforeDenials, "Rejected registrations never send account mail");
+
+    approvedEmails.add("withdrawn@example.test");
+    const withdrawn = await post("sign-up/email", {
+      username: "withdrawnpolicy", name: "Withdrawn policy fixture",
+      email: "withdrawn@example.test", password,
+      callbackURL: `${onlineOrigin}/?account=verified`,
+    }, "198.51.100.41");
+    assert.equal(withdrawn.status, 200);
+    assert.equal((await auth.handler(new Request(mail.at(-1).url))).status, 302);
+    approvedEmails.delete("withdrawn@example.test");
+    const sessionsBeforeDenials = sql.prepare('SELECT count(*) AS count FROM "session"').get().count;
+    const missing = await post("sign-in/username", { username: "missingpolicy", password }, "198.51.100.42");
+    assert.equal(missing.status, 401);
+    const missingBody = await missing.json();
+    const malformedCredentials = [
+      { password: undefined }, { password: "" }, { password: "x".repeat(129) },
+      ...[null, "true", {}, []].map((rememberMe) => ({ rememberMe })),
+      ...[null, false, {}, []].map((callbackURL) => ({ callbackURL })),
+    ];
+    for (const [index, credentials] of malformedCredentials.entries()) {
+      const unknownInput = await post("sign-in/username", { username: "missingpolicy", password, ...credentials }, `203.0.113.${index * 2 + 1}`);
+      const deniedInput = await post("sign-in/username", { username: "withdrawnpolicy", password, ...credentials }, `203.0.113.${index * 2 + 2}`);
+      assert.notEqual(unknownInput.status, 429, "A rate limit must not hide credential-validation differences");
+      assert.equal(deniedInput.status, unknownInput.status);
+      assert.deepEqual(await deniedInput.json(), await unknownInput.json(), "Malformed credentials must not reveal a disallowed username");
+    }
+    for (let index = 0; index < 10; index++) {
+      const rejected = await post("sign-in/username", { username: "withdrawnpolicy", password }, "198.51.100.43");
+      assert.equal(rejected.status, 401, "A verified account with withdrawn approval cannot sign in, even with its correct password");
+      assert.equal(rejected.headers.get("set-cookie"), null);
+      assert.deepEqual(await rejected.json(), missingBody, "Policy denials must not reveal that the username exists");
+    }
+    assert.equal((await post("sign-in/username", { username: "withdrawnpolicy", password }, "198.51.100.43")).status, 429);
+    assert.equal(sql.prepare('SELECT count(*) AS count FROM "session"').get().count, sessionsBeforeDenials);
     console.log("Native Better Auth verification, recovery, expiry, replay, revocation and rate-limit integration passed.");
   } finally { sql.close(); }
 }
@@ -255,7 +303,8 @@ async function main() {
     const account = await access.getAccountContext(request("/api/account", undefined, {}, onlineOrigin));
     assert.deepEqual(account.workspaces, []);
     assert.equal(JSON.stringify(account).includes("private-token"), false);
-    assert.equal((await authRoute.POST(request("/api/auth/sign-up/email", { username: "foreign", email: "foreign@example.test" }, {}, onlineOrigin))).status, 403);
+    // Native integration below verifies allowlist denials and their rate limit;
+    // the HTTP wrapper forwards policy decisions to that throttled plugin.
     for (const key of Object.keys(onlineConfiguration)) delete environment[key];
 
     for (const endpoint of ["admin-delete-user", "account-mail", "outbox"])

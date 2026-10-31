@@ -67,7 +67,7 @@
 
 Register with an **email address, username, and ProjectAnvil password**; sign in with your **username and password**.
 
-**Account security:** verify your email, change or reset your password, inspect signed-in browser sessions, and revoke access on other browsers. Local verification/recovery links stay in a private outbox on this PC; no email is sent. Password resets end existing sessions. See [account recovery](docs/LOCAL_SETUP.md#account-security-and-recovery).
+**Account security:** verify your email, change or reset your password, inspect signed-in browser sessions, and revoke access on other browsers. Repeated account attempts are limited, including accounts not approved for online access. Local verification/recovery links stay in a private outbox on this PC; no email is sent. Password resets end existing sessions. See [account recovery](docs/LOCAL_SETUP.md#account-security-and-recovery).
 
 **Access modes:** local mode retains the separate guest workspace and accepts loopback addresses only. A separately configured online mode requires approved, verified accounts and has no shared guest workspace. It stays unavailable until its HTTPS address, email service, secrets, and database migrations are prepared. This does not publish the app.
 

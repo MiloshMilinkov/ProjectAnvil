@@ -190,6 +190,9 @@ for (const path of [
   "CON.txt",
   "a/./note.md",
   "note.md ",
+  "folder/constructor/Note.md",
+  "//network-share/Note.md",
+  "Broken \ud800.md",
 ])
   assert.throws(() => portable.portablePath(path));
 assert.throws(
@@ -256,6 +259,75 @@ for (let index = 0; index < lyingSize.length - 46; index++)
     break;
   }
 assert.throws(() => portable.unpackPortableZip(lyingSize), /expanded beyond/);
+
+const centralOffset = (bytes) => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let index = 0; index <= bytes.length - 46; index++)
+    if (view.getUint32(index, true) === 0x02014b50) return index;
+  throw new Error("The ZIP fixture has no central directory.");
+};
+const linkedEntry = zipSync({ "Linked.md": encoder.encode("target") });
+new DataView(linkedEntry.buffer).setUint32(
+  centralOffset(linkedEntry) + 38,
+  0xa1ff0000,
+  true,
+);
+assert.throws(() => portable.unpackPortableZip(linkedEntry), /linked/);
+const encryptedEntry = zipSync({ "Encrypted.md": encoder.encode("private") });
+new DataView(encryptedEntry.buffer).setUint16(
+  centralOffset(encryptedEntry) + 8,
+  1,
+  true,
+);
+assert.throws(() => portable.unpackPortableZip(encryptedEntry), /Encrypted/);
+const mismatchedEntry = zipSync({ "Named.md": encoder.encode("ordinary") });
+mismatchedEntry[30] = "X".charCodeAt(0);
+assert.throws(
+  () => portable.unpackPortableZip(mismatchedEntry),
+  /paths or sizes do not match/,
+);
+const hostileProperties = portable.readPortableBundle([
+  {
+    path: "Hostile.md",
+    bytes: encoder.encode(
+      '---\nproperties: {"__proto__":{"projectanvilPolluted":true}}\n---\nKeep this as data.',
+    ),
+  },
+]);
+assert.throws(
+  () =>
+    portable.planPortableImport(
+      hostileProperties,
+      createSeedWorkspace(),
+      "",
+      new Map([["Hostile.md", "hostile_note"]]),
+      now,
+    ),
+  /property limits/,
+);
+assert.equal({}.projectanvilPolluted, undefined);
+for (const name of [
+  "Broken \ud800 attachment.png",
+  `${"x".repeat(74)}💡.png`,
+]) {
+  const unicodeWorkspace = structuredClone(workspace);
+  unicodeWorkspace.media[0].name = name;
+  const unicodeExport = portable.exportPortableNotes(unicodeWorkspace);
+  const path = unicodeExport.attachmentPaths.get("picture");
+  assert(
+    path.isWellFormed(),
+    "Export paths remain valid Unicode after truncation",
+  );
+  unicodeExport.files.push({ path, bytes: new Uint8Array([1, 2, 3]) });
+  const unicodeRoundTrip = portable.readPortableBundle(
+    portable.unpackPortableZip(portable.packPortableZip(unicodeExport.files)),
+  );
+  assert.equal(
+    unicodeRoundTrip.attachments[0].name,
+    name,
+    "Filename metadata and the UTF-8 archive path remain associated",
+  );
+}
 console.log(
   "PASS: Markdown folder/ZIP portability, metadata and attachment round trips, collision-safe links, deterministic retry archives, literal code, and bounded hostile archive rejection.",
 );

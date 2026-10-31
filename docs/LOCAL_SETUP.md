@@ -103,6 +103,8 @@ Open the relevant verification/reset link on this PC while the local server is r
 
 Local registration and sign-in do not require verification. This preserves current accounts and guest work. Verification/recovery need the running server and are not available offline. Account-link callbacks are restricted to this app; sensitive query parameters are cleared from the browser address when the form opens and are not stored as drafts.
 
+Online registration and sign-in refusals, including accounts not approved for access, use the same database-backed account rate limits. Failed sign-in details remain generic. If attempts are temporarily limited, wait before retrying; changing account names does not bypass the request limit.
+
 ### Local and future online access modes
 
 The default **local** mode accepts loopback application addresses only (`127.0.0.1`, `localhost`, or IPv6 loopback). The launcher remains bound to this PC. Requests through a public hostname fail closed; changing an address/header cannot grant guest access. `BETTER_AUTH_URL`, when set, must match the actual origin, including its port.
@@ -288,6 +290,8 @@ Personal templates retain reusable decision reasoning in Markdown and begin with
 | Public app cache                 | Up to 50 MB per build; the current and one earlier shell build are retained                                                                                                             |
 
 Archived note history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. Team permissions, activity, watches, Notifications, and shared editing state are stored separately too, with the limits above. Recovery records have no automatic expiry. Note history loads in pages of 20 versions. Change-impact markers indicate possible consequences; review connected content before acknowledging them.
+
+The local version has no aggregate server attachment quota or dedicated upload-request throttle. Its per-file limit does not bound total storage. Set and verify hosted storage budgets and upload throttling before online access; these operational limits are separate from any future subscription plan.
 
 ### Reviewed storage cleanup
 

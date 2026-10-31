@@ -3131,7 +3131,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       "```",
       "",
       "```javascript",
-      "const total = 2 + 3;",
+      "const total = 2 + 3; // <script>window.__markdownUnsafe=true</script>",
       "```",
       "",
       "```ino",
@@ -3143,11 +3143,23 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       "```",
       "",
       "```mermaid",
+      '%%{init: {"securityLevel": "loose"}}%%',
       "flowchart LR",
       '  A["$$x^2 + y^2$$"] --> B["Review"]',
+      '  click B "javascript:window.__markdownUnsafe=true" "Unsafe diagram link"',
       "```",
       "",
       '<img data-unsafe="true" src="missing-image" onerror="window.__markdownUnsafe=true">',
+      "",
+      '<svg data-unsafe="true" onload="window.__markdownUnsafe=true"></svg>',
+      "",
+      "[Unsafe JavaScript link](javascript:window.__markdownUnsafe=true)",
+      "",
+      "[Unsafe encoded link](java&#x73;cript:window.__markdownUnsafe=true)",
+      "",
+      "[Unsafe data link](data:text/html,unsafe)",
+      "",
+      "$\\href{javascript:window.__markdownUnsafe=true}{Unsafe math link}$",
     ].join("\n");
     await upsert(owner, owner.personal.id, "notes", {
       id: plainId,
@@ -3212,7 +3224,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       phase = "technical";
       await openNote(owner, technicalId);
       const assertFormatting = async () => {
-        await expect(preview().locator(".markdown-math .katex")).toHaveCount(3);
+        await expect(preview().locator(".markdown-math .katex")).toHaveCount(4);
         await expect(
           preview().locator(".markdown-math .katex-display"),
         ).toHaveCount(2);
@@ -3222,9 +3234,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         await expect(preview().locator("code.language-ino.hljs")).toContainText(
           "pinMode",
         );
-        expect(
-          await preview().locator("code.language-ino.hljs span").count(),
-        ).toBeGreaterThan(0);
+        await expect(
+          preview().locator("code.language-ino.hljs span").first(),
+        ).toBeVisible();
         const unknown = preview().locator("code.language-projectanvil-unknown");
         await expect(unknown).toHaveText("<mark>Keep me literal</mark>\n");
         await expect(unknown).not.toHaveClass(/hljs/);
@@ -3235,12 +3247,27 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         await expect(preview().locator(".mermaid-diagram")).toContainText(
           "Review",
         );
-        await expect(
-          preview().locator("script, img[data-unsafe], mark"),
-        ).toHaveCount(0);
         expect(
-          await owner.page.evaluate(() => "__markdownUnsafe" in window),
-        ).toBeFalsy();
+          await preview().evaluate((root) => ({
+            unsafeNodes: root.querySelectorAll(
+              "script, img[data-unsafe], svg[data-unsafe], iframe, object, embed, mark",
+            ).length,
+            unsafeUrls: Array.from(root.querySelectorAll("*")).flatMap(
+              (element) =>
+                ["href", "xlink:href", "src", "data"].flatMap((name) => {
+                  const value = element.getAttribute(name);
+                  return value &&
+                    /^(?:javascript|vbscript|data|file):$/i.test(
+                      new URL(value, location.href).protocol,
+                    )
+                    ? [value]
+                    : [];
+                }),
+            ),
+            executed: "__markdownUnsafe" in window,
+          })),
+          "Raw HTML, code samples, math commands, and diagram directives must not produce active content",
+        ).toEqual({ unsafeNodes: 0, unsafeUrls: [], executed: false });
       };
       await assertFormatting();
       await Promise.all([...inspections]);
