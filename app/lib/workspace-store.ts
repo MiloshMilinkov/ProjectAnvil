@@ -714,7 +714,17 @@ export function routeError(error: unknown): Response {
   if (error instanceof WorkspaceError)
     return Response.json(
       { error: error.message },
-      { status: error.status, headers: { "Cache-Control": "no-store" } },
+      {
+        status: error.status,
+        headers: {
+          "Cache-Control": "no-store",
+          ...(error.status === 429 &&
+          "retryAfter" in error &&
+          typeof error.retryAfter === "number"
+            ? { "Retry-After": String(error.retryAfter) }
+            : {}),
+        },
+      },
     );
   if (error instanceof SyntaxError)
     return Response.json(

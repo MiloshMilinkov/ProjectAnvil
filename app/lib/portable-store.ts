@@ -10,6 +10,11 @@ import { WorkspaceError, validateWorkspace } from "./workspace-model";
 import { assertMutationAccess, assertProjectWritable } from "./permissions";
 import { commitWorkspace, hasReceipt, payloadHash } from "./workspace-journal";
 import { recordUpload, retainFailedUpload } from "./media-store";
+import {
+  admitUploadRequest,
+  admitUploadWrites,
+  reserveUploadBytes,
+} from "./upload-policy";
 import { createSignatureReader } from "./relationships";
 import {
   exportPortableNotes,
@@ -56,7 +61,10 @@ export async function exportMarkdownFolder(request: Request) {
     (!validIdentifier(projectId) ||
       !workspace.projects.some((project) => project.id === projectId))
   )
-    throw new WorkspaceError("This project is no longer available for export.", 404);
+    throw new WorkspaceError(
+      "This project is no longer available for export.",
+      404,
+    );
   const selected = projectId
     ? {
         ...workspace,
@@ -179,6 +187,7 @@ export async function importMarkdownFolder(request: Request) {
   let access = await resolveWorkspace(request);
   let current = await readRawWorkspace(access);
   writableTarget(access, current, projectId);
+  await admitUploadRequest(access);
   const archive = await readBoundedBody(
     request,
     portableLimits.archiveBytes,
@@ -214,6 +223,7 @@ export async function importMarkdownFolder(request: Request) {
     );
   const now = new Date().toISOString();
   const staged = new Set<string>();
+  let writesAdmitted = false;
   try {
     for (let attempt = 0; attempt < 6; attempt++) {
       access = await resolveWorkspace(request);
@@ -288,6 +298,10 @@ export async function importMarkdownFolder(request: Request) {
       assertMutationAccess(access, current, updated, mutation);
       if (bundle.attachments.length && !env.BUCKET)
         throw new WorkspaceError("Attachment storage is unavailable.", 503);
+      if (!writesAdmitted && bundle.attachments.length) {
+        await admitUploadWrites(access, bundle.attachments.length);
+        writesAdmitted = true;
+      }
       for (const file of bundle.attachments) {
         const id = ids.get(file.path)!;
         if (staged.has(id)) continue;
@@ -303,8 +317,9 @@ export async function importMarkdownFolder(request: Request) {
             "The attachment staging record has changed. Start a new import.",
             409,
           );
-        if (!existing) await recordUpload(access, id, key);
+        await recordUpload(access, id, key);
         staged.add(id);
+        await reserveUploadBytes(access, key, file.bytes.byteLength);
         const metadata = plan.media.find((item) => item.id === id)!;
         const bucket = env.BUCKET;
         if (!bucket)

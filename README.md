@@ -81,6 +81,8 @@ Large task lists show 50 rows per page, and boards start with 40 cards per statu
 
 **Storage cleanup:** owners and admins can review unused uploads, Trash, and older note versions after 30 days, 90 days, or a year. Removal requires a separate confirmation and is permanent. Current attachments, referenced recovery files, and each note's newest saved version are protected; nothing expires automatically. Keep a complete backup before cleanup.
 
+**Upload safeguards:** each workspace has a 500 MiB attachment allowance, including retained files and uploads in progress. Uploads and Markdown imports share server-enforced account/workspace rate limits. See [storage limits](docs/LOCAL_SETUP.md#storage-limits).
+
 ## Developer setup
 
 Requires **Node.js 22.13+** and npm. Clone or download the repository, open its folder, then run:

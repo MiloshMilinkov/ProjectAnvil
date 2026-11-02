@@ -6,6 +6,7 @@ import { canManageWorkspace, permissionsSnapshotSQL } from "./permissions";
 import { payloadHash } from "./workspace-journal";
 import { WorkspaceError } from "./workspace-model";
 import type { Workspace } from "./types";
+import { releaseUploadBytes } from "./upload-policy";
 export type { StorageReport } from "./media-store";
 
 const reviewLifetime = 10 * 60_000;
@@ -474,6 +475,7 @@ export async function applyStorageCleanup(
           )
           .bind(new Date().toISOString(), access.id, row.id)
           .run();
+        await releaseUploadBytes(access.id, row.key);
         removedUploads++;
       }),
     );

@@ -335,7 +335,7 @@ export const tourSteps: TourStep[] = [
     page: "notes",
     title: "Attachments and audio",
     body: "The attachment button adds images, PDFs, audio, video, or text files. The microphone records audio when you allow access. Uploaded references can be displayed in notes and used as cards on a canvas.",
-    tip: "Uploads support 20 MB per file. Navigation finishes recording and uploads it first. If upload fails, keep the page open to retry or download the audio.",
+    tip: "Uploads support 20 MB per file and 500 MiB total per workspace, including retained files. Frequent uploads and imports are temporarily limited. Navigation finishes recording and uploads it first. If upload fails, keep the page open to retry or download the audio.",
     anchors: [
       '[data-tour="note-media"]',
       ".note-format-tools",

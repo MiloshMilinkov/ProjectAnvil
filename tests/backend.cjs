@@ -939,6 +939,7 @@ async function main() {
     "db/collaboration.sql",
     "db/note-collaboration.sql",
     "db/storage.sql",
+    "db/upload-limits.sql",
   ])
     sql.exec(fs.readFileSync(path.join(root, relative), "utf8"));
   const requiredTables = [

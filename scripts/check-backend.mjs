@@ -67,6 +67,7 @@ const files = [
   "app/lib/source-excerpts.ts",
   "app/lib/workspace-journal.ts",
   "app/lib/media-store.ts",
+  "app/lib/upload-policy.ts",
   "app/lib/storage-cleanup.ts",
   "app/lib/request-body.ts",
   "app/lib/draft-store.ts",

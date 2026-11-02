@@ -291,7 +291,9 @@ Personal templates retain reusable decision reasoning in Markdown and begin with
 
 Archived note history, Trash, personal templates, and uploaded file bytes do not count toward the active workspace allowance. Team permissions, activity, watches, Notifications, and shared editing state are stored separately too, with the limits above. Recovery records have no automatic expiry. Note history loads in pages of 20 versions. Change-impact markers indicate possible consequences; review connected content before acknowledging them.
 
-The local version has no aggregate server attachment quota or dedicated upload-request throttle. Its per-file limit does not bound total storage. Set and verify hosted storage budgets and upload throttling before online access; these operational limits are separate from any future subscription plan.
+Workspace attachments have a **500 MiB (524,288,000 bytes)** total server allowance. Actual stored bytes, retained recovery files, incomplete uploads, and concurrent upload reservations count; editable file metadata cannot reduce the charge. Existing files are inventoried on the first upload after upgrade, including legacy guest files. Existing workspaces over the allowance remain readable and cleanable, but cannot add files. Allowance is released only after reviewed cleanup confirms file deletion; uncertain failures remain charged until cleanup succeeds. Direct changes to the private file bucket outside the app are unsupported.
+
+Uploads and Markdown imports share database-backed limits of **20 requests per account per minute** and **60 per workspace**. File writes additionally allow **500 per account per minute** and **1,500 per workspace**, including imported attachments. Request limits apply before reading upload bodies; file-write limits apply before storage. Guest activity shares its workspace identity. Limited requests return HTTP 429 with a Retry-After header. These safeguards apply locally too and are independent of future subscription plans. Review the fixed server limits in `app/lib/upload-policy.ts` before online staging; no hosting is enabled.
 
 ### Reviewed storage cleanup
 

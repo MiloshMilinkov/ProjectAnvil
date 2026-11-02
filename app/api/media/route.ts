@@ -11,6 +11,11 @@ import { recordUpload, retainFailedUpload } from "../../lib/media-store";
 import { readBoundedBody } from "../../lib/request-body";
 import type { Media } from "../../lib/types";
 import { assertProjectWritable } from "../../lib/permissions";
+import {
+  admitUploadRequest,
+  admitUploadWrites,
+  reserveUploadBytes,
+} from "../../lib/upload-policy";
 
 const maximumSize = 20 * 1024 * 1024;
 
@@ -26,6 +31,7 @@ export async function POST(request: Request) {
         "Media storage is unavailable. Enable the BUCKET storage binding before uploading files.",
         503,
       );
+    await admitUploadRequest(access);
     if (!request.headers.get("content-type")?.startsWith("multipart/form-data"))
       throw new WorkspaceError(
         "Upload a file using a multipart form with a file field.",
@@ -69,6 +75,7 @@ export async function POST(request: Request) {
       file.name.replace(/[\r\n\x00-\x1f]/g, "").slice(0, 240) ||
       "Untitled file";
     const type = file.type.slice(0, 150) || "application/octet-stream";
+    await admitUploadWrites(access, 1);
     const media: Media = {
       id,
       name,
@@ -83,6 +90,7 @@ export async function POST(request: Request) {
     await recordUpload(access, id, uploadedKey);
     uploadedWorkspace = access.id;
     uploadedId = id;
+    await reserveUploadBytes(access, uploadedKey, file.size);
     await env.BUCKET.put(uploadedKey, await file.arrayBuffer(), {
       httpMetadata: { contentType: type },
       customMetadata: { name, workspaceId: access.id },

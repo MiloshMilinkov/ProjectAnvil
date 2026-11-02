@@ -14,6 +14,7 @@ import collaborationSQL from "../../db/collaboration.sql?raw";
 import noteCollaborationSQL from "../../db/note-collaboration.sql?raw";
 import releaseSQL from "../../db/release.sql?raw";
 import storageSQL from "../../db/storage.sql?raw";
+import uploadLimitsSQL from "../../db/upload-limits.sql?raw";
 
 const runtimeMigrationSQL = [
   workspaceSQL,
@@ -25,6 +26,7 @@ const runtimeMigrationSQL = [
   noteCollaborationSQL,
   releaseSQL,
   storageSQL,
+  uploadLimitsSQL,
 ];
 
 /** Read-only release verification: online mode never bootstraps or applies SQL. */

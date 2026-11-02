@@ -18,7 +18,7 @@ Two-account browser regressions for Chromium, Firefox, and WebKit and repeatable
 
 - Local release preparation now includes loopback-only guest access, fail-closed online policies with approved/verified accounts, local account-link delivery, account recovery/session controls, and versioned migration rehearsals. Real online resources and an external email service remain unconfigured.
 - Connect and verify real account email delivery, HTTPS/proxy behavior, and authentication request limits on future staging.
-- Set and verify aggregate attachment-storage budgets and upload throttling before online access. The current per-file cap does not bound total retained file storage; pricing plans remain deferred.
+- Workspace attachment allowances and account/workspace upload throttling are enforced locally, including imports and concurrent uploads. Review their budgets and validate hosted behavior before online access; pricing plans remain deferred.
 - Local readiness includes bounded task rendering, explicit reviewed recovery cleanup, redacted configuration/private health checks, an optional email adapter, and disposable migration/backup/rollback rehearsals. Services remain unconfigured; no online resources are created.
 - Browser-readiness fixes address Firefox's native offline test interception and WebKit's retained interrupted entry preload. Preserve the strict in-place recovery, real offline, and multi-account regressions. Current engine results, including the final Windows WebKit focused follow-up, are recorded in [browser verification](TESTING.md#browser-verification).
 - Run a real project locally before beta: capture task/note friction, misleading feedback, recovery issues, and slow interactions. Fix repeated problems before expanding the feature set.

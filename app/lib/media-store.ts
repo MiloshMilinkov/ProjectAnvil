@@ -91,7 +91,11 @@ export async function recordUpload(
     .prepare(
       `INSERT INTO media_objects (workspace_id, media_id, object_key, state, created_at)
     SELECT ?, ?, ?, 'uploading', ? WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = ?)${membership}
-    AND NOT EXISTS (SELECT 1 FROM storage_media_purges WHERE workspace_id = ? AND media_id = ?)`,
+    AND NOT EXISTS (SELECT 1 FROM storage_media_purges WHERE workspace_id = ? AND media_id = ?)
+    ON CONFLICT(workspace_id, media_id) DO UPDATE SET
+      state = CASE WHEN media_objects.state = 'active' THEN 'active' ELSE 'uploading' END,
+      unreferenced_at = NULL
+    WHERE media_objects.object_key = excluded.object_key`,
     )
     .bind(
       access.id,
