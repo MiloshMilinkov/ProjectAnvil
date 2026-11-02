@@ -1392,6 +1392,7 @@ async function main() {
   });
   await require("./phase4-boundaries.cjs")({ sql, store: rawStore, request, users });
   await require("./phase5-portability.cjs")({ sql, store: rawStore, request, users });
+  await require("./upload-limits.cjs")({ sql, store: rawStore, request, users, objects, BUCKET });
   Module._load = originalLoad;
   sql.close();
   console.log(

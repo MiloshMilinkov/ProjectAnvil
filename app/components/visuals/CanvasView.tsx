@@ -35,6 +35,7 @@ import {
   type Workspace,
 } from "../../lib/types";
 import { useWorkspaceFetch } from "../WorkspaceScope";
+import { uploadErrorMessage } from "../../lib/workspace-transport";
 import { useWorkspacePermissions } from "../WorkspacePermissions";
 import { useCanvasPersistence } from "../useCanvasPersistence";
 import { clamp, short, cssColor, type Camera } from "./visual-helpers";
@@ -331,13 +332,19 @@ export function CanvasView(props: CanvasViewProps) {
         method: "POST",
         body: form,
       });
-      const body = (await result.json()) as {
+      const body = (await result.json().catch(() => ({}))) as {
         media?: Media;
         workspace?: Workspace;
         error?: string;
       };
-      if (!result.ok || !body.media)
-        throw new Error(body.error || "Upload failed");
+      if (!result.ok || !body?.media)
+        throw new Error(
+          uploadErrorMessage(
+            result,
+            body,
+            "The attachment could not be uploaded.",
+          ),
+        );
       const media: Media = body.media;
       if (!body.workspace)
         await mutate({ action: "upsert", entity: "media", item: media });

@@ -70,7 +70,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   test.beforeEach(async ({ browserName }, testInfo) => {
     if (browserName !== "webkit") return;
     const actors =
-      /account recovery|delayed saves|interrupted attachments|storage cleanup/.test(
+      /account recovery|delayed saves|interrupted attachments|storage cleanup|attachment allowance and upload feedback/.test(
         testInfo.title,
       )
         ? [owner]
@@ -3372,6 +3372,388 @@ test.describe("Separate accounts and recoverable everyday work", () => {
         ?.content,
     ).toBe(technical);
   });
+  test("attachment allowance and upload feedback preserve work across themes and narrow layouts", async ({}, testInfo) => {
+    test.setTimeout(180_000);
+    await selectWorkspace(owner, owner.personal);
+    const limit = 500 * 1024 * 1024;
+    const upload = await owner.context.request.post("/api/media", {
+      headers: {
+        Origin: base,
+        "X-Account-Id": owner.userId,
+        "X-Workspace-Id": owner.personal.id,
+      },
+      multipart: {
+        file: {
+          name: `allowance-${fixtureId().slice(0, 8)}.txt`,
+          mimeType: "text/plain",
+          buffer: Buffer.from("Actual attachment bytes."),
+        },
+      },
+    });
+    expect(upload.status()).toBe(201);
+    const actual = await api(
+      owner,
+      "/api/storage",
+      undefined,
+      owner.personal.id,
+    );
+    expect(actual.attachments.status).toBe("ready");
+    expect(actual.attachments.limitBytes).toBe(limit);
+    expect(actual.attachments.usedBytes).toBeGreaterThanOrEqual(24);
+    expect(actual.attachments.remainingBytes).toBe(
+      Math.max(0, limit - actual.attachments.usedBytes),
+    );
+
+    type UsageCase = "normal" | "near" | "full" | "unavailable" | "error";
+    let usageCase: UsageCase = "normal";
+    let checks = 0;
+    const storage = async (route: Route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      checks++;
+      if (usageCase === "error")
+        return route.fulfill({
+          status: 503,
+          json: { error: "Storage could not be checked. Try again shortly." },
+        });
+      const used =
+        usageCase === "near"
+          ? limit * 0.94
+          : usageCase === "full"
+            ? limit * 1.1
+            : limit / 4;
+      return route.fulfill({
+        json: {
+          ...actual,
+          attachments:
+            usageCase === "unavailable"
+              ? {
+                  status: "unavailable",
+                  limitBytes: limit,
+                  usedBytes: null,
+                  remainingBytes: null,
+                }
+              : {
+                  status: "ready",
+                  limitBytes: limit,
+                  usedBytes: used,
+                  remainingBytes: Math.max(0, limit - used),
+                },
+        },
+      });
+    };
+    await owner.page.route("**/api/storage", storage);
+    try {
+      await navigate(owner.page, "Workspace settings");
+      const panel = owner.page.locator('[data-tour="storage-health"]');
+      const meter = panel.getByRole("meter", {
+        name: "Attachment storage",
+        exact: true,
+      });
+      const refresh = panel.getByRole("button", {
+        name: "Check storage",
+        exact: true,
+      });
+      const check = async (next: UsageCase) => {
+        usageCase = next;
+        await expect(refresh).toBeEnabled();
+        const before = checks;
+        await refresh.focus();
+        await expect(refresh).toBeFocused();
+        await refresh.press("Enter");
+        await expect.poll(() => checks).toBe(before + 1);
+        await expect(refresh).toBeEnabled();
+      };
+      await check("normal");
+      await expect(meter).toHaveAttribute("value", String(limit / 4));
+      for (const theme of detailedThemes(testInfo)) {
+        await owner.page.getByRole("button", { name: /^Appearance:/ }).click();
+        await owner.page
+          .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+          .click();
+        for (const width of [1365, 320]) {
+          await owner.page.setViewportSize({ width, height: 900 });
+          for (const next of [
+            "normal",
+            "near",
+            "full",
+            "unavailable",
+          ] as const) {
+            await check(next);
+            if (next === "unavailable") {
+              await expect(meter).toHaveCount(0);
+              await expect(
+                panel.getByText(
+                  "Attachment usage is unavailable. Check storage again to refresh it.",
+                  { exact: true },
+                ),
+              ).toBeVisible();
+              await expect(panel).not.toContainText("Attachments: 0 MiB");
+            } else {
+              const expected =
+                next === "normal"
+                  ? limit / 4
+                  : next === "near"
+                    ? limit * 0.94
+                    : limit;
+              await expect(meter).toHaveAttribute("value", String(expected));
+              await expect(meter).toHaveAttribute("max", String(limit));
+              await expect(meter).toHaveAttribute(
+                "aria-valuetext",
+                next === "normal"
+                  ? "125 MiB used; 375 MiB remaining"
+                  : next === "near"
+                    ? "470 MiB used; 30 MiB remaining"
+                    : "550 MiB used; 0 MiB remaining",
+              );
+              if (next === "near")
+                await expect(
+                  panel.getByText(/^Attachment storage is nearly full\./),
+                ).toBeVisible();
+              else if (next === "full")
+                await expect(
+                  panel.getByText(/^Attachment storage is full\./),
+                ).toBeVisible();
+              else
+                await expect(
+                  panel.getByText(/^Attachment storage is (nearly )?full\./),
+                ).toHaveCount(0);
+            }
+            expect(
+              await owner.page.evaluate(
+                () => document.documentElement.scrollWidth <= innerWidth,
+              ),
+            ).toBeTruthy();
+            if (
+              next === "full" ||
+              (theme === "Focus" && next === "unavailable")
+            ) {
+              await panel.scrollIntoViewIfNeeded();
+              const screenshot = testInfo.outputPath(
+                `attachment-${next}-${theme.toLowerCase()}-${width}.png`,
+              );
+              await owner.page.screenshot({ path: screenshot });
+              await testInfo.attach(
+                `attachment-${next}-${theme.toLowerCase()}-${width}`,
+                { path: screenshot, contentType: "image/png" },
+              );
+            }
+          }
+        }
+      }
+      await check("normal");
+      await expect(meter).toHaveAttribute("value", String(limit / 4));
+      await check("error");
+      await expect(
+        panel
+          .getByRole("alert")
+          .filter({ hasText: "Storage could not be checked" }),
+      ).toBeVisible();
+      await expect(meter).toHaveAttribute("value", String(limit / 4));
+      await expect(
+        panel.getByText(
+          "Showing the last successful storage check. Usage may have changed.",
+          { exact: true },
+        ),
+      ).toBeVisible();
+      await check("normal");
+      await expect(
+        panel.getByText(
+          "Showing the last successful storage check. Usage may have changed.",
+          { exact: true },
+        ),
+      ).toHaveCount(0);
+    } finally {
+      await owner.page.unroute("**/api/storage", storage);
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+
+    const noteId = `upload_feedback_${fixtureId()}`;
+    const content = "Keep this note while upload limits are reported.";
+    await upsert(owner, owner.personal.id, "notes", {
+      id: noteId,
+      title: "Upload feedback reference",
+      content,
+    });
+    await openNote(owner, noteId);
+    const editor = owner.page.getByRole("textbox", {
+      name: "Note content",
+      exact: true,
+    });
+    const fileInput = owner.page.locator(
+      'input[type="file"][accept="image/*,audio/*,video/*,application/pdf,.txt,.md"]',
+    );
+    const file = {
+      name: "keep-local-selection.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Uncommitted attachment."),
+    };
+    let failures = 0;
+    let limited = false;
+    const rejectUpload = async (route: Route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      failures++;
+      return route.fulfill(
+        limited
+          ? {
+              status: 429,
+              headers: { "Retry-After": "30" },
+              json: {
+                error: "Uploads are temporarily limited.",
+                code: "upload_rate_limited",
+                retryAfter: 30,
+              },
+            }
+          : {
+              status: 413,
+              json: {
+                error:
+                  "Not enough attachment storage. Ask a workspace owner or admin to review unused files before adding more attachments.",
+                code: "attachment_quota_exceeded",
+              },
+            },
+      );
+    };
+    const before = await workspace(owner);
+    await owner.page.route("**/api/media", rejectUpload);
+    try {
+      for (const width of [1365, 320]) {
+        limited = width === 320;
+        await owner.page.setViewportSize({ width, height: 900 });
+        await owner.page
+          .getByRole("group", { name: "Note view", exact: true })
+          .getByRole("button", { name: "Write", exact: true })
+          .click();
+        const draft = `${content}\nDraft at ${width}px.`;
+        await editor.fill(draft);
+        await fileInput.setInputFiles(file);
+        const error = owner.page.locator(".note-inline-error");
+        await expect(error).toContainText(
+          limited
+            ? "Try again in 30 seconds."
+            : "Not enough attachment storage.",
+        );
+        await expect(editor).toHaveValue(draft);
+        expect(
+          await owner.page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBeTruthy();
+        await expect(
+          owner.page.getByRole("button", {
+            name: "Attach an image, PDF, audio, or video",
+            exact: true,
+          }),
+        ).toBeEnabled();
+        await expect
+          .poll(
+            async () =>
+              (await workspace(owner)).notes.find((item) => item.id === noteId)
+                ?.content,
+          )
+          .toBe(draft);
+        expect((await workspace(owner)).media).toHaveLength(
+          before.media.length,
+        );
+        expect(failures).toBe(limited ? 2 : 1);
+        const screenshot = testInfo.outputPath(
+          `attachment-upload-${limited ? "limited" : "quota"}-${width}.png`,
+        );
+        await owner.page.screenshot({ path: screenshot });
+        await testInfo.attach(`attachment-upload-${width}`, {
+          path: screenshot,
+          contentType: "image/png",
+        });
+      }
+    } finally {
+      await owner.page.unroute("**/api/media", rejectUpload);
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+    }
+
+    await navigate(owner.page, "Workspace settings");
+    const portable = owner.page.locator(".portable-panel");
+    const importedTitle = `Retried import ${fixtureId().slice(0, 8)}`;
+    const archiveName = "kept-import-selection.zip";
+    await portable
+      .locator('input[type="file"][accept=".zip,application/zip"]')
+      .setInputFiles({
+        name: archiveName,
+        mimeType: "application/zip",
+        buffer: Buffer.from(
+          zipSync({
+            "README.md": strToU8(
+              `---\ntitle: ${importedTitle}\n---\n# ${importedTitle}\n\nKeep this reviewed selection.\n`,
+            ),
+          }),
+        ),
+      });
+    await expect(
+      portable.getByRole("heading", { name: "Review import", exact: true }),
+    ).toBeVisible();
+    const importButton = portable.getByRole("button", {
+      name: "Import as new notes",
+      exact: true,
+    });
+    const beforeImport = await workspace(owner);
+    let importAttempts = 0;
+    let operationId = "";
+    const limitImport = async (route: Route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      importAttempts++;
+      operationId = route.request().headers()["x-import-operation"] || "";
+      await route.fulfill({
+        status: 429,
+        headers: { "Retry-After": "30" },
+        json: {
+          error: "Uploads are temporarily limited.",
+          code: "upload_rate_limited",
+          retryAfter: 30,
+        },
+      });
+    };
+    await owner.page.route("**/api/portable", limitImport);
+    try {
+      await importButton.click();
+      await expect(portable.getByRole("alert")).toContainText(
+        "Try again in 30 seconds.",
+      );
+      await expect(portable.getByRole("alert")).toContainText(
+        "Your selection is kept.",
+      );
+      await expect(
+        portable.getByRole("heading", { name: "Review import", exact: true }),
+      ).toBeVisible();
+      await expect(portable.locator(".portable-review")).toContainText(
+        archiveName,
+      );
+      await expect(importButton).toBeEnabled();
+      const unchanged = await workspace(owner);
+      expect(unchanged.notes).toHaveLength(beforeImport.notes.length);
+      expect(unchanged.media).toHaveLength(beforeImport.media.length);
+      expect(importAttempts).toBe(1);
+      expect(operationId).not.toBe("");
+    } finally {
+      await owner.page.unroute("**/api/portable", limitImport);
+    }
+    const retriedRequest = owner.page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === "/api/portable" &&
+        request.method() === "POST",
+    );
+    await importButton.click();
+    expect((await retriedRequest).headers()["x-import-operation"]).toBe(
+      operationId,
+    );
+    await expect(
+      portable.getByRole("heading", { name: "Import complete", exact: true }),
+    ).toBeFocused();
+    const imported = await workspace(owner);
+    expect(imported.notes).toHaveLength(beforeImport.notes.length + 1);
+    expect(
+      imported.notes.filter((note) => note.title === importedTitle),
+    ).toHaveLength(1);
+    expect(imported.media).toHaveLength(beforeImport.media.length);
+  });
+
   test("storage cleanup requires review, preserves empty work, and keeps stale failures recoverable in every theme", async ({}, testInfo) => {
     test.setTimeout(180_000);
     await selectWorkspace(owner, owner.personal);

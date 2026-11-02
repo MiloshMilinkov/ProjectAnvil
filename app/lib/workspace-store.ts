@@ -713,7 +713,17 @@ function reportOperationalFailure(
 export function routeError(error: unknown): Response {
   if (error instanceof WorkspaceError)
     return Response.json(
-      { error: error.message },
+      {
+        error: error.message,
+        ...("code" in error && typeof error.code === "string"
+          ? { code: error.code }
+          : {}),
+        ...(error.status === 429 &&
+        "retryAfter" in error &&
+        typeof error.retryAfter === "number"
+          ? { retryAfter: error.retryAfter }
+          : {}),
+      },
       {
         status: error.status,
         headers: {

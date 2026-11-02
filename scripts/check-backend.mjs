@@ -148,6 +148,7 @@ try {
   for (const name of [
     "phase1-trash.cjs",
     "storage-cleanup.cjs",
+    "upload-limits.cjs",
     "release-operations.cjs",
     "offline.cjs",
     "database-migrations.cjs",

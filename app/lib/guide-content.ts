@@ -335,7 +335,7 @@ export const tourSteps: TourStep[] = [
     page: "notes",
     title: "Attachments and audio",
     body: "The attachment button adds images, PDFs, audio, video, or text files. The microphone records audio when you allow access. Uploaded references can be displayed in notes and used as cards on a canvas.",
-    tip: "Uploads support 20 MB per file and 500 MiB total per workspace, including retained files. Frequent uploads and imports are temporarily limited. Navigation finishes recording and uploads it first. If upload fails, keep the page open to retry or download the audio.",
+    tip: "Uploads support 20 MB per file and 500 MiB total per workspace, including retained files. A temporary upload limit shows how long to wait before retrying. Navigation finishes recording and uploads it first. If upload fails, keep the page open to retry or download the audio.",
     anchors: [
       '[data-tour="note-media"]',
       ".note-format-tools",
@@ -578,7 +578,7 @@ export const tourSteps: TourStep[] = [
     id: "backups",
     page: "settings",
     title: "Exports and backups",
-    body: "In Workspace settings → Data & offline, Storage & recovery reports the active workspace allowance, archived history, and attachment problems. Workspace records exports visible records or imports a replacement after confirmation, resetting relationship review markers. New imported ideas start without votes; matching ideas retain current trusted votes. JSON excludes personal rooms, archived versions, and uploaded files.",
+    body: "In Workspace settings → Data & offline, Storage & recovery shows workspace text and attachment usage, remaining attachment space, archived history, and file problems. Owners and admins see near-full and full attachment warnings. Workspace records exports visible records or imports a replacement after confirmation, resetting relationship review markers. New imported ideas start without votes; matching ideas retain current trusted votes. JSON excludes personal rooms, archived versions, and uploaded files.",
     tip: "Owners and admins can open Clean up storage, choose unused uploads, Trash, or older note versions, and review items older than 30 days, 90 days, or a year. Removal is permanent, with no Undo. Current files, referenced attachments, and each note's newest saved version are kept. Finish pending saves and keep a complete backup first; browser drafts are separate.",
     anchors: [
       '[data-tour="storage-health"]',

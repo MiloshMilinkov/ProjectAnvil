@@ -102,6 +102,18 @@ Both modes execute the same workload; the label selects the report filename. Reu
 
 The separate typing study performs five edits per mode per account (30 total) with workspace copies off, on while connected, and disconnected. It verifies the final server text after reconnecting. Its input-to-save timing includes the intentional autosave delay.
 
+## Upload allowance and feedback checks
+
+`npm test` includes real SQLite and route regressions for shared account/workspace throttles, concurrent quota reservations, legacy files, retained/pending bytes, incomplete inventory and lease recovery, revoked access, confirmed-deletion accounting, and interrupted/import retry receipts. A virtual provider size exercises the 500 MiB boundary without allocating a large file; actual small uploads still pass through the normal routes and bucket fixture. Shared feedback tests check valid and malformed retry waits.
+
+The focused browser workflow checks a real small upload and its reported usage, then uses controlled report responses for normal, near-full, over-limit, unavailable, and failed-refresh states. It checks keyboard refresh, all five themes on desktop and narrow Chromium layouts, and Focus at both widths in Firefox/WebKit. Failed note uploads preserve text and create no broken links; a throttled Markdown import keeps its selection and a manual retry reuses its operation reference without duplicates.
+
+```sh
+npm run test:browser -- --grep "attachment allowance and upload feedback|storage cleanup requires|interrupted attachments|Markdown import preview"
+```
+
+On **3 November 2026**, build **`593cff2276972ebef2bb`** passed the complete code check, including types, zero-warning lint, backend/security regressions, 39 native Node tests, and the production build. The four affected workflows passed in Chromium, Firefox, and WebKit: **12 passed, no failures or skips**. Representative desktop/mobile screenshots were inspected, and existing startup/offline size budgets passed. This was affected-workflow verification; the complete 24-workflow browser suite and broad performance studies were not rerun for this change.
+
 ## Practical local trial
 
 Use one actual project for several ordinary work sessions before an online beta. Create a few tasks and linked notes, change dates and priorities, find older work, use a saved view, and resume a work room. Try the same work on a narrow screen and with the keyboard. Make a complete backup and verify it before any cleanup or update.

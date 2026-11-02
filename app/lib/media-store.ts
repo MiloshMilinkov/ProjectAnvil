@@ -3,6 +3,10 @@ import { database, type ResolvedWorkspace } from "./access-store";
 import { WorkspaceError } from "./workspace-model";
 import type { Workspace } from "./types";
 import {
+  readAttachmentStorageUsage,
+  type AttachmentStorageUsage,
+} from "./upload-policy";
+import {
   assertWorkspaceWritable,
   canManageWorkspace,
   permissionsSnapshotSQL,
@@ -64,6 +68,7 @@ export interface StorageReport {
   activeBytes: number;
   limitBytes: number;
   canCleanup: boolean;
+  attachments: AttachmentStorageUsage;
   history: { versions: number; bytes: number };
   media: {
     active: number;
@@ -139,6 +144,7 @@ export async function storageHealth(
     );
   if (!env.BUCKET)
     throw new WorkspaceError("Media storage is unavailable.", 503);
+  const attachments = await readAttachmentStorageUsage(access);
   const rows = await database()
     .prepare(
       "SELECT media_id, object_key, state, created_at, unreferenced_at FROM media_objects WHERE workspace_id = ?",
@@ -198,6 +204,7 @@ export async function storageHealth(
     .first<{ versions: number; bytes: number }>();
   return {
     canCleanup: true,
+    attachments,
     activeBytes: new TextEncoder().encode(JSON.stringify(activeRecords))
       .byteLength,
     limitBytes: 1_500_000,

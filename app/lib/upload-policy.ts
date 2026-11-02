@@ -1,11 +1,39 @@
 import { env } from "cloudflare:workers";
 import { database, type ResolvedWorkspace } from "./access-store";
-import { assertWorkspaceWritable, permissionsSnapshotSQL } from "./permissions";
+import {
+  assertWorkspaceWritable,
+  canManageWorkspace,
+  permissionsSnapshotSQL,
+} from "./permissions";
 import { WorkspaceError } from "./workspace-model";
 
 export const attachmentLimitBytes = 500 * 1024 * 1024;
 const windowMilliseconds = 60_000;
 const inventoryLeaseMilliseconds = 120_000;
+
+type UploadErrorCode =
+  | "upload_rate_limited"
+  | "attachment_quota_exceeded"
+  | "attachment_upload_changed"
+  | "attachment_storage_unavailable";
+
+class UploadError extends WorkspaceError {
+  constructor(
+    message: string,
+    status: number,
+    public code: UploadErrorCode,
+    public retryAfter?: number,
+  ) {
+    super(message, status);
+  }
+}
+
+export interface AttachmentStorageUsage {
+  usedBytes: number | null;
+  limitBytes: number;
+  remainingBytes: number | null;
+  status: "ready" | "unavailable";
+}
 
 async function admitUploads(
   access: ResolvedWorkspace,
@@ -57,16 +85,28 @@ async function admitUploads(
       )
       .first();
     if (!accepted) {
+      const permitted = await database()
+        .prepare(
+          `SELECT 1 AS allowed FROM workspaces WHERE id = ? AND (${authorization.sql})`,
+        )
+        .bind(access.id, ...authorization.bindings)
+        .first();
+      if (!permitted)
+        throw new WorkspaceError(
+          "Workspace access changed. Refresh before uploading again.",
+          403,
+        );
       const current = await database()
         .prepare(
           "SELECT started_at FROM upload_rate_limits WHERE bucket_key = ?",
         )
         .bind(key)
         .first<{ started_at: number }>();
-      const error = new WorkspaceError(
-        "Too many uploads. Wait a moment before trying again.",
+      const error = new UploadError(
+        "Uploads are temporarily limited.",
         429,
-      ) as WorkspaceError & { retryAfter: number };
+        "upload_rate_limited",
+      );
       error.retryAfter = Math.max(
         1,
         Math.min(
@@ -127,9 +167,10 @@ async function initializeInventory(access: ResolvedWorkspace) {
     )
     .run();
   if (!claimed.meta.changes)
-    throw new WorkspaceError(
+    throw new UploadError(
       "Attachment storage is being checked. Try uploading again shortly.",
       503,
+      "attachment_storage_unavailable",
     );
   const ownsInventory =
     "EXISTS (SELECT 1 FROM upload_storage_inventory WHERE workspace_id = ? AND token = ? AND ready = 0)";
@@ -197,9 +238,10 @@ async function initializeInventory(access: ResolvedWorkspace) {
       .bind(access.id, token)
       .run()
       .catch(() => undefined);
-    throw new WorkspaceError(
+    throw new UploadError(
       "Attachment storage could not be checked. Try uploading again shortly.",
       503,
+      "attachment_storage_unavailable",
     );
   }
 }
@@ -253,11 +295,104 @@ export async function reserveUploadBytes(
       bytes,
     )
     .first();
-  if (!accepted)
+  if (accepted) return;
+  // Diagnose only after a denied reservation. The reservation itself remains
+  // one atomic statement; a concurrent cleanup must not be called a full quota.
+  const state = await database()
+    .prepare(
+      `SELECT (${authorization.sql}) AS allowed,
+      (SELECT ready FROM upload_storage_inventory WHERE workspace_id = ?) AS ready,
+      (SELECT bytes FROM upload_storage_objects WHERE workspace_id = ? AND object_key = ?) AS reservedBytes,
+      EXISTS (SELECT 1 FROM media_objects WHERE workspace_id = ? AND object_key = ? AND state IN ('uploading', 'active')) AS registered,
+      EXISTS (SELECT 1 FROM storage_media_purges WHERE workspace_id = ? AND object_key = ?) AS purged,
+      COALESCE((SELECT SUM(bytes) FROM upload_storage_objects WHERE workspace_id = ?), 0) AS usedBytes`,
+    )
+    .bind(
+      ...authorization.bindings,
+      access.id,
+      access.id,
+      objectKey,
+      access.id,
+      objectKey,
+      access.id,
+      objectKey,
+      access.id,
+    )
+    .first<{
+      allowed: number;
+      ready: number | null;
+      reservedBytes: number | null;
+      registered: number;
+      purged: number;
+      usedBytes: number;
+    }>();
+  if (!state?.allowed)
     throw new WorkspaceError(
-      "This workspace has reached its 500 MB attachment limit, or the upload has changed. Clean up unused files before uploading more.",
-      413,
+      "Workspace access changed. Refresh before uploading again.",
+      403,
     );
+  if (state.ready !== 1)
+    throw new UploadError(
+      "Attachment storage is being checked. Try uploading again shortly.",
+      503,
+      "attachment_storage_unavailable",
+    );
+  if (
+    !state.registered ||
+    state.purged ||
+    (state.reservedBytes !== null && state.reservedBytes !== bytes)
+  )
+    throw new UploadError(
+      "This attachment changed or was removed. Choose the file again or start a new import.",
+      409,
+      "attachment_upload_changed",
+    );
+  if (state.usedBytes + bytes > attachmentLimitBytes)
+    throw new UploadError(
+      "Not enough attachment storage. Ask a workspace owner or admin to review unused files before adding more attachments.",
+      413,
+      "attachment_quota_exceeded",
+    );
+  throw new UploadError(
+    "Attachment storage changed. Try uploading again.",
+    409,
+    "attachment_upload_changed",
+  );
+}
+
+/** Full accounting is separate from the bounded attachment-health listing. */
+export async function readAttachmentStorageUsage(
+  access: ResolvedWorkspace,
+): Promise<AttachmentStorageUsage> {
+  if (!canManageWorkspace(access))
+    throw new WorkspaceError(
+      "Workspace storage reports are available to owners and admins.",
+      403,
+    );
+  try {
+    await initializeInventory(access);
+  } catch (error) {
+    if (!(error instanceof WorkspaceError) || error.status !== 503) throw error;
+    return {
+      usedBytes: null,
+      remainingBytes: null,
+      limitBytes: attachmentLimitBytes,
+      status: "unavailable",
+    };
+  }
+  const totals = await database()
+    .prepare(
+      "SELECT COALESCE(SUM(bytes), 0) AS bytes FROM upload_storage_objects WHERE workspace_id = ?",
+    )
+    .bind(access.id)
+    .first<{ bytes: number }>();
+  const usedBytes = totals?.bytes ?? 0;
+  return {
+    usedBytes,
+    remainingBytes: Math.max(0, attachmentLimitBytes - usedBytes),
+    limitBytes: attachmentLimitBytes,
+    status: "ready",
+  };
 }
 
 /** Call only after the bucket deletion and its durable purge acknowledgement succeed. */

@@ -1,5 +1,6 @@
 "use client";
 import { useWorkspaceFetch, useWorkspaceScope } from "./WorkspaceScope";
+import { uploadErrorMessage } from "../lib/workspace-transport";
 
 import {
   useCallback,
@@ -1160,15 +1161,24 @@ export default function Knowledge({
         method: "POST",
         body: data,
       });
-      if (!response.ok) throw new Error("File upload failed. Try again.");
-      const { media, workspace: updatedWorkspace } =
-        (await response.json()) as {
-          media?: Media;
-          workspace?: Workspace;
-          error?: string;
-        };
+      const body = (await response.json().catch(() => ({}))) as {
+        media?: Media;
+        workspace?: Workspace;
+        error?: string;
+      };
+      if (!response.ok)
+        throw new Error(
+          uploadErrorMessage(
+            response,
+            body,
+            "The attachment could not be uploaded.",
+          ),
+        );
+      const { media, workspace: updatedWorkspace } = body || {};
       if (!media?.url)
-        throw new Error("The upload could not be verified. Check Storage & recovery before uploading again.");
+        throw new Error(
+          "The upload could not be verified. Check Storage & recovery before uploading again.",
+        );
       binarySaved = true;
       // The upload route stores media in the shared workspace; upsert also refreshes clients.
       if (!updatedWorkspace)
@@ -1204,14 +1214,12 @@ export default function Knowledge({
       return true;
     } catch (cause) {
       if (mounted.current) {
-        setRecordError(
+        const message =
           cause instanceof Error
             ? cause.message
-            : "The attachment could not be uploaded. Please try again.",
-        );
-        notify(
-          "The attachment could not be uploaded or linked. Keep this page open and retry.",
-        );
+            : "The attachment could not be uploaded. Please try again.";
+        setRecordError(message);
+        notify(message);
       }
       return binarySaved;
     } finally {
@@ -1472,7 +1480,9 @@ export default function Knowledge({
       );
     } catch (cause) {
       notify(
-        cause instanceof Error ? cause.message : "Could not move this note to Trash.",
+        cause instanceof Error
+          ? cause.message
+          : "Could not move this note to Trash.",
       );
     } finally {
       deletingRef.current = false;
@@ -2727,8 +2737,7 @@ export default function Knowledge({
               />
             </label>
             <div className="note-template-label">
-              Templates{" "}
-              <span>{templates.length} built-in templates</span>
+              Templates <span>{templates.length} built-in templates</span>
             </div>
             {personalCreation && (
               <p className="draft-recovery-note" role="status">

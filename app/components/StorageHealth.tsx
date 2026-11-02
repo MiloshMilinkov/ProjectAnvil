@@ -20,6 +20,72 @@ const size = (bytes: number) =>
     bytes < 1_000_000 ? bytes / 1_000 : bytes / 1_000_000,
   ) + (bytes < 1_000_000 ? " KB" : " MB");
 
+const attachmentSize = (bytes: number) =>
+  bytes > 0 && bytes < 0.1 * 1024 * 1024
+    ? "<0.1 MiB"
+    : `${new Intl.NumberFormat(undefined, {
+        maximumFractionDigits: 1,
+      }).format(bytes / (1024 * 1024))} MiB`;
+
+function AttachmentAllowance({
+  usage,
+}: {
+  usage: StorageReport["attachments"] | undefined;
+}) {
+  const descriptionId = useId();
+  if (
+    usage?.status !== "ready" ||
+    typeof usage.usedBytes !== "number" ||
+    !Number.isFinite(usage.usedBytes) ||
+    usage.usedBytes < 0 ||
+    typeof usage.remainingBytes !== "number" ||
+    !Number.isFinite(usage.remainingBytes) ||
+    usage.remainingBytes < 0 ||
+    !Number.isFinite(usage.limitBytes) ||
+    usage.limitBytes <= 0
+  )
+    return (
+      <p role="status">
+        Attachment usage is unavailable. Check storage again to refresh it.
+      </p>
+    );
+  const full = usage.usedBytes >= usage.limitBytes;
+  return (
+    <>
+      <label className="storage-meter-label">
+        Attachments: {attachmentSize(usage.usedBytes)} of{" "}
+        {attachmentSize(usage.limitBytes)}
+        <meter
+          className="storage-meter"
+          aria-label="Attachment storage"
+          aria-describedby={descriptionId}
+          aria-valuetext={`${attachmentSize(usage.usedBytes)} used; ${attachmentSize(usage.remainingBytes)} remaining`}
+          min={0}
+          max={usage.limitBytes}
+          value={Math.min(usage.usedBytes, usage.limitBytes)}
+          low={usage.limitBytes * 0.7}
+          high={usage.limitBytes * 0.9}
+          optimum={0}
+        />
+        <span className="small-text muted">
+          {attachmentSize(usage.remainingBytes)} remaining
+        </span>
+      </label>
+      <p className="small-text muted" id={descriptionId}>
+        Includes retained files and uploads in progress. Allowance is released
+        after unused files are removed through reviewed cleanup.
+      </p>
+      {usage.usedBytes >= usage.limitBytes * 0.9 && (
+        <p className="warning-box" role="status">
+          {full
+            ? "Attachment storage is full. Review unused uploaded files below before uploading more."
+            : "Attachment storage is nearly full. Review unused uploaded files below to make room for future uploads."}
+        </p>
+      )}
+    </>
+  );
+}
+
 /** Cleanup is always reviewed and explicitly applied; no automatic retention job. */
 export default function StorageHealth() {
   const scopedFetch = useWorkspaceFetch();
@@ -151,6 +217,13 @@ export default function StorageHealth() {
     <section className="panel settings-section" data-tour="storage-health">
       <h2>Storage & recovery</h2>
       <p>Check workspace data, saved note versions, and uploaded files.</p>
+      {report && (busy || error) && (
+        <p className="small-text muted" role="status">
+          {busy
+            ? "Updating storage usage…"
+            : "Showing the last successful storage check. Usage may have changed."}
+        </p>
+      )}
       {report && (
         <>
           <label className="storage-meter-label">
@@ -166,6 +239,7 @@ export default function StorageHealth() {
               optimum={0}
             />
           </label>
+          <AttachmentAllowance usage={report.attachments} />
           <p className="small-text muted">
             {report.history.versions} saved note versions (
             {size(report.history.bytes)}), stored separately.{" "}
@@ -189,8 +263,8 @@ export default function StorageHealth() {
           )}
           {report.media.partial && (
             <p>
-              The scan reached its limit. Some files kept for recovery may not
-              be included in these totals.
+              The file-health scan reached its limit. Recovery-file counts may
+              be incomplete; attachment allowance is checked separately.
             </p>
           )}
           {report.media.pendingCleanup > 0 && (

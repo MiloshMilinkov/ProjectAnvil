@@ -27,6 +27,7 @@ import {
 } from "../lib/draft-store";
 import { useDraftScope } from "./useRecoverableDraft";
 import { useWorkspaceFetch } from "./WorkspaceScope";
+import { uploadErrorMessage } from "../lib/workspace-transport";
 import { useWorkspacePermissions } from "./WorkspacePermissions";
 import "./portable-markdown.css";
 
@@ -272,15 +273,18 @@ export default function PortableMarkdownPanel({
           },
           body: new Uint8Array(selected.bytes),
         });
-        const body = (await response.json()) as {
+        const body = (await response.json().catch(() => ({}))) as {
           imported?: { notes: number; attachments: number };
           warnings?: string[];
           error?: string;
         };
-        if (!response.ok || !body.imported)
+        if (!response.ok || !body?.imported)
           throw new Error(
-            body.error ||
+            uploadErrorMessage(
+              response,
+              body,
               "The import could not be confirmed. Keep the same selection and retry.",
+            ),
           );
         removeDraft(scope, "portable-import", key, draft.record.token);
         if (!alive.current) return;
@@ -302,7 +306,7 @@ export default function PortableMarkdownPanel({
       } catch (cause) {
         if (alive.current)
           setError(
-            `${cause instanceof Error ? cause.message : "The import could not be completed."} Reselect the same unchanged folder or ZIP to retry safely. An uncertain attachment upload is retained for storage recovery.`,
+            `${cause instanceof Error ? cause.message : "The import could not be completed."} Your selection is kept. Retry the same unchanged folder or ZIP when ready.`,
           );
       } finally {
         if (alive.current) setBusy("");

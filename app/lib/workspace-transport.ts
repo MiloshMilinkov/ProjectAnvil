@@ -2,6 +2,25 @@ import type { Media, Mutation, Workspace } from "./types";
 
 const identifier = /^[A-Za-z0-9_-]{1,120}$/;
 
+/** Upload screens share server feedback; retries remain an explicit user action. */
+export function uploadErrorMessage(
+  response: Pick<Response, "status" | "headers">,
+  body: unknown,
+  fallback: string,
+): string {
+  const error =
+    body && typeof body === "object" && "error" in body
+      ? body.error
+      : undefined;
+  const message = typeof error === "string" && error.trim() ? error : fallback;
+  if (response.status !== 429) return message;
+  const raw = response.headers.get("Retry-After");
+  const seconds = raw && /^\d+$/.test(raw) ? Number(raw) : NaN;
+  return Number.isSafeInteger(seconds) && seconds > 0 && seconds <= 3600
+    ? `${message} Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`
+    : `${message} Wait a moment before trying again.`;
+}
+
 /** Workspace query strings are transport context, never persisted ownership. */
 export function canonicalMediaAddress(
   file: Pick<Media, "id" | "url">,
