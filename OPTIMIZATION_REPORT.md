@@ -27,7 +27,8 @@ Gzip is the sum of independently compressed files using Node's default gzip sett
 - **Step 0 — setup:** created the requested branch and checkpoint, detected the actual stack, captured the baseline, and passed strict types, zero-warning lint, backend checks, 45 native Node tests, and the production build. Knip runs temporarily through npm exec without changing project dependencies.
 - **Step 1 — bundle:** added a narrow lazy collaboration entry while retaining the original runtime's full API. The six Yjs members and eight helpers retain identical references; update/recovery and cursor-position checks pass. Production output decreased by 26,939 raw bytes and 8,623 gzip bytes; the complete offline application decreased by 13,434 bytes. The full type/lint/test/build chain passed.
 - **Step 2 — dependencies:** verified all direct runtime packages are used and retained the dependency tree. Knip's Tailwind warning is a CSS-import false positive. The dedupe dry run proposed twelve unrelated version updates and only a small removal, so it was not applied. No package or lockfile changes were made; the complete check chain passed.
-- **Steps 3–7:** in progress; only verified, behavior-preserving changes will be retained.
+- **Step 3 — runtime:** reuse one locale-aware collator per Collections sort, constructing none for empty, singleton or numeric-only lists. Use stable native brainstorm sorting without temporary decoration objects. Exact comparison/order checks passed for 5,887 localized pairs, 202 complete sorts and 402 ranking cases. The local 200-row sort median fell from 6.190 ms to 0.902 ms; this is a microbenchmark, not a whole-screen timing claim. Combined source is 99 bytes smaller and the full check chain passed.
+- **Steps 4–7:** in progress; only verified, behavior-preserving changes will be retained.
 
 ## Skipped or reverted
 
