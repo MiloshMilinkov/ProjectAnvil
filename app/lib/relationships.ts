@@ -11,7 +11,7 @@ export function entityKey(reference: EntityRef): string {
   return `${reference.type}:${reference.id}`;
 }
 
-function stableValue(value: unknown): unknown {
+export function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
   if (value && typeof value === "object") {
     return Object.fromEntries(

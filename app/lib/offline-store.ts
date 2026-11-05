@@ -56,17 +56,22 @@ interface ResumePointer {
 }
 
 export type OfflineMetadata = OfflineWorkspaceCopy | ResumePointer;
+// Byte buffers work in browser runtimes whose IndexedDB cannot persist Blobs.
+// Existing Blob records remain readable without clearing or migrating copies.
+export type OfflineMediaValue =
+  | Blob
+  | { version: 1; type: string; bytes: ArrayBuffer };
 export interface OfflineStorageChange {
   put?: { key: string; value: OfflineMetadata }[];
   remove?: string[];
-  putMedia?: { key: string; value: Blob }[];
+  putMedia?: { key: string; value: OfflineMediaValue }[];
   removeMedia?: string[];
 }
 
 /** Metadata and attachment changes commit together, or none of them do. */
 export interface OfflineStorageAdapter {
   read(key: string): Promise<OfflineMetadata | undefined>;
-  readMedia(key: string): Promise<Blob | undefined>;
+  readMedia(key: string): Promise<OfflineMediaValue | undefined>;
   mutate(
     update: (current: Map<string, OfflineMetadata>) => OfflineStorageChange,
   ): Promise<void>;
@@ -551,6 +556,9 @@ export function createOfflineStore(adapter: OfflineStorageAdapter) {
       );
     const key = scopeKey(scope);
     const binaryKey = mediaKey(scope, id);
+    // Read bytes before opening the transaction. The token and file are still
+    // checked inside it, including access changes while this read was pending.
+    const bytes = await blob.arrayBuffer();
     await adapter.mutate((current) => {
       const copy = current.get(key);
       const file =
@@ -614,7 +622,9 @@ export function createOfflineStore(adapter: OfflineStorageAdapter) {
             },
           },
         ],
-        putMedia: [{ key: binaryKey, value: blob }],
+        putMedia: [
+          { key: binaryKey, value: { version: 1, type: file.type, bytes } },
+        ],
       };
     });
     changed();
@@ -634,7 +644,16 @@ export function createOfflineStore(adapter: OfflineStorageAdapter) {
       stored.fingerprint !== fingerprint(file, scope.workspaceId)
     )
       return null;
-    const blob = await adapter.readMedia(mediaKey(scope, id));
+    const binary = await adapter.readMedia(mediaKey(scope, id));
+    const blob =
+      binary instanceof Blob
+        ? binary
+        : binary?.version === 1 &&
+            binary.bytes instanceof ArrayBuffer &&
+            binary.bytes.byteLength === stored.size &&
+            binary.type === file.type
+          ? new Blob([binary.bytes], { type: binary.type })
+          : null;
     if (!blob || blob.size !== stored.size) return null;
     const latest = await readWorkspace(scope);
     return latest?.token === copy.token &&
@@ -750,7 +769,8 @@ const browserAdapter: OfflineStorageAdapter = {
     return new Promise((resolve, reject) => {
       const tx = db.transaction("media", "readonly");
       const request = tx.objectStore("media").get(key);
-      tx.oncomplete = () => resolve(request.result?.value as Blob | undefined);
+      tx.oncomplete = () =>
+        resolve(request.result?.value as OfflineMediaValue | undefined);
       tx.onerror = () => reject(storageFailure(tx.error));
       tx.onabort = () => reject(storageFailure(tx.error));
     });

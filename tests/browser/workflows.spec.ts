@@ -3111,6 +3111,521 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       await context.close();
     }
   });
+  test("browser policy blocks untrusted scripts and preserves media", async ({}, testInfo) => {
+    test.setTimeout(180_000);
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+    await selectWorkspace(owner, owner.personal);
+    const suffix = fixtureId().slice(0, 12);
+    const noteId = `csp_note_${suffix}`;
+    const canvasId = `csp_canvas_${suffix}`;
+    const nonceIn = (policy: string) =>
+      /'nonce-([a-f0-9]{32})'/.exec(policy)?.[1];
+
+    // API requests bypass service-worker navigation, proving that the server
+    // chooses each nonce instead of accepting an incoming renderer policy.
+    const nonces: string[] = [];
+    for (let index = 0; index < 2; index++) {
+      const response = await owner.context.request.get(
+        `/?csp=${suffix}_${index}`,
+        {
+          headers: {
+            "x-csp-nonce": "caller-selected",
+            "Content-Security-Policy":
+              "script-src 'unsafe-inline' 'unsafe-eval'",
+            "Content-Security-Policy-Report-Only": "default-src *",
+          },
+        },
+      );
+      expect(response.status()).toBe(200);
+      const policy = response.headers()["content-security-policy"];
+      const nonce = nonceIn(policy);
+      expect(nonce).toMatch(/^[a-f0-9]{32}$/);
+      expect(policy).toContain("'strict-dynamic'");
+      expect(policy).toContain("script-src-attr 'none'");
+      expect(policy).toContain("object-src 'none'");
+      expect(response.headers()["cache-control"]).toBe("private, no-store");
+      expect(response.headers()["etag"]).toBeUndefined();
+      expect(await response.text()).toContain(`nonce="${nonce}"`);
+      nonces.push(nonce!);
+    }
+    expect(nonces[0]).not.toBe(nonces[1]);
+
+    const assertBlockedScripts = async () => {
+      const nonce = await owner.page.evaluate(
+        () =>
+          (
+            document.querySelector(
+              'meta[property="csp-nonce"]',
+            ) as HTMLElement | null
+          )?.nonce,
+      );
+      expect(nonce).toMatch(/^[a-f0-9]{32}$/);
+      // A parsed srcdoc inherits the app's real policy. Run all probes there:
+      // scripts synchronously appended by debugger evaluation can bypass CSP.
+      await owner.page.evaluate((token) => {
+        const frame = document.createElement("iframe");
+        frame.id = "projectanvil-csp-probe";
+        frame.title = "Browser policy probe";
+        frame.hidden = true;
+        frame.srcdoc = `<!doctype html><body>
+          <script nonce="${token}">
+            const violations = [];
+            document.addEventListener('securitypolicyviolation', event => {
+              violations.push({ directive: event.effectiveDirective, blocked: event.blockedURI });
+              document.body.dataset.violations = JSON.stringify(violations);
+            });
+          </script>
+          <script>document.body.dataset.inline = 'executed'</script>
+          <script src="https://csp-probe.invalid/untrusted.js"></script>
+          <button onclick="document.body.dataset.handler = 'executed'">Untrusted handler</button>
+          <script nonce="${token}">
+            document.body.dataset.trusted = 'executed';
+            try { eval("document.body.dataset.eval='executed'"); }
+            catch (error) { document.body.dataset.eval = error.name; }
+            try { Function("document.body.dataset.function='executed'")(); }
+            catch (error) { document.body.dataset.function = error.name; }
+            document.querySelector('button').click();
+          </script>
+        </body>`;
+        document.body.appendChild(frame);
+      }, nonce!);
+      const probe = owner.page
+        .frameLocator("#projectanvil-csp-probe")
+        .locator("body");
+      await expect(probe).toHaveAttribute("data-trusted", "executed");
+      await expect(probe).toHaveAttribute("data-eval", "EvalError");
+      await expect(probe).toHaveAttribute("data-function", "EvalError");
+      await expect
+        .poll(async () =>
+          JSON.parse((await probe.getAttribute("data-violations")) || "[]"),
+        )
+        .toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              directive: "script-src-elem",
+              blocked: "inline",
+            }),
+            expect.objectContaining({
+              directive: "script-src-attr",
+              blocked: "inline",
+            }),
+            expect.objectContaining({
+              blocked: expect.stringMatching(
+                /^https:\/\/csp-probe\.invalid(?:\/|$)/,
+              ),
+            }),
+          ]),
+        );
+      expect(await probe.getAttribute("data-inline")).toBeNull();
+      expect(await probe.getAttribute("data-handler")).toBeNull();
+      await owner.page
+        .locator("#projectanvil-csp-probe")
+        .evaluate((element) => element.remove());
+      return nonce!;
+    };
+
+    const image = await readFile(
+      new URL("../../public/icons/projectanvil-192.png", import.meta.url),
+    );
+    const audio = Buffer.alloc(44 + 1600);
+    audio.write("RIFF", 0);
+    audio.writeUInt32LE(audio.length - 8, 4);
+    audio.write("WAVEfmt ", 8);
+    audio.writeUInt32LE(16, 16);
+    audio.writeUInt16LE(1, 20);
+    audio.writeUInt16LE(1, 22);
+    audio.writeUInt32LE(8000, 24);
+    audio.writeUInt32LE(16000, 28);
+    audio.writeUInt16LE(2, 32);
+    audio.writeUInt16LE(16, 34);
+    audio.write("data", 36);
+    audio.writeUInt32LE(1600, 40);
+    // Compare actual decoding, not canPlayType: Windows WebKit advertises WAV
+    // support but can reject this valid fixture even without a security policy.
+    const controlPage = await owner.context.newPage();
+    let audioOutcome: string;
+    try {
+      await controlPage.setContent('<audio preload="metadata"></audio>');
+      audioOutcome = await controlPage.evaluate(
+        async (values) => {
+          const element = document.querySelector("audio")!;
+          const outcome = new Promise<string>((resolve) => {
+            element.addEventListener("loadedmetadata", () => resolve("ready"), {
+              once: true,
+            });
+            element.addEventListener(
+              "error",
+              () => resolve(`error-${element.error?.code}`),
+              { once: true },
+            );
+            setTimeout(() => resolve("timeout"), 15_000);
+          });
+          element.src = URL.createObjectURL(
+            new Blob([new Uint8Array(values)], { type: "audio/wav" }),
+          );
+          return outcome;
+        },
+        [...audio],
+      );
+      expect(["ready", "error-4"]).toContain(audioOutcome);
+      await testInfo.attach("native-wav-decoding", {
+        body: JSON.stringify({
+          control: audioOutcome,
+          explanation:
+            "error-4 means the runtime also rejects WAV without CSP; file bytes and absence of media policy violations remain required.",
+        }),
+        contentType: "application/json",
+      });
+    } finally {
+      await withDocumentExit(controlPage, () => controlPage.close());
+    }
+    await owner.context.addInitScript(() => {
+      const violations: string[] = [];
+      Reflect.set(
+        window,
+        Symbol.for("projectanvil-csp-media-violations"),
+        violations,
+      );
+      document.addEventListener("securitypolicyviolation", (event) => {
+        if (event.effectiveDirective === "media-src")
+          violations.push(event.blockedURI);
+      });
+    });
+    const pdfObjects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Contents 4 0 R >>",
+      "<< /Length 4 >>\nstream\nq\nQ\nendstream",
+    ];
+    let pdf = "%PDF-1.4\n";
+    const offsets = [0];
+    for (const [index, object] of pdfObjects.entries()) {
+      offsets.push(Buffer.byteLength(pdf));
+      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    }
+    const xref = Buffer.byteLength(pdf);
+    pdf += `xref\n0 5\n0000000000 65535 f \n${offsets
+      .slice(1)
+      .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+      .join(
+        "",
+      )}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    const upload = async (name: string, mimeType: string, buffer: Buffer) => {
+      const response = await owner.context.request.post("/api/media", {
+        headers: {
+          Origin: base,
+          "X-Account-Id": owner.userId,
+          "X-Workspace-Id": owner.personal.id,
+        },
+        multipart: { file: { name, mimeType, buffer } },
+      });
+      expect(response.status()).toBe(201);
+      return (await response.json()).media as {
+        id: string;
+        url: string;
+        name: string;
+      };
+    };
+    const picture = await upload("csp-image.png", "image/png", image);
+    const tone = await upload("csp-tone.wav", "audio/wav", audio);
+    const pdfFile = await upload(
+      "csp-document.pdf",
+      "application/pdf",
+      Buffer.from(pdf),
+    );
+    const content = `# CSP media reference\n\n![CSP image](${picture.url})\n\n![CSP tone](${tone.url})\n\n![CSP document](${pdfFile.url})\n\n\`\`\`mermaid\nflowchart-elk LR\n  A[Plan] --> B[Review]\n\`\`\`\n\n---\n\n# Second CSP slide\n\nContent stays available.`;
+    await upsert(owner, owner.personal.id, "notes", {
+      id: noteId,
+      title: "CSP media reference",
+      content,
+    });
+    await openNote(owner, noteId);
+    const assertMedia = async (offline = false) => {
+      const preview = owner.page.locator(".note-preview-pane");
+      const pictureElement = preview.getByRole("img", {
+        name: "CSP image",
+        exact: true,
+      });
+      await expect(pictureElement).toBeVisible();
+      await expect
+        .poll(() =>
+          pictureElement.evaluate(
+            (element) => (element as HTMLImageElement).naturalWidth,
+          ),
+        )
+        .toBe(192);
+      const audioElement = preview.locator('audio[aria-label="CSP tone"]');
+      await expect(audioElement).toBeVisible();
+      await expect
+        .poll(() =>
+          audioElement.evaluate((element) => {
+            const audio = element as HTMLAudioElement;
+            return audio.readyState > 0
+              ? "ready"
+              : `error-${audio.error?.code}`;
+          }),
+        )
+        .toBe(audioOutcome);
+      // Offline blobs are consumed by media-src, not the API connection policy.
+      // Do not fetch them as script connections merely to inspect their bytes.
+      if (!offline)
+        expect(
+          await audioElement.evaluate(async (element) => {
+            const response = await fetch((element as HTMLAudioElement).src);
+            return {
+              ok: response.ok,
+              bytes: (await response.arrayBuffer()).byteLength,
+              type: response.headers.get("Content-Type")?.split(";")[0],
+            };
+          }),
+        ).toEqual({ ok: true, bytes: audio.length, type: "audio/wav" });
+      expect(
+        await owner.page.evaluate(() =>
+          Reflect.get(window, Symbol.for("projectanvil-csp-media-violations")),
+        ),
+      ).toEqual([]);
+      await expect(
+        preview.getByTitle("CSP document", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        preview.getByRole("link", { name: "Open CSP document ↗", exact: true }),
+      ).toBeVisible();
+      await expect(preview.locator(".mermaid-diagram svg")).toBeVisible();
+      await expect(preview.locator(".mermaid-diagram")).toContainText("Plan");
+      await expect(preview.locator(".mermaid-diagram")).toContainText("Review");
+      if (offline) {
+        await expect(pictureElement).toHaveAttribute("src", /^blob:/);
+        await expect(audioElement).toHaveAttribute("src", /^blob:/);
+        await expect(
+          preview.getByTitle("CSP document", { exact: true }),
+        ).toHaveAttribute("src", /^blob:/);
+      }
+    };
+    await assertMedia();
+    await assertBlockedScripts();
+
+    await owner.page
+      .getByRole("button", { name: "More note actions", exact: true })
+      .click();
+    await owner.page
+      .getByRole("button", { name: "Present as slides", exact: true })
+      .click();
+    const presentation = owner.page.getByRole("dialog", {
+      name: "Note presentation",
+      exact: true,
+    });
+    await expect(
+      presentation.getByRole("heading", {
+        name: "CSP media reference",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await presentation
+      .getByRole("button", { name: "Next slide", exact: true })
+      .click();
+    await expect(
+      presentation.getByRole("heading", {
+        name: "Second CSP slide",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await presentation
+      .getByRole("button", { name: "Close presentation", exact: true })
+      .click();
+    const popupPromise = owner.context.waitForEvent("page");
+    await owner.page
+      .getByRole("button", { name: "More note actions", exact: true })
+      .click();
+    await owner.page
+      .getByRole("button", { name: "Open in a new window", exact: true })
+      .click();
+    const popup = await popupPromise;
+    await appReady(popup);
+    await expect(
+      popup.getByRole("textbox", { name: "Note content", exact: true }),
+    ).toHaveValue(content);
+    await withDocumentExit(popup, () => popup.close());
+    await owner.page.bringToFront();
+
+    const referenceUrl = `${base}/__projectanvil_csp_reference`;
+    const reference = (route: Route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<!doctype html><p>Sandboxed canvas reference</p>",
+      });
+    await owner.context.route(referenceUrl, reference);
+    try {
+      await upsert(owner, owner.personal.id, "canvases", {
+        id: canvasId,
+        title: "CSP canvas reference",
+        projectId: "",
+        edges: [],
+        cards: [
+          {
+            id: `image_${suffix}`,
+            type: "media",
+            entityId: picture.id,
+            text: picture.name,
+            x: -390,
+            y: 0,
+            width: 250,
+            height: 260,
+            color: "#70bddb",
+          },
+          {
+            id: `pdf_${suffix}`,
+            type: "media",
+            entityId: pdfFile.id,
+            text: pdfFile.name,
+            x: -110,
+            y: 0,
+            width: 250,
+            height: 260,
+            color: "#70bddb",
+          },
+          {
+            id: `web_${suffix}`,
+            type: "url",
+            text: referenceUrl,
+            x: 170,
+            y: 0,
+            width: 250,
+            height: 260,
+            color: "#70bddb",
+          },
+        ],
+      });
+      await navigate(owner.page, "Canvas");
+      await owner.page
+        .getByRole("combobox", { name: "Select canvas", exact: true })
+        .selectOption(canvasId);
+      const canvas = owner.page.locator(".canvas-feature");
+      await expect(
+        canvas.getByRole("img", { name: picture.name, exact: true }),
+      ).toBeVisible();
+      await expect(
+        canvas.locator(`iframe[title="${pdfFile.name}"]`),
+      ).toBeVisible();
+      await expect(
+        canvas.getByRole("link", { name: `Open ${pdfFile.name}`, exact: true }),
+      ).toBeVisible();
+      await expect(canvas.locator("object, embed")).toHaveCount(0);
+      const frame = canvas.getByTitle("Reference: 127.0.0.1", { exact: true });
+      await expect(frame).toHaveAttribute(
+        "sandbox",
+        "allow-scripts allow-forms",
+      );
+      await expect(
+        owner.page
+          .frameLocator('iframe[title="Reference: 127.0.0.1"]')
+          .getByText("Sandboxed canvas reference", { exact: true }),
+      ).toBeVisible();
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        for (const theme of detailedThemes(testInfo)) {
+          await owner.page
+            .getByRole("button", { name: /^Appearance:/ })
+            .click();
+          await owner.page
+            .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+            .click();
+          await canvas
+            .getByRole("button", { name: "Fit canvas", exact: true })
+            .first()
+            .click();
+          const openPdf = canvas.getByRole("link", {
+            name: `Open ${pdfFile.name}`,
+            exact: true,
+          });
+          await openPdf.focus();
+          await expect(openPdf).toBeFocused();
+          await expect(
+            canvas.locator(`iframe[title="${pdfFile.name}"]`),
+          ).toBeVisible();
+          expect(
+            await owner.page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBe(true);
+          const screenshot = testInfo.outputPath(
+            `csp-media-${theme.toLowerCase()}-${width}.png`,
+          );
+          await owner.page.screenshot({ path: screenshot, fullPage: false });
+          await testInfo.attach(`csp-media-${theme.toLowerCase()}-${width}`, {
+            path: screenshot,
+            contentType: "image/png",
+          });
+        }
+      }
+    } finally {
+      await owner.context.unroute(referenceUrl, reference);
+      await owner.page.setViewportSize({ width: 1365, height: 900 });
+      await expect(
+        owner.page.getByRole("button", {
+          name: "Open navigation",
+          exact: true,
+        }),
+      ).toBeHidden();
+      await owner.page.bringToFront();
+    }
+
+    await navigate(owner.page, "Workspace settings");
+    await expect(
+      owner.page.getByText("Application files are ready for offline startup.", {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30_000 });
+    await owner.page
+      .getByRole("button", {
+        name: /^(Save workspace offline|Refresh offline copy)$/,
+      })
+      .click();
+    await expect(
+      owner.page.getByText("Offline workspace copy saved", { exact: true }),
+    ).toBeVisible();
+    await owner.page
+      .getByRole("button", { name: "Save attachments offline", exact: true })
+      .click();
+    await expect(
+      owner.page.getByText(/new attachments? saved on this device\./),
+    ).toBeVisible();
+    await openNote(owner, noteId);
+    await setActorOffline(owner, true);
+    try {
+      await withDocumentExit(owner.page, () => owner.page.close());
+      owner.page = await owner.context.newPage();
+      const firstResponse = await withDocumentExit(owner.page, () =>
+        owner.page.goto(`${base}/?note=${noteId}`),
+      );
+      await appReady(owner.page);
+      await assertMedia(true);
+      const firstNonce = await assertBlockedScripts();
+      expect(
+        nonceIn((await firstResponse!.allHeaders())["content-security-policy"]),
+      ).toBe(firstNonce);
+      const secondResponse = await withDocumentExit(owner.page, () =>
+        owner.page.reload(),
+      );
+      await appReady(owner.page);
+      await assertMedia(true);
+      const secondNonce = await assertBlockedScripts();
+      expect(secondNonce).not.toBe(firstNonce);
+      expect(
+        nonceIn(
+          (await secondResponse!.allHeaders())["content-security-policy"],
+        ),
+      ).toBe(secondNonce);
+      await expect(
+        owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+      ).toHaveValue(content);
+    } finally {
+      await setActorOffline(owner, false);
+    }
+    expect(
+      (await workspace(owner)).notes.find((note) => note.id === noteId)
+        ?.content,
+    ).toBe(content);
+  });
   test("technical Markdown loads formatting on demand and remains portable offline", async ({}, testInfo) => {
     await owner.page.setViewportSize({ width: 1365, height: 900 });
     await selectWorkspace(owner, owner.personal);

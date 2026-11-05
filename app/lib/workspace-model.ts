@@ -8,7 +8,7 @@ import {
   type Workspace,
   type BrainstormBoard,
 } from "./types";
-import { createSignatureReader, entityKey } from "./relationships";
+import { createSignatureReader, entityKey, stableValue } from "./relationships";
 import { normalizeSourceExcerpt } from "./source-excerpts";
 import { fieldLabel } from "./collaboration-model";
 import { planningError } from "./planning-model";
@@ -680,20 +680,6 @@ export function validateWorkspace(value: unknown): Workspace {
   return workspace;
 }
 
-function comparable(value: unknown): string {
-  function ordered(input: unknown): unknown {
-    if (Array.isArray(input)) return input.map(ordered);
-    if (input && typeof input === "object")
-      return Object.fromEntries(
-        Object.entries(input)
-          .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-          .map(([key, child]) => [key, ordered(child)]),
-      );
-    return input;
-  }
-  return JSON.stringify(ordered(value));
-}
-
 function serverOwnedField(entity: Entity, key: string): boolean {
   return (
     key === "createdAt" ||
@@ -728,7 +714,7 @@ function comparableField(entity: Entity, key: string, value: unknown): string {
       if (!idea || typeof idea !== "object") return idea;
       return { ...idea, votes: [] };
     });
-  return comparable(value);
+  return JSON.stringify(stableValue(value));
 }
 
 function assertMutationBase(current: Workspace, mutation: Mutation): void {

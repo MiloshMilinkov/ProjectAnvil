@@ -22,23 +22,30 @@ export function indexNotes(
   notes: readonly Note[],
   types: NoteType[],
 ): IndexedNote[] {
-  return notes.map((note) => ({
-    note,
-    searchText:
-      `${note.title} ${note.content} ${note.tags.join(" ")} ${Object.values(note.propertyValues || {}).join(" ")} ${note.decision ? Object.values(note.decision).join(" ") : ""}`.toLowerCase(),
-    excerpt:
-      note.content
-        .replace(/[#*[\]`>_=]/g, "")
-        .replace(/\s+/g, " ")
-        .slice(0, 90) || "Empty note",
-    typeLabel:
-      noteTypeLabel(note, types) ||
-      (note.kind === "decision" ? "Decision record" : note.folder),
-    updatedLabel: new Date(note.updatedAt).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    }),
-  }));
+  if (!notes.length) return [];
+  const dateFormatter = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  return notes.map((note) => {
+    const updated = new Date(note.updatedAt);
+    return {
+      note,
+      searchText:
+        `${note.title} ${note.content} ${note.tags.join(" ")} ${Object.values(note.propertyValues || {}).join(" ")} ${note.decision ? Object.values(note.decision).join(" ") : ""}`.toLowerCase(),
+      excerpt:
+        note.content
+          .replace(/[#*[\]`>_=]/g, "")
+          .replace(/\s+/g, " ")
+          .slice(0, 90) || "Empty note",
+      typeLabel:
+        noteTypeLabel(note, types) ||
+        (note.kind === "decision" ? "Decision record" : note.folder),
+      updatedLabel: Number.isNaN(updated.getTime())
+        ? updated.toLocaleDateString()
+        : dateFormatter.format(updated),
+    };
+  });
 }
 
 /** Filtering and sorting never reorder or mutate the workspace's source records. */

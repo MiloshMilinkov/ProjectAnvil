@@ -125,27 +125,12 @@ try {
     path.join(root, "tests", "backend.cjs"),
     path.join(output, "check.cjs"),
   );
-  fs.copyFileSync(
-    path.join(root, "tests", "account-boundaries.cjs"),
-    path.join(output, "account-boundaries.cjs"),
-  );
-  fs.copyFileSync(
-    path.join(root, "tests", "connected-work.cjs"),
-    path.join(output, "connected-work.cjs"),
-  );
-  fs.copyFileSync(
-    path.join(root, "tests", "reliability.cjs"),
-    path.join(output, "reliability.cjs"),
-  );
-  fs.copyFileSync(
-    path.join(root, "tests", "drafts.cjs"),
-    path.join(output, "drafts.cjs"),
-  );
-  fs.copyFileSync(
-    path.join(root, "tests", "task-scheduling.cjs"),
-    path.join(output, "task-scheduling.cjs"),
-  );
   for (const name of [
+    "account-boundaries.cjs",
+    "connected-work.cjs",
+    "reliability.cjs",
+    "drafts.cjs",
+    "task-scheduling.cjs",
     "phase1-trash.cjs",
     "storage-cleanup.cjs",
     "upload-limits.cjs",
@@ -179,20 +164,8 @@ try {
   ]) {
     fs.copyFileSync(path.join(root, "tests", name), path.join(output, name));
   }
-  const result = spawnSync(process.execPath, [path.join(output, "check.cjs")], {
-    cwd: root,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      PROJECTANVIL_CHECK_ROOT: root,
-      NODE_PATH: [path.join(root, "node_modules"), process.env.NODE_PATH]
-        .filter(Boolean)
-        .join(path.delimiter),
-    },
-  });
-  if (result.error) throw result.error;
-  process.exitCode = result.status ?? 1;
   for (const check of [
+    { file: "check.cjs" },
     { file: "drafts.cjs" },
     { file: "database-migrations.cjs" },
     { file: "account-security.cjs" },
@@ -217,7 +190,6 @@ try {
     { file: "task-scheduling.cjs", timezone: "Europe/Belgrade" },
     { file: "task-scheduling.cjs", timezone: "America/New_York" },
   ]) {
-    if (process.exitCode) break;
     const draftResult = spawnSync(
       process.execPath,
       [path.join(output, check.file)],
@@ -226,6 +198,7 @@ try {
         stdio: "inherit",
         env: {
           ...process.env,
+          ...(check.file === "check.cjs" ? { PROJECTANVIL_CHECK_ROOT: root } : {}),
           ...(check.timezone ? { TZ: check.timezone } : {}),
           NODE_PATH: [path.join(root, "node_modules"), process.env.NODE_PATH]
             .filter(Boolean)
@@ -235,6 +208,7 @@ try {
     );
     if (draftResult.error) throw draftResult.error;
     process.exitCode = draftResult.status ?? 1;
+    if (process.exitCode) break;
   }
 } catch (error) {
   failures.push(error);

@@ -24,7 +24,7 @@ const securitySource = await fs.readFile(
   new URL("../app/lib/http-security.ts", import.meta.url),
   "utf8",
 );
-const { secureResponse } = await import(
+const { secureResponse, createSecurityContext } = await import(
   "data:text/javascript;base64," +
     Buffer.from(
       ts.transpileModule(securitySource, {
@@ -55,34 +55,158 @@ test("security headers preserve private responses, cookies and streamed bodies",
   );
   assert.equal(response.status, 201);
   assert.equal(response.headers.get("cache-control"), "private, no-store");
-  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+  assert.equal(
+    response.headers.get("cross-origin-resource-policy"),
+    "same-origin",
+  );
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("referrer-policy"), "no-referrer");
   assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
-  assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000");
-  assert.match(response.headers.get("permissions-policy"), /microphone=\(self\)/);
-  assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'self'/);
+  assert.equal(
+    response.headers.get("strict-transport-security"),
+    "max-age=31536000",
+  );
+  assert.match(
+    response.headers.get("permissions-policy"),
+    /microphone=\(self\)/,
+  );
+  assert.match(
+    response.headers.get("content-security-policy"),
+    /frame-ancestors 'self'/,
+  );
   assert.equal(response.headers.get("etag"), '"workspace-4"');
-  assert.equal(response.headers.get("set-cookie"), "session=test; HttpOnly; SameSite=Lax");
-  assert.equal(response.body, original.body, "The wrapper must not buffer the stream.");
+  assert.equal(
+    response.headers.get("set-cookie"),
+    "session=test; HttpOnly; SameSite=Lax",
+  );
+  assert.equal(
+    response.body,
+    original.body,
+    "The wrapper must not buffer the stream.",
+  );
   assert.equal(await response.text(), "streamed content");
 });
 
 test("local responses retain cache rules and stricter attachment sandbox policies", async () => {
   const local = new Request("http://127.0.0.1:5173/offline.html");
-  const response = secureResponse(local, new Response("public shell", {
-    headers: { "Cache-Control": "public, max-age=3600" },
-  }));
+  const response = secureResponse(
+    local,
+    new Response("public shell", {
+      headers: { "Cache-Control": "public, max-age=3600" },
+    }),
+  );
   assert.equal(response.headers.get("strict-transport-security"), null);
   assert.equal(response.headers.get("cache-control"), "public, max-age=3600");
   assert.equal(response.headers.get("cross-origin-resource-policy"), null);
   const policy = "sandbox; default-src 'none'";
   const media = secureResponse(
     new Request("https://projectanvil.test/api/media/attachment"),
-    new Response("attachment", { headers: { "Content-Security-Policy": policy } }),
+    new Response("attachment", {
+      headers: { "Content-Security-Policy": policy },
+    }),
   );
   assert.equal(media.headers.get("content-security-policy"), policy);
   assert.equal(await media.text(), "attachment");
+});
+
+test("document policies use fresh trusted nonces and preserve the forwarded request", async () => {
+  const original = new Request("https://projectanvil.test/?note=private", {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain",
+      Cookie: "session=private",
+      "X-Workspace-Id": "personal-fixture",
+      "x-csp-nonce": "caller-selected",
+      "x-nonce": "another-caller-value",
+      "Content-Security-Policy": "script-src 'unsafe-inline' 'unsafe-eval'",
+      "Content-Security-Policy-Report-Only": "default-src *",
+    },
+    body: "keep the streamed request body",
+  });
+  const context = createSecurityContext(original);
+  const next = createSecurityContext(new Request(original.url));
+  assert.match(context.nonce, /^[a-f0-9]{32}$/);
+  assert.notEqual(context.nonce, next.nonce);
+  assert.notEqual(context.nonce, "caller-selected");
+  assert.equal(original.headers.get("x-csp-nonce"), "caller-selected");
+  assert.equal(context.request.headers.get("x-csp-nonce"), context.nonce);
+  assert.equal(context.request.headers.get("x-nonce"), null);
+  assert.equal(
+    context.request.headers.get("content-security-policy"),
+    context.policy,
+  );
+  assert.equal(
+    context.request.headers.get("content-security-policy-report-only"),
+    null,
+  );
+  assert.equal(context.request.headers.get("cookie"), "session=private");
+  assert.equal(
+    context.request.headers.get("x-workspace-id"),
+    "personal-fixture",
+  );
+  assert.equal(context.request.method, "POST");
+  assert.equal(await context.request.text(), "keep the streamed request body");
+  const directives = new Map(
+    context.policy.split(";").map((entry) => {
+      const [name, ...sources] = entry.trim().split(/\s+/);
+      return [name, sources];
+    }),
+  );
+  assert.deepEqual(directives.get("script-src"), [
+    `'nonce-${context.nonce}'`,
+    "'strict-dynamic'",
+  ]);
+  for (const name of [
+    "default-src",
+    "script-src-attr",
+    "object-src",
+    "base-uri",
+  ])
+    assert.deepEqual(directives.get(name), ["'none'"]);
+  assert.deepEqual(directives.get("worker-src"), ["'self'"]);
+  assert.deepEqual(directives.get("connect-src"), ["'self'"]);
+  assert.deepEqual(directives.get("style-src"), ["'self'", "'unsafe-inline'"]);
+  assert(
+    !directives
+      .get("script-src")
+      .some((source) => /unsafe-inline|unsafe-eval|^https?:|\*/.test(source)),
+  );
+});
+
+test("HTML uses the renderer policy without replayable HTTP cache validators", async () => {
+  const original = new Request("https://projectanvil.test/");
+  const context = createSecurityContext(original);
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(
+        new TextEncoder().encode(
+          `<script nonce="${context.nonce}">bootstrap()</script>`,
+        ),
+      );
+      controller.close();
+    },
+  });
+  const upstream = new Response(body, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
+      ETag: '"shared-shell"',
+      "Last-Modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+      "Set-Cookie": "session=retained; HttpOnly; SameSite=Lax",
+    },
+  });
+  const secured = secureResponse(original, upstream, context.policy);
+  assert.equal(
+    secured.body,
+    upstream.body,
+    "CSP must not buffer the React stream.",
+  );
+  assert.equal(secured.headers.get("Content-Security-Policy"), context.policy);
+  assert.equal(secured.headers.get("Cache-Control"), "private, no-store");
+  assert.equal(secured.headers.get("ETag"), null);
+  assert.equal(secured.headers.get("Last-Modified"), null);
+  assert.match(secured.headers.get("Set-Cookie"), /session=retained/);
+  assert.match(await secured.text(), new RegExp(`nonce="${context.nonce}"`));
 });
 
 test("stress targets require an owned marker and cannot select an everyday server", async () => {

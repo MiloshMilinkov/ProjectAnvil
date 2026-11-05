@@ -49,11 +49,17 @@ export function MediaContent({ media }: { media: Media }) {
     );
   if (media.type === "application/pdf")
     return (
-      <object data={resolved.url} type="application/pdf" aria-label={media.name}>
-        <a href={resolved.url} target="_blank" rel="noopener noreferrer">
+      <div className="canvas-pdf">
+        <iframe src={resolved.url} title={media.name} />
+        <a
+          href={resolved.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={media.name}
+        >
           Open {media.name}
         </a>
-      </object>
+      </div>
     );
   return (
     <a href={resolved.url} target="_blank" rel="noopener noreferrer">

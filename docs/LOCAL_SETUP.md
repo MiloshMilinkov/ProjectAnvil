@@ -41,6 +41,8 @@ Open **Workspace settings → Data & offline → Install ProjectAnvil**. Wait fo
 
 The app cache contains only verified public application files and a generic startup shell. Account responses, workspace records, and uploaded files are never placed in that cache. Keeping private work offline is a separate choice below.
 
+The built app enforces its browser script policy during ordinary and offline startup. Each cached navigation gets a renewed script nonce with matching HTML and headers. If public startup files cannot be verified, reconnect to the local server and reopen the app so it can repair that public copy. Private workspace copies and unfinished edits are kept separately; clearing browser storage is not needed for this repair. PDF previews retain an **Open** link for browsers that cannot display them. See [browser security](DEPENDENCY_SECURITY.md#browser-and-request-boundaries) for the policy and its compatibility allowances.
+
 Use **Check for updates** to look for a prepared build. Finish pending work, close other ProjectAnvil windows, then choose **Restart to update**. Updates also activate after all older app windows close. A prepared shell keeps its HTML and scripts from the same build, so an interrupted reload cannot mix versions. Starting the server after a source update prepares the new build before browser installation.
 
 Use the same browser profile and address each time. `127.0.0.1`, `localhost`, another port, and another browser profile have separate offline copies and recovery storage.

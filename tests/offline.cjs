@@ -196,6 +196,24 @@ async function storageChecks() {
   const data = new Blob(["abc"], { type: "text/plain" });
   await store.cacheMedia(scope, "file-a", data, copy.token);
   assert.equal(await (await store.readMedia(scope, "file-a")).text(), "abc");
+  const [binaryKey, serializedMedia] = [...adapter.media][0];
+  assert(serializedMedia.bytes instanceof ArrayBuffer);
+  adapter.media.set(binaryKey, data);
+  assert.equal(
+    await (await store.readMedia(scope, "file-a")).text(),
+    "abc",
+    "Existing Blob copies remain readable",
+  );
+  adapter.media.set(binaryKey, {
+    ...serializedMedia,
+    bytes: new ArrayBuffer(1),
+  });
+  assert.equal(
+    await store.readMedia(scope, "file-a"),
+    null,
+    "Damaged byte copies fail closed",
+  );
+  adapter.media.set(binaryKey, serializedMedia);
   assert.equal(
     await store.readMedia({ ...scope, accountId: "user-b" }, "file-a"),
     null,
@@ -238,7 +256,27 @@ async function storageChecks() {
     projectRoles: { "project-a": "viewer" },
   };
   const changedAccount = { ...account, workspaces: [changedAccess] };
+  let finishBinaryRead;
+  const delayedMedia = new Blob(["abc"], { type: "text/plain" });
+  Object.defineProperty(delayedMedia, "arrayBuffer", {
+    value: () =>
+      new Promise((resolve) => {
+        finishBinaryRead = resolve;
+      }),
+  });
+  const pendingMedia = store.cacheMedia(
+    scope,
+    "file-a",
+    delayedMedia,
+    copy.token,
+  );
   await store.reconcileAccount(changedAccount);
+  finishBinaryRead(await data.arrayBuffer());
+  await assert.rejects(
+    pendingMedia,
+    /Refresh/,
+    "Revocation during binary preparation cannot restore the old attachment",
+  );
   copy = await store.readWorkspace(scope);
   assert.equal(
     copy.workspace,
@@ -765,7 +803,8 @@ async function accountRefreshChecks() {
       );
     changed.workspaces[0].securityRevision++;
     assert.notEqual(workspacePermissionKey(changed, "personal"), withProject);
-    changed.workspaces[0].securityRevision = current.workspaces[0].securityRevision;
+    changed.workspaces[0].securityRevision =
+      current.workspaces[0].securityRevision;
     changed.workspaces[0].role = role === "viewer" ? "editor" : "viewer";
     assert.notEqual(workspacePermissionKey(changed, "personal"), withProject);
   }

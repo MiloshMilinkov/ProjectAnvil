@@ -334,7 +334,7 @@ export const tourSteps: TourStep[] = [
     id: "media",
     page: "notes",
     title: "Attachments and audio",
-    body: "The attachment button adds images, PDFs, audio, video, or text files. The microphone records audio when you allow access. Uploaded references can be displayed in notes and used as cards on a canvas.",
+    body: "The attachment button adds images, PDFs, audio, video, or text files. The microphone records audio when you allow access. Uploaded references can be displayed in notes and used as cards on a canvas. PDF previews include an Open link for a separate window.",
     tip: "Uploads support 20 MB per file and 500 MiB total per workspace, including retained files. A temporary upload limit shows how long to wait before retrying. Navigation finishes recording and uploads it first. If upload fails, keep the page open to retry or download the audio.",
     anchors: [
       '[data-tour="note-media"]',
@@ -591,7 +591,7 @@ export const tourSteps: TourStep[] = [
     page: "settings",
     title: "Install ProjectAnvil",
     body: "Open Workspace settings → Data & offline to install ProjectAnvil in a supported browser, or use the browser's install or Add to Home Screen command. The normal local launcher prepares the built app and its public application files for offline reopening. Installation keeps the same local server and workspace storage.",
-    tip: "Use Check for updates when needed. Finish saving and close other ProjectAnvil windows before restarting to update. Development previews do not install an offline service worker.",
+    tip: "Use Check for updates when needed. Finish saving and close other ProjectAnvil windows before restarting to update. If offline startup files cannot be verified, reconnect and reopen the app to repair the public copy; private offline work is kept separately.",
     anchors: ['[data-tour="install-app"]', ".settings-page .page-heading"],
   },
   {

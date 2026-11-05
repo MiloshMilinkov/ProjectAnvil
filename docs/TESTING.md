@@ -77,6 +77,24 @@ The same candidate passed local configuration checks and version-9 migration, ba
 
 Local engine checks do not establish physical-device Safari behavior, hosted HTTPS/email delivery, or online service capacity. The changed workflow must run again on GitHub after the fixes are pushed; a previous failed run does not change retroactively.
 
+## Browser policy checks
+
+The production build's CSP is checked through real document headers and browser-parsed probes that inherit the application's policy. These verify fresh server-selected nonces, blocked untrusted inline/external scripts, blocked inline event handlers, and blocked string evaluation. The probes run outside debugger evaluation, which can bypass script restrictions. Offline checks open a new window and reload again, requiring a new matching header/markup nonce each time.
+
+The same workflow uploads a small image, WAV recording, and PDF, renders an ELK diagram, opens note slides and a separate note window, and checks sandboxed Canvas references. PDF cards keep a keyboard-accessible Open link across the desktop/mobile theme matrix. Saved attachments must reopen as device-local blob URLs while disconnected. Existing technical Markdown and worker-update workflows check math, syntax formatting, safe rendering, and queued-edit recovery alongside this coverage.
+
+Audio decoding is compared with an independent, unrestricted copy of the same fixture. Windows WebKit reports WAV support but rejects this fixture with media error 4 even without CSP. In that runtime, tests require the same native result, accessible uploaded bytes, offline blob sources, and no `media-src` violation; they do not claim successful playback. Chromium and Firefox require loaded metadata. Platform codec support still needs a real-device check; see [Playwright's browser limitations](https://playwright.dev/docs/browsers#webkit). Blocked evaluation is verified through its actual `EvalError`, since WebKit does not also emit the evaluation violation event in this fixture.
+
+A separate local reproduction found that this WebKit runtime rejects IndexedDB Blob writes while accepting byte buffers. New attachment copies use typed buffers, with regression checks for existing Blob records, damaged copies, and access revocation during binary preparation. Browser assertions still require real downloaded attachments to survive offline reopening; this storage failure is not skipped.
+
+On **5 November 2026**, build **`c956d094b9209273136f`** passed the complete code check, including backend/security regressions, **45 native Node tests**, and the production build. Final runs passed all four affected workflows in Chromium, Firefox, and WebKit: **12 passed, no failures or skips**. Source and browser-test fingerprints were recorded, all five themes and desktop/mobile captures were reviewed, and existing startup/offline size budgets passed without new dependencies or maintained source files. This was focused verification; the complete 25-workflow browser suite and broad performance studies were not rerun.
+
+Earlier diagnostic runs corrected debugger-driven probes, documented native audio limits, and exposed the attachment-storage issue above. One earlier Chromium update run hit a request-interceptor error; its isolated and subsequent combined checks passed without changing that workflow. The new multi-window fixture explicitly restores its original window and waits for desktop navigation after its mobile captures. No forced clicks, automatic retries, or longer action deadlines were introduced.
+
+```sh
+npm run test:browser -- --grep "browser policy blocks|technical Markdown loads|offline edits survive a new window|a prepared app update"
+```
+
 ## Performance profiles
 
 `npm run release:check` validates the command environment without contacting services. `npm run release:rehearse` verifies migrations, complete backup/restore, and rollback using owned temporary fixtures. The normal test suite covers redacted configuration/health failures, mock email delivery, cleanup permissions/review expiry/races, attachment references, and retryable bucket-deletion failures. See [local release checks](LOCAL_SETUP.md#local-release-checks) for private settings and limitations.

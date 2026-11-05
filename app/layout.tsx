@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import "./themes.css";
 import "./syntax-light-themes.css";
@@ -21,14 +22,17 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
 };
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const nonce = (await headers()).get("x-csp-nonce") || undefined;
   return (
     <html lang="en" data-theme="warp" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#14141b" />
+        <meta property="csp-nonce" nonce={nonce} />
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html:
               "try{var t=(localStorage.getItem('projectanvil-appearance')??localStorage.getItem('forgeboard-appearance'));document.documentElement.dataset.theme=['light','dark','warp','focus','soft'].includes(t||'')?t:'warp'}catch(e){}",

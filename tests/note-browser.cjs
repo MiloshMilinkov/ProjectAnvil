@@ -69,6 +69,35 @@ assert.equal(
   "Search and sorting leave source order and content intact",
 );
 
+// Each indexing pass follows the current device time zone and native date labels.
+const previousTimezone = process.env.TZ;
+const originalTimeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+const datedNotes = [
+  "2026-01-01T00:30:00Z",
+  "2026-03-29T00:30:00Z",
+  "2026-11-01T00:30:00Z",
+  "invalid",
+  "",
+].map((updatedAt) => ({ ...older, updatedAt }));
+try {
+  for (const timezone of ["Europe/Belgrade", "America/New_York"]) {
+    process.env.TZ = timezone;
+    assert.deepEqual(
+      indexNotes(datedNotes, []).map(({ updatedLabel }) => updatedLabel),
+      datedNotes.map(({ updatedAt }) =>
+        new Date(updatedAt).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+        }),
+      ),
+    );
+  }
+} finally {
+  process.env.TZ = previousTimezone ?? originalTimeZone;
+  if (previousTimezone === undefined) delete process.env.TZ;
+}
+assert.deepEqual(indexNotes([], []), []);
+
 assert.equal(new Set(noteTemplateIds).size, templates.length);
 for (const template of templates) {
   const first = newNote(template.id, "First", "project-a");

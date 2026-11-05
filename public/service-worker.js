@@ -4,6 +4,133 @@ const RESOURCES = /* PROJECTANVIL_RESOURCES */ [];
 const CACHE_PREFIX = "projectanvil-shell-v1-";
 const CACHE_NAME = CACHE_PREFIX + BUILD;
 const SHELL_URL = "/";
+const maximumShellBytes = 1024 * 1024;
+
+function publicShell(response, html) {
+  return (
+    response.status === 200 &&
+    response.headers.get("Content-Type")?.includes("text/html") &&
+    !response.headers.has("Set-Cookie") &&
+    html.includes('data-projectanvil-shell="public"') &&
+    html.includes("Opening your workspace")
+  );
+}
+
+function shellNonce(response, html) {
+  if (!publicShell(response, html))
+    throw new Error("The public application shell could not be verified.");
+  const policies = (response.headers.get("Content-Security-Policy") || "")
+    .split(";")
+    .map((directive) => directive.trim())
+    .filter((directive) => /^script-src(?:\s|$)/.test(directive));
+  const nonce =
+    policies.length === 1 &&
+    /^script-src 'nonce-([a-f0-9]{32})' 'strict-dynamic'$/.exec(
+      policies[0],
+    )?.[1];
+  const attributes = [
+    ...html.matchAll(/\snonce\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi),
+  ];
+  if (
+    !nonce ||
+    !attributes.length ||
+    attributes.some(
+      (attribute) => (attribute[1] ?? attribute[2] ?? attribute[3]) !== nonce,
+    )
+  )
+    throw new Error("The cached application policy could not be verified.");
+  const noncedScript = new RegExp(
+    `<script\\b[^>]*\\snonce=["']${nonce}["']`,
+    "i",
+  );
+  if (!noncedScript.test(html))
+    throw new Error("The cached application scripts could not be verified.");
+  return nonce;
+}
+
+async function readShell(response) {
+  const chunks = [];
+  let length = 0;
+  const reader = response.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        length += chunk.value.byteLength;
+        if (length > maximumShellBytes) {
+          void reader.cancel().catch(() => undefined);
+          throw new Error("The cached application shell is too large.");
+        }
+        chunks.push(chunk.value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const html = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  return { html, nonce: shellNonce(response, html) };
+}
+
+/** Renew only an existing nonce in the verified public shell, never authorize new scripts. */
+async function navigationShell(response, cache) {
+  try {
+    const { html, nonce: previous } = await readShell(response);
+    const nonce = [...crypto.getRandomValues(new Uint8Array(16))]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+    const headers = new Headers(response.headers);
+    headers.set(
+      "Content-Security-Policy",
+      headers.get("Content-Security-Policy").replaceAll(previous, nonce),
+    );
+    headers.set("Cache-Control", "no-store");
+    for (const name of [
+      "Content-Length",
+      "Content-Encoding",
+      "ETag",
+      "Last-Modified",
+    ])
+      headers.delete(name);
+    return new Response(html.replaceAll(previous, nonce), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    if (cache) {
+      // Repair only the public root through an anonymous, verified fetch. Keep
+      // public assets, unrelated caches, and private IndexedDB copies intact.
+      try {
+        await cache.delete(SHELL_URL);
+        await prepareShell();
+        const repaired = await cache.match(SHELL_URL);
+        if (repaired) return navigationShell(repaired);
+      } catch {
+        // Offline or invalid replacement content must never become executable.
+      }
+    }
+    return new Response(
+      "ProjectAnvil's offline application files could not be verified. Reconnect and reopen the app to prepare a new offline copy.",
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Content-Security-Policy":
+            "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      },
+    );
+  }
+}
 
 function publicResource(request) {
   if (request.method !== "GET" || request.headers.has("Range")) return null;
@@ -93,21 +220,24 @@ async function prepareShell() {
       }
     }),
   );
-  if (!(await cache.match(SHELL_URL))) {
+  const cached = await cache.match(SHELL_URL);
+  let valid = false;
+  if (cached) {
+    try {
+      await readShell(cached);
+      valid = true;
+    } catch {
+      await cache.delete(SHELL_URL);
+    }
+  }
+  if (!valid) {
     // Never cache a navigation response carrying a signed-in request. This
     // anonymous root has only the public loading shell, before account lookup.
     const response = await fetchPublic(
       new URL(SHELL_URL, self.location.origin),
-      1024 * 1024,
+      maximumShellBytes,
     );
-    const html = await response.clone().text();
-    if (
-      !response.headers.get("Content-Type")?.includes("text/html") ||
-      response.headers.has("Set-Cookie") ||
-      !html.includes('data-projectanvil-shell="public"') ||
-      !html.includes("Opening your workspace")
-    )
-      throw new Error("The public application shell could not be verified.");
+    const { html } = await readShell(response.clone());
     for (const match of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
       const resource = new URL(match[1], self.location.origin);
       if (
@@ -175,22 +305,23 @@ self.addEventListener("fetch", (event) => {
         // The generic shell and its chunks belong to one verified build. A
         // new shell becomes visible only when its prepared worker activates.
         const shell = await cache.match(SHELL_URL);
-        if (shell) return shell;
+        if (shell) return navigationShell(shell, cache);
         try {
           const response = await fetch(request);
           if (response.status < 500) return response;
-          return (await cache.match(SHELL_URL)) || response;
+          const fallback = await cache.match(SHELL_URL);
+          return fallback ? navigationShell(fallback, cache) : response;
         } catch {
-          return (
-            (await cache.match(SHELL_URL)) ||
-            new Response(
-              "ProjectAnvil is not ready for offline startup. Open the local app while its server is running first.",
-              {
-                status: 503,
-                headers: { "Content-Type": "text/plain; charset=utf-8" },
-              },
-            )
-          );
+          const fallback = await cache.match(SHELL_URL);
+          return fallback
+            ? navigationShell(fallback, cache)
+            : new Response(
+                "ProjectAnvil is not ready for offline startup. Open the local app while its server is running first.",
+                {
+                  status: 503,
+                  headers: { "Content-Type": "text/plain; charset=utf-8" },
+                },
+              );
         }
       })(),
     );

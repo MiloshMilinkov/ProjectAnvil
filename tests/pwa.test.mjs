@@ -23,8 +23,13 @@ const resource = {
   bytes: asset.byteLength,
   sha256: createHash("sha256").update(asset).digest("hex"),
 };
-const publicHtml =
-  '<!doctype html><html><body data-projectanvil-shell="public">Opening your workspace…<script src="/_next/static/chunks/app-123.js"></script></body></html>';
+const publicNonce = "0123456789abcdef0123456789abcdef";
+const publicPolicy = `default-src 'self'; script-src 'nonce-${publicNonce}' 'strict-dynamic'; script-src-attr 'none'`;
+const publicHeaders = {
+  "Content-Type": "text/html; charset=utf-8",
+  "Content-Security-Policy": publicPolicy,
+};
+const publicHtml = `<!doctype html><html><head><meta property="csp-nonce" nonce="${publicNonce}"></head><body data-projectanvil-shell="public">Opening your workspace…<script nonce="${publicNonce}" src="/_next/static/chunks/app-123.js"></script><script nonce="${publicNonce}">self.__fixtureNonce="${publicNonce}";</script></body></html>`;
 const updatesSource = await fs.readFile(
   path.join(root, "app", "lib", "app-installation-updates.ts"),
   "utf8",
@@ -131,7 +136,9 @@ function worker() {
   const fetches = [];
   let network = true;
   let shell = publicHtml;
-  let shellHeaders = { "Content-Type": "text/html; charset=utf-8" };
+  let shellHeaders = publicHeaders;
+  let shellStatus = 200;
+  let missedShellLookups = 0;
   let assetBody = asset;
   let windows = 1;
   let activated = 0;
@@ -144,6 +151,10 @@ function worker() {
       const entries = stores.get(name);
       return {
         async match(input) {
+          if (key(input) === origin + "/" && missedShellLookups > 0) {
+            missedShellLookups--;
+            return undefined;
+          }
           return entries.get(key(input))?.clone();
         },
         async put(input, response) {
@@ -151,6 +162,9 @@ function worker() {
         },
         async keys() {
           return [...entries.keys()].map((url) => new Request(url));
+        },
+        async delete(input) {
+          return entries.delete(key(input));
         },
       };
     },
@@ -168,6 +182,7 @@ function worker() {
     Headers,
     AbortController,
     Uint8Array,
+    TextDecoder,
     Set,
     crypto: webcrypto,
     setTimeout,
@@ -177,7 +192,10 @@ function worker() {
       if (!network) throw new TypeError("Network unavailable");
       fetches.push(request);
       if (new URL(request.url).pathname === "/")
-        return new Response(shell, { headers: shellHeaders });
+        return new Response(shell, {
+          headers: shellHeaders,
+          status: shellStatus,
+        });
       return new Response(assetBody, {
         headers: { "Content-Type": "text/javascript" },
       });
@@ -246,9 +264,13 @@ function worker() {
     setNetwork: (value) => {
       network = value;
     },
-    setShell: (value, headers = shellHeaders) => {
+    setShell: (value, headers = shellHeaders, status = 200) => {
       shell = value;
       shellHeaders = headers;
+      shellStatus = status;
+    },
+    missShellLookup: () => {
+      missedShellLookups++;
     },
     setAsset: (value) => {
       assetBody = value;
@@ -258,6 +280,27 @@ function worker() {
     },
     counts: () => ({ activated, claimed }),
   };
+}
+
+const navigation = () => ({
+  url: origin + "/?note=private-id",
+  mode: "navigate",
+  method: "GET",
+  headers: new Headers(),
+});
+
+async function assertRenewedShell(response, expected = publicHtml) {
+  assert.equal(response.status, 200);
+  const policy = response.headers.get("Content-Security-Policy");
+  const nonce = /script-src 'nonce-([a-f0-9]{32})' 'strict-dynamic'/.exec(
+    policy,
+  )?.[1];
+  assert(nonce, "A served shell needs its own valid CSP nonce");
+  assert.notEqual(nonce, publicNonce);
+  const html = await response.text();
+  assert.equal(html, expected.replaceAll(publicNonce, nonce));
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  return { nonce, html, policy };
 }
 
 test("installation caches only verified public files and an anonymous generic shell", async () => {
@@ -300,18 +343,10 @@ test("API, upload, cross-origin, range, query and mutation requests never use th
 test("navigation uses one coherent public build and never stores authenticated navigation responses", async () => {
   const fixture = worker();
   await fixture.dispatch("install");
-  const request = {
-    url: origin + "/?note=private-id",
-    mode: "navigate",
-    method: "GET",
-    headers: new Headers(),
-  };
+  const request = navigation();
   fixture.setShell("PRIVATE_ACCOUNT_RESPONSE");
   const reads = fixture.fetches.length;
-  assert.equal(
-    await (await fixture.dispatch("fetch", { request })).text(),
-    publicHtml,
-  );
+  await assertRenewedShell(await fixture.dispatch("fetch", { request }));
   assert.equal(
     fixture.fetches.length,
     reads,
@@ -328,12 +363,9 @@ test("navigation uses one coherent public build and never stores authenticated n
   );
   await (
     await fixture.caches.open(fixture.api.CACHE_NAME)
-  ).put("/", new Response(publicHtml));
+  ).put("/", new Response(publicHtml, { headers: publicHeaders }));
   fixture.setNetwork(false);
-  assert.equal(
-    await (await fixture.dispatch("fetch", { request })).text(),
-    publicHtml,
-  );
+  await assertRenewedShell(await fixture.dispatch("fetch", { request }));
   assert.equal(
     await (
       await fixture.dispatch("fetch", {
@@ -358,16 +390,191 @@ test("integrity, body limits, shell identity and mixed-build checks fail closed"
       publicHtml,
       { "Content-Type": "text/html", "Set-Cookie": "private=value" },
     ],
-    [
-      publicHtml.replace("app-123.js", "new-build.js"),
-      { "Content-Type": "text/html" },
-    ],
+    [publicHtml.replace("app-123.js", "new-build.js"), publicHeaders],
   ]) {
     const fixture = worker();
     fixture.setShell(html, headers);
     await assert.rejects(fixture.dispatch("install"), /shell|updated/);
     assert.equal(await fixture.api.cacheReady(), false);
   }
+});
+
+test("cached navigation renews matching CSP and serialized nonces without authorizing new scripts", async () => {
+  const fixture = worker();
+  const untrusted = "<script>globalThis.untrustedShellScript=true</script>";
+  const html = publicHtml.replace("</body>", untrusted + "</body>");
+  fixture.setShell(html);
+  await fixture.dispatch("install");
+  const cache = await fixture.caches.open(fixture.api.CACHE_NAME);
+  const sourceHeaders = {
+    ...publicHeaders,
+    ETag: '"original-public-copy"',
+    "Content-Length": "999",
+    "Content-Encoding": "gzip",
+    "Last-Modified": "Mon, 02 Nov 2026 12:00:00 GMT",
+    "X-Fixture": "public-only",
+  };
+  await cache.put("/", new Response(html, { headers: sourceHeaders }));
+  fixture.setNetwork(false);
+  const firstResponse = await fixture.dispatch("fetch", {
+    request: navigation(),
+  });
+  for (const name of [
+    "ETag",
+    "Content-Length",
+    "Content-Encoding",
+    "Last-Modified",
+  ])
+    assert.equal(firstResponse.headers.has(name), false);
+  assert.equal(firstResponse.headers.get("X-Fixture"), "public-only");
+  const first = await assertRenewedShell(firstResponse, html);
+  const second = await assertRenewedShell(
+    await fixture.dispatch("fetch", { request: navigation() }),
+    html,
+  );
+  assert.notEqual(first.nonce, second.nonce);
+  assert(
+    first.html.includes(untrusted),
+    "New markup is never automatically given a nonce",
+  );
+  assert.equal(
+    first.html.includes(
+      `<script nonce="${first.nonce}">globalThis.untrustedShellScript`,
+    ),
+    false,
+  );
+  const cached = await cache.match("/");
+  assert.equal(
+    await cached.text(),
+    html,
+    "The trusted cache entry remains pristine",
+  );
+  assert.equal(cached.headers.get("Content-Security-Policy"), publicPolicy);
+  assert.equal(cached.headers.get("ETag"), sourceHeaders.ETag);
+});
+
+test("both navigation fallback branches renew cached nonces", async () => {
+  for (const online of [true, false]) {
+    const fixture = worker();
+    await fixture.dispatch("install");
+    fixture.missShellLookup();
+    if (online) fixture.setShell("server unavailable", publicHeaders, 503);
+    else fixture.setNetwork(false);
+    await assertRenewedShell(
+      await fixture.dispatch("fetch", { request: navigation() }),
+    );
+  }
+});
+
+test("malformed offline shells fail closed and reconnect repairs only the public root anonymously", async () => {
+  const variants = [
+    [publicHtml, { "Content-Type": "text/html" }],
+    [
+      publicHtml,
+      {
+        ...publicHeaders,
+        "Content-Security-Policy": publicPolicy.replace(
+          publicNonce,
+          "bad-nonce",
+        ),
+      },
+    ],
+    [
+      publicHtml.replace(
+        `nonce="${publicNonce}"`,
+        'nonce="ffffffffffffffffffffffffffffffff"',
+      ),
+      publicHeaders,
+    ],
+    [publicHtml.replaceAll(` nonce="${publicNonce}"`, ""), publicHeaders],
+    [publicHtml + "x".repeat(1024 * 1024), publicHeaders],
+  ];
+  for (const [html, headers] of variants) {
+    const fixture = worker();
+    await fixture.dispatch("install");
+    const cache = await fixture.caches.open(fixture.api.CACHE_NAME);
+    const privateCache = await fixture.caches.open("unrelated-private-cache");
+    await privateCache.put("/private", new Response("Keep private recovery"));
+    await cache.put("/", new Response(html, { headers }));
+    fixture.setNetwork(false);
+    const unavailable = await fixture.dispatch("fetch", {
+      request: navigation(),
+    });
+    assert.equal(unavailable.status, 503);
+    assert.match(unavailable.headers.get("Content-Type"), /^text\/plain/);
+    assert.equal(
+      unavailable.headers.get("Content-Security-Policy"),
+      "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    );
+    assert.equal((await unavailable.text()).includes("<script"), false);
+    assert.equal(await cache.match("/"), undefined);
+    assert.equal(
+      await (await cache.match(resource.url)).text(),
+      new TextDecoder().decode(asset),
+    );
+    assert.equal(
+      await (await privateCache.match("/private")).text(),
+      "Keep private recovery",
+    );
+    fixture.setNetwork(true);
+    const beforeRepair = fixture.fetches.length;
+    assert.equal(
+      (await fixture.message("PROJECTANVIL_PREPARE_SHELL")).ready,
+      true,
+    );
+    assert.deepEqual(
+      fixture.fetches
+        .slice(beforeRepair)
+        .map((request) => new URL(request.url).pathname),
+      ["/"],
+    );
+    assert(
+      fixture.fetches
+        .slice(beforeRepair)
+        .every((request) => request.credentials === "omit"),
+    );
+    await assertRenewedShell(
+      await fixture.dispatch("fetch", { request: navigation() }),
+    );
+    assert.equal(await (await cache.match("/")).text(), publicHtml);
+  }
+});
+
+test("preparing repairs an invalid public copy but refuses private replacements", async () => {
+  const fixture = worker();
+  await fixture.dispatch("install");
+  const cache = await fixture.caches.open(fixture.api.CACHE_NAME);
+  await cache.put(
+    "/",
+    new Response("not the public shell", { headers: publicHeaders }),
+  );
+  await assertRenewedShell(
+    await fixture.dispatch("fetch", { request: navigation() }),
+  );
+  await cache.put(
+    "/",
+    new Response(publicHtml, { headers: { "Content-Type": "text/html" } }),
+  );
+  const repaired = await fixture.message("PROJECTANVIL_PREPARE_SHELL");
+  assert.equal(repaired.ready, true);
+  await assertRenewedShell(
+    await fixture.dispatch("fetch", { request: navigation() }),
+  );
+  await cache.put(
+    "/",
+    new Response(publicHtml, { headers: { "Content-Type": "text/html" } }),
+  );
+  fixture.setShell(publicHtml, {
+    ...publicHeaders,
+    "Set-Cookie": "private=value",
+  });
+  const denied = await fixture.dispatch("fetch", { request: navigation() });
+  assert.equal(denied.status, 503);
+  assert.equal(await cache.match("/"), undefined);
+  assert.equal(
+    (await fixture.message("PROJECTANVIL_PREPARE_SHELL")).ready,
+    false,
+  );
 });
 
 test("updates wait for other windows and activation removes only older public shell caches", async () => {
