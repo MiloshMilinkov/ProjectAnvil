@@ -24,10 +24,10 @@ import { useWorkspaceFetch } from "./WorkspaceScope";
 import type { SharedDraftReference } from "../lib/note-collaboration-drafts";
 import { sharedNoteDraftKey } from "../lib/note-collaboration-draft-keys";
 
-type CollaborationRuntime = typeof import("../lib/note-collaboration-runtime");
+type CollaborationRuntime = typeof import("../lib/note-collaboration-browser");
 let browserRuntime: Promise<CollaborationRuntime> | undefined;
 function loadBrowserRuntime(): Promise<CollaborationRuntime> {
-  browserRuntime ||= import("../lib/note-collaboration-runtime").catch(
+  browserRuntime ||= import("../lib/note-collaboration-browser").catch(
     (error) => {
       browserRuntime = undefined;
       throw error;

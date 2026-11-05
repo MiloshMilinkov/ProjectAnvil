@@ -95,6 +95,7 @@ export function authOptions(
                   ),
                 };
               }
+              return;
             },
           },
         ]

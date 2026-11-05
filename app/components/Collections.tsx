@@ -478,6 +478,7 @@ export default function Collections({
                 ? note.updatedAt
                 : note.title;
     const query = prefs.query.trim().toLowerCase();
+    let collator: Intl.Collator | undefined;
     const filtered = allNotes
       .filter(
         (note) =>
@@ -495,10 +496,10 @@ export default function Collections({
         const result =
           numeric(av) && numeric(bv)
             ? Number(av) - Number(bv)
-            : av.localeCompare(bv, undefined, {
+            : (collator ||= new Intl.Collator(undefined, {
                 numeric: true,
                 sensitivity: "base",
-              });
+              })).compare(av, bv);
         return (prefs.descending ? -1 : 1) * result;
       });
     const groups =

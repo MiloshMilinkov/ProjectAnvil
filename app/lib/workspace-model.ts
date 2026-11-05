@@ -29,6 +29,7 @@ import {
   emptyDecision,
   noteTypesSchema,
   relationshipPresetsSchema,
+  uniqueIds,
 } from "./connected-thinking-model";
 
 export class WorkspaceError extends Error {
@@ -82,8 +83,6 @@ const references = z
     (values) => new Set(values).size === values.length,
     "Remove duplicate links.",
   );
-const uniqueIds = <T extends { id: string }>(values: T[]) =>
-  new Set(values.map((value) => value.id)).size === values.length;
 const timeZone = z
   .string()
   .max(100)

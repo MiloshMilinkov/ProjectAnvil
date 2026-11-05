@@ -86,13 +86,6 @@ export function discardBrainstormDraft(
 /** Stable tie order keeps voting from unexpectedly reshuffling equally ranked ideas. */
 export function rankedIdeas(board: BrainstormBoard, byVotes: boolean) {
   return byVotes
-    ? board.ideas
-        .map((idea, index) => ({ idea, index }))
-        .sort(
-          (left, right) =>
-            right.idea.votes.length - left.idea.votes.length ||
-            left.index - right.index,
-        )
-        .map((entry) => entry.idea)
+    ? board.ideas.slice().sort((left, right) => right.votes.length - left.votes.length)
     : board.ideas;
 }
