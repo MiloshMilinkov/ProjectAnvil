@@ -3111,6 +3111,102 @@ test.describe("Separate accounts and recoverable everyday work", () => {
       await context.close();
     }
   });
+  test("note links wait for refreshed records before choosing a cached fallback", async ({}, testInfo) => {
+    await selectWorkspace(owner, owner.personal);
+    const cached = await createNoteUi(
+      owner,
+      `Cached link reference ${fixtureId()}`,
+      "This older note is already saved on the device.",
+    );
+    await navigate(owner.page, "Workspace settings");
+    await expect(
+      owner.page.getByText("Application files are ready for offline startup.", {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30_000 });
+    await owner.page
+      .getByRole("button", {
+        name: /^(Save workspace offline|Refresh offline copy)$/,
+      })
+      .click();
+    await expect(
+      owner.page.getByText("Offline workspace copy saved", { exact: true }),
+    ).toBeVisible();
+    // Stop live refresh before another client creates a note absent from this
+    // device's copy. The server mutation uses the real API and access checks.
+    await withDocumentExit(owner.page, () => owner.page.close());
+    const linked = {
+      id: `linked_${fixtureId()}`,
+      title: "New linked reference",
+      content: "The requested note arrives with the server refresh.",
+    };
+    await upsert(owner, owner.personal.id, "notes", linked);
+    owner.page = await owner.context.newPage();
+    await owner.page.addInitScript(() => {
+      if (!new URL(location.href).searchParams.has("startup-delay")) return;
+      const original = window.fetch;
+      window.fetch = async (input, init) => {
+        const address = input instanceof Request ? input.url : String(input);
+        const method =
+          init?.method || (input instanceof Request ? input.method : "GET");
+        // Preserve native service workers and actual response contents while
+        // making cached startup win the race against the first server read.
+        if (
+          new URL(address, location.href).pathname === "/api/state" &&
+          method === "GET"
+        )
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        return original.call(window, input, init);
+      };
+    });
+    await owner.page.goto(`/?note=${linked.id}&startup-delay=1`);
+    await appReady(owner.page);
+    await expect(
+      owner.page.getByRole("textbox", { name: "Note title", exact: true }),
+    ).toHaveValue(linked.title);
+    await expect(
+      owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+    ).toHaveValue(linked.content);
+    for (const theme of detailedThemes(testInfo)) {
+      await owner.page.getByRole("button", { name: /^Appearance:/ }).click();
+      await owner.page
+        .getByRole("menuitemradio", { name: new RegExp(`^${theme} `) })
+        .click();
+      for (const width of [1365, 320]) {
+        await owner.page.setViewportSize({ width, height: 900 });
+        const read = owner.page.getByRole("button", { name: "Read", exact: true });
+        await read.focus();
+        await read.press("Enter");
+        await expect(read).toHaveAttribute("aria-pressed", "true");
+        await expect(owner.page.locator(".note-preview-pane")).toHaveText(linked.content);
+        await expect.poll(() => owner.page.evaluate(() => document.documentElement.scrollWidth))
+          .toBeLessThanOrEqual(width);
+        await owner.page.screenshot({
+          path: testInfo.outputPath(`note-link-${theme.toLowerCase()}-${width}.png`),
+        });
+      }
+    }
+    await owner.page.setViewportSize({ width: 1365, height: 900 });
+    // An actually absent link retains the existing newest-note fallback once
+    // the server has answered; cached links still work with native networking off.
+    await openNote(owner, `absent_${fixtureId()}`);
+    await expect(
+      owner.page.getByRole("textbox", { name: "Note title", exact: true }),
+    ).toHaveValue(linked.title);
+    await setActorOffline(owner, true);
+    try {
+      await openNote(owner, cached.id);
+      await expect(
+        owner.page.getByRole("textbox", { name: "Note content", exact: true }),
+      ).toHaveValue(cached.content);
+      await openNote(owner, `offline_absent_${fixtureId()}`);
+      await expect(owner.page.getByRole("textbox", { name: "Note content", exact: true }))
+        .not.toHaveValue("");
+    } finally {
+      await setActorOffline(owner, false);
+    }
+  });
+
   test("browser policy blocks untrusted scripts and preserves media", async ({}, testInfo) => {
     test.setTimeout(180_000);
     await owner.page.setViewportSize({ width: 1365, height: 900 });

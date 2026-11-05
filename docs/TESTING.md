@@ -41,6 +41,8 @@ Formatting checks wait for highlighted markup after theme changes and other rere
 
 First-use readiness waits for the actual guide when its saved preference is absent, dismisses it through **Skip guide**, and checks that the overlay is gone. Returning profiles no longer spend 1.5 seconds waiting for a guide they have already dismissed. A regression deliberately delays the onboarding animation frame beyond that old deadline.
 
+Note-link startup waits for the initial workspace read when the requested note is absent from the saved offline copy. Previously, Notes could choose a cached fallback before the server returned the linked note, leaving the wrong note selected. A regression saves an older device copy, creates another note through the real API while the page is closed, and delays the next state read. It checks the requested title/content, keyboard Read controls, desktop/320 px layouts, absent-link fallback, and cached/absent links with native networking disabled. The real service worker and server response remain intact.
+
 The external-request guard matches only disallowed origins, leaving local requests out of its route chain. This avoids a second continuation when Playwright removes a page fixture while a local request is in flight. A regression checks local fixture removal, blocked external navigation, and allowed blob/data reads. The storage layout check polls the measured document width after viewport changes, retaining the strict desktop/320 px limits and reporting the failing theme and usage case; it does not hide overflow or retry the entire test.
 
 Chromium runs the full five-theme desktop/mobile matrix in detailed workflows. Firefox and WebKit use Focus at both widths in repeated capture loops, retaining every functional/security assertion; the dedicated appearance workflow still checks all five themes. This avoids duplicating the same visual matrix in every engine while retaining coverage of Focus's split surfaces and narrow layouts.
@@ -72,6 +74,10 @@ Tests create only two accounts per run to stay within the application's normal r
 For repeated workflow verification, start a fresh `npm run test:browser` invocation each time. Playwright's `--repeat-each` reuses the run's database and can exhaust registration limits.
 
 ### Browser verification
+
+The later **5 November 2026 PR #2 follow-up** fixes the application startup race described above. The CI media failure showed a newly created note in the list while the previous recovery note remained selected; it was distinct from the earlier full-run WebKit deadline below. The delayed-state regression failed against the original application with the cached note's title, then passed with the fix.
+
+Build **`a4447091e20dcac61550`** passed types, zero-warning lint, backend/security checks, **45 native Node tests**, the production build, and startup/offline size budgets. Chromium and Firefox each passed **28/28** cases. Six affected WebKit workflows passed together: offline recovery, all-theme keyboard navigation, deferred-screen recovery, linked-note startup, CSP/media, and the queued-edit app update. All ten linked-note desktop/320 px captures across the five themes were reviewed. Application and test fingerprints matched the isolated validation copy. Firefox used a temporary copy matching all 63 original runtime hashes. This was **62 passing engine/test cases**, with focused WebKit coverage; the complete WebKit suite was not rerun. Dependencies, CSP assertions, retries, and action deadlines were unchanged. GitHub's Windows Chromium and Linux Firefox/WebKit jobs still need to verify the published fix.
 
 The **5 November 2026 CI follow-up** changes browser helpers/assertions and documentation only. The complete code check passed, including **45 native Node tests**, types, zero-warning lint, backend/security regressions, and the production build. The delayed-onboarding regression failed against the old helper and passed with the fix.
 

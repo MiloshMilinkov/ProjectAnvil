@@ -127,6 +127,7 @@ export default function ProjectAnvil() {
   const data = useWorkspaceData();
   const {
     workspace,
+    initialReadComplete,
     load,
     loadError,
     liveStatus,
@@ -418,7 +419,14 @@ export default function ProjectAnvil() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [prefs.taskShortcut, tourOpen]);
-  if (!workspace)
+  // A saved offline copy may predate a linked note. Let the first server read
+  // settle before Notes treats the missing cached target as an absent note.
+  const pendingLinkedNote =
+    !initialReadComplete &&
+    !!startup.note &&
+    selectedNote === startup.note &&
+    !workspace?.notes.some((note) => note.id === startup.note);
+  if (!workspace || pendingLinkedNote)
     return (
       <main className="loading-page">
         <div className="brand-mark">

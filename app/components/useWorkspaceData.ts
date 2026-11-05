@@ -79,6 +79,9 @@ export function useWorkspaceData() {
     epoch.current = permissionEpoch;
   }, [permissionEpoch]);
   const [workspaceEpoch, setWorkspaceEpoch] = useState(permissionEpoch);
+  const [readCompletedEpoch, setReadCompletedEpoch] = useState<string | null>(
+    null,
+  );
   const [confirmedWorkspace, setConfirmedWorkspace] =
     useState<Workspace | null>(null);
   const [offlineCopy, setOfflineCopy] = useState<OfflineWorkspaceCopy | null>(
@@ -311,6 +314,8 @@ export function useWorkspaceData() {
           offline.current = unavailable;
           onConnectionChange(unavailable);
         }
+      } finally {
+        if (isCurrentRead()) setReadCompletedEpoch(permissionEpoch);
       }
     })();
     inFlightRead.current = operation;
@@ -880,6 +885,7 @@ export function useWorkspaceData() {
 
   return {
     workspace: workspaceEpoch === permissionEpoch ? workspace : null,
+    initialReadComplete: readCompletedEpoch === permissionEpoch,
     confirmedWorkspace:
       workspaceEpoch === permissionEpoch ? confirmedWorkspace : null,
     offlineCopy,
