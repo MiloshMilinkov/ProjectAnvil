@@ -200,12 +200,12 @@ export function OfflineMediaProvider({
   children,
 }: {
   scope: DraftScope;
-  workspace: Workspace;
+  workspace: Workspace | null;
   isOffline: boolean;
   children: ReactNode;
 }) {
   const { accountId, workspaceId } = scope;
-  const mediaSignature = JSON.stringify(workspace.media);
+  const mediaSignature = JSON.stringify(workspace?.media || []);
   const manager = useMemo(
     () =>
       new OfflineMediaManager(

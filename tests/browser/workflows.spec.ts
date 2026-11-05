@@ -1,14 +1,12 @@
 import { readFile } from "node:fs/promises";
-import {
-  test,
-  expect,
-  type Request as BrowserRequest,
-  type Route,
-  type Page,
-  type TestInfo,
+import type {
+  Request as BrowserRequest,
+  Route,
+  Page,
+  TestInfo,
 } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
-import { validateDisposableTarget } from "../../scripts/test-runtime.mjs";
 import { readLocalAccountMail } from "../../scripts/account-mail.mjs";
 import type { AccountContext } from "../../app/lib/access-types";
 import {
@@ -22,7 +20,6 @@ import {
   isNativeDocumentExitError,
   navigate,
   openNote,
-  registerThroughUi,
   selectWorkspace,
   setActorOffline,
   upsert,
@@ -39,7 +36,6 @@ const detailedThemes = (info: TestInfo) =>
     : ["Focus"];
 
 test.describe("Separate accounts and recoverable everyday work", () => {
-  test.describe.configure({ mode: "serial" });
   let owner: BrowserAccount;
   let colleague: BrowserAccount;
   let base: string;
@@ -47,27 +43,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
   let runId: string;
   const restoreNetworkFixtures: (() => Promise<void>)[] = [];
 
-  test.beforeAll(async ({ browser, baseURL }) => {
-    if (!baseURL) throw new Error("The disposable test origin is missing.");
-    const marker = await validateDisposableTarget(
-      baseURL,
-      process.env.PROJECTANVIL_TEST_MANIFEST,
-    );
-    stateDirectory = marker.stateDirectory;
-    runId = marker.runId;
-    base = baseURL;
-    owner = await registerThroughUi(browser, base, "owner");
-    colleague = await registerThroughUi(browser, base, "peer");
-  });
-
-  test.afterAll(async () => {
-    await Promise.allSettled([
-      owner?.context.close(),
-      colleague?.context.close(),
-    ]);
-  });
-
-  test.beforeEach(async ({ browserName }, testInfo) => {
+  test.beforeEach(async ({ scenario, browserName }, testInfo) => {
+    ({ owner, colleague, stateDirectory, runId } = scenario);
+    base = scenario.baseURL;
     if (browserName !== "webkit") return;
     const actors =
       /account recovery|delayed saves|interrupted attachments|storage cleanup|attachment allowance and upload feedback/.test(
@@ -106,45 +84,8 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     }
   });
 
-  test.afterEach(async ({}, testInfo) => {
+  test.afterEach(async () => {
     for (const restore of restoreNetworkFixtures.splice(0)) await restore();
-    const nativeExits = [owner, colleague]
-      .filter(Boolean)
-      .flatMap((actor) => actor.nativeExitErrors.splice(0));
-    if (nativeExits.length)
-      await testInfo.attach("native-document-exit-errors", {
-        body: nativeExits.join("\n\n"),
-        contentType: "text/plain",
-      });
-    const errors = [owner, colleague]
-      .filter(Boolean)
-      .flatMap((actor) => actor.pageErrors.splice(0));
-    if (errors.length)
-      await testInfo.attach("browser-runtime-errors", {
-        body: errors.join("\n"),
-        contentType: "text/plain",
-      });
-    if (testInfo.status === testInfo.expectedStatus) {
-      expect(
-        errors,
-        "Application pages must not raise uncaught JavaScript errors.",
-      ).toEqual([]);
-      return;
-    }
-    for (const [label, actor] of [
-      ["owner", owner],
-      ["colleague", colleague],
-    ] as const) {
-      if (!actor || actor.page.isClosed()) continue;
-      const screenshot = await actor.page
-        .screenshot({ fullPage: false })
-        .catch(() => null);
-      if (screenshot)
-        await testInfo.attach(`${label}-failure`, {
-          body: screenshot,
-          contentType: "image/png",
-        });
-    }
   });
 
   test("personal projects stay private and username sign-in restores the right account", async ({}, testInfo) => {

@@ -77,7 +77,7 @@ Each account has a private personal workspace. Team owners and admins invite reg
 
 New workspaces start empty. Guest work stays separate from account and team workspaces.
 
-Account and workspace menus support arrow keys; Escape closes them and returns focus to the menu button.
+Account and workspace menus support arrow keys; Escape closes them and returns focus to the menu button. Open menus remain usable while access changes refresh the workspace; protected records stay hidden until that check finishes.
 
 Large task lists show 50 rows per page, and boards start with 40 cards per status with **Show more**. Filters, totals, and bulk editing still cover all matching tasks.
 

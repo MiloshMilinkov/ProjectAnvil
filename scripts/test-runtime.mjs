@@ -160,7 +160,12 @@ async function availablePort(requested = 0) {
   return port;
 }
 
-/** A benchmark may write only to a run explicitly created by this harness. */
+/**
+ * A benchmark may write only to a run explicitly created by this harness.
+ * @param {string} baseURL
+ * @param {string | undefined} manifestPath
+ * @param {{ fetcher?: typeof fetch, signal?: AbortSignal }} [options]
+ */
 export async function validateDisposableTarget(
   baseURL,
   manifestPath,
@@ -228,11 +233,15 @@ export function assertLocalTestBindings(configuration) {
   visit(configuration);
 }
 
-/** Starts a fresh database/file bucket without reading the user's state or secret. */
+/**
+ * Starts a fresh database/file bucket without reading the user's state or secret.
+ * @param {{ kind?: string, port?: number, signal?: AbortSignal, guardParent?: boolean }} [options]
+ */
 export async function startDisposableServer({
   kind = "browser",
   port: requestedPort,
   signal,
+  guardParent = false,
 } = {}) {
   signal?.throwIfAborted();
   if (!/^[a-z][a-z-]{0,30}$/.test(kind))
@@ -324,6 +333,9 @@ export async function startDisposableServer({
   const child = spawn(
     process.execPath,
     [
+      ...(guardParent
+        ? [path.join(projectRoot, "scripts", "test-server-guardian.mjs")]
+        : []),
       path.join(projectRoot, "node_modules", "wrangler", "bin", "wrangler.js"),
       "dev",
       "--config",
@@ -344,7 +356,7 @@ export async function startDisposableServer({
       cwd: directory,
       detached: process.platform !== "win32",
       windowsHide: true,
-      stdio: ["ignore", logFile.fd, logFile.fd],
+      stdio: ["ignore", logFile.fd, logFile.fd, ...(guardParent ? ["ipc"] : [])],
       env: environment,
     },
   );
@@ -352,7 +364,19 @@ export async function startDisposableServer({
   child.once("error", (error) => {
     failure = error;
   });
-  const terminate = ownedProcessStopper(child);
+  const forceTerminate = ownedProcessStopper(child);
+  const terminate = async () => {
+    if (!guardParent) return forceTerminate();
+    // Give the guardian enough time to stop its own child before exiting.
+    // IPC disconnection also happens if the fixture worker is killed abruptly.
+    if (child.connected) child.disconnect();
+    try {
+      await waitForOwnedExit(child, 8000);
+    } catch {
+      await forceTerminate();
+      throw new Error("The disposable server guardian did not finish cleanup.");
+    }
+  };
   let stopped = false,
     stopping;
   async function stop() {

@@ -205,6 +205,11 @@ export async function appReady(page: Page) {
       name: /^(Sign in or create account|Account: )/,
     }),
   ).toBeVisible({ timeout: 30_000 });
+  // Account/navigation controls remain mounted during permission refreshes.
+  // Wait for authorized content, not just the surrounding shell.
+  await expect(
+    page.locator('#workspace-content:not([aria-busy="true"])'),
+  ).toBeVisible({ timeout: 30_000 });
   // The account button can render before onboarding's first animation frame.
   // A fresh profile must finish the real guide; returning profiles need no wait.
   if (
@@ -283,6 +288,10 @@ export async function api(
 ) {
   const response = await actor.context.request.fetch(path, {
     method: body === undefined ? "GET" : "POST",
+    // A reset connection can interrupt an otherwise healthy fixture read.
+    // Playwright retries only ECONNRESET here; never replay a mutation or an
+    // HTTP error, whose original result must remain visible to the test.
+    maxRetries: body === undefined ? 1 : 0,
     headers: {
       Origin: new URL(actor.page.url()).origin,
       "X-Account-Id": actor.userId,
