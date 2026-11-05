@@ -25,12 +25,14 @@ Gzip is the sum of independently compressed files using Node's default gzip sett
 ## Changes by step
 
 - **Step 0 — setup:** created the requested branch and checkpoint, detected the actual stack, captured the baseline, and passed strict types, zero-warning lint, backend checks, 45 native Node tests, and the production build. Knip runs temporarily through npm exec without changing project dependencies.
-- **Steps 1–7:** in progress; only verified, behavior-preserving changes will be retained.
+- **Step 1 — bundle:** added a narrow lazy collaboration entry while retaining the original runtime's full API. The six Yjs members and eight helpers retain identical references; update/recovery and cursor-position checks pass. Production output decreased by 26,939 raw bytes and 8,623 gzip bytes; the complete offline application decreased by 13,434 bytes. The full type/lint/test/build chain passed.
+- **Steps 2–7:** in progress; only verified, behavior-preserving changes will be retained.
 
 ## Skipped or reverted
 
 - Vue Router, Pinia, Vue templates, `defineAsyncComponent`, and `vue-tsc` do not apply to this React/Vinext project. Existing React, TypeScript, and framework checks are used instead.
 - No major dependency upgrades, manual lockfile edits, secret-file edits, or manually edited generated output are authorized by this review.
+- Vite already disables production source maps, splits CSS, targets modern supported browsers and minifies output; Vinext also minifies the server. Existing feature/renderer lazy loading and syntax chunk splitting remain. Operational console output, established preload recovery and worker response handling are preserved. Extra compression files would add offline-cache bytes without a verified local-serving benefit.
 
 ## Needs manual review
 
