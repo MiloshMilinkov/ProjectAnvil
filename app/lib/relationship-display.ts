@@ -31,15 +31,6 @@ export function relationshipLabel(kind: RelationshipKind): string {
   return relationshipOptions.find(option => option.value === kind)?.label ?? kind;
 }
 
-export function entityTitle(workspace: Workspace, ref: EntityRef): string {
-  const collection = ref.type === 'note'
-    ? workspace.notes
-    : ref.type === 'task' ? workspace.tasks : workspace.projects;
-  const item = collection.find(entity => entity.id === ref.id);
-  if (!item) return 'Removed item';
-  return 'title' in item ? item.title : item.name;
-}
-
 export function workspaceEntities(workspace: Workspace): EntityRef[] {
   return [
     ...workspace.notes.map(note => ({ type: 'note' as const, id: note.id })),

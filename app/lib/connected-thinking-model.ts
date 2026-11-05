@@ -5,7 +5,7 @@ import { isCalendarDate } from "./reminder-time";
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,120}$/);
 const reference = z.union([id, z.literal("")]);
 const named = (maximum: number) => z.string().trim().min(1).max(maximum);
-const uniqueIds = <T extends { id: string }>(items: T[]) =>
+export const uniqueIds = <T extends { id: string }>(items: T[]) =>
   new Set(items.map((item) => item.id)).size === items.length;
 const date = z
   .string()
