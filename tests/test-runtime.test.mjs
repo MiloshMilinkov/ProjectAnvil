@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { EventEmitter } from "node:events";
+import { EventEmitter, once } from "node:events";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import {
   captureBrowserFailureLog,
@@ -19,6 +21,39 @@ import {
   ownedProcessStopper,
   runNode,
 } from "../scripts/test-runtime.mjs";
+
+test("a disposable server guardian stops its child when the worker IPC channel disappears", {
+  timeout: 15_000,
+}, async () => {
+  const guardian = spawn(process.execPath, [
+    fileURLToPath(new URL("../scripts/test-server-guardian.mjs", import.meta.url)),
+    "--eval",
+    "setInterval(() => {}, 1000)",
+  ], {
+    stdio: ["ignore", "ignore", "pipe", "ipc"],
+    detached: process.platform !== "win32",
+    windowsHide: true,
+  });
+  const stop = ownedProcessStopper(guardian);
+  let diagnostic = "";
+  guardian.stderr.on("data", (chunk) => { diagnostic += chunk; });
+  const exited = once(guardian, "exit");
+  try {
+    const [message] = await once(guardian, "message", {
+      signal: AbortSignal.timeout(5000),
+    });
+    assert.equal(message.type, "child-started");
+    assert.equal(typeof message.pid, "number");
+    process.kill(message.pid, 0);
+    guardian.disconnect();
+    const [code] = await exited;
+    assert.equal(code, 0, diagnostic);
+    assert.throws(() => process.kill(message.pid, 0), { code: "ESRCH" });
+  } finally {
+    if (guardian.connected) guardian.disconnect();
+    await stop();
+  }
+});
 
 const securitySource = await fs.readFile(
   new URL("../app/lib/http-security.ts", import.meta.url),

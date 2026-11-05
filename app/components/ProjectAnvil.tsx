@@ -127,6 +127,7 @@ export default function ProjectAnvil() {
   const data = useWorkspaceData();
   const {
     workspace,
+    initialReadComplete,
     load,
     loadError,
     liveStatus,
@@ -202,7 +203,7 @@ export default function ProjectAnvil() {
     sidebarRef,
     () => setMobile(false),
     false,
-    !!workspace && phoneLayout && mobile,
+    phoneLayout && mobile,
   );
   useDialog(
     shortcutsRef,
@@ -418,27 +419,39 @@ export default function ProjectAnvil() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [prefs.taskShortcut, tourOpen]);
-  if (!workspace)
-    return (
-      <main className="loading-page">
-        <div className="brand-mark">
-          <Anvil size={25} />
-        </div>
-        <h1>ProjectAnvil</h1>
-        <p>{loadError || data.offlineError || "Opening your workspace…"}</p>
-        {loadError ? (
-          <button className="btn" onClick={load}>
-            <RefreshCw size={15} /> Try again
-          </button>
-        ) : (
-          <div className="loading-line" />
-        )}
-      </main>
-    );
-  const w = workspace;
-  const project = w.projects.find((p) => p.id === projectFilter);
-  const featureProps: FeatureProps = {
-    workspace: w,
+  // A saved offline copy may predate a linked note. Let the first server read
+  // settle before Notes treats the missing cached target as an absent note.
+  const pendingLinkedNote =
+    !initialReadComplete &&
+    !!startup.note &&
+    selectedNote === startup.note &&
+    !workspace?.notes.some((note) => note.id === startup.note);
+  const loadingView = (
+    <main
+      id="workspace-content"
+      tabIndex={-1}
+      aria-busy="true"
+      className="loading-page"
+    >
+      <div className="brand-mark">
+        <Anvil size={25} />
+      </div>
+      <h1>ProjectAnvil</h1>
+      <p>{loadError || data.offlineError || "Opening your workspace…"}</p>
+      {loadError ? (
+        <button className="btn" onClick={load}>
+          <RefreshCw size={15} /> Try again
+        </button>
+      ) : (
+        <div className="loading-line" />
+      )}
+    </main>
+  );
+  // Account navigation stays mounted while changed grants retire protected
+  // workspace data. Menus must not lose their open state or keyboard focus.
+  const w = pendingLinkedNote ? null : workspace;
+  const project = w?.projects.find((p) => p.id === projectFilter);
+  const featureProps: Omit<FeatureProps, "workspace"> = {
     mutate,
     openTask,
     openNote,
@@ -510,6 +523,7 @@ export default function ProjectAnvil() {
               <button
                 data-tour="search"
                 className="sidebar-search"
+                disabled={!w}
                 onClick={() => setPalette(true)}
               >
                 <Search size={15} />
@@ -520,15 +534,15 @@ export default function ProjectAnvil() {
                 <WorkspaceNavigation
                   page={page}
                   assignedCount={
-                    w.tasks.filter(
+                    w?.tasks.filter(
                       (task) =>
                         task.assigneeId === currentPerson &&
                         task.status !== "done",
-                    ).length
+                    ).length || 0
                   }
                   onNavigate={go}
                 />
-                <div className="sidebar-projects">
+                {w && <div className="sidebar-projects">
                   <div className="nav-caption">
                     Projects
                     <button
@@ -569,7 +583,7 @@ export default function ProjectAnvil() {
                       Projects you create appear here.
                     </p>
                   )}
-                </div>
+                </div>}
               </div>
               <div className="sidebar-bottom">
                 <button
@@ -591,7 +605,7 @@ export default function ProjectAnvil() {
                 >
                   <Users size={17} />
                   Teams &amp; workspaces
-                  <span className="nav-end">{w.people.length}</span>
+                  {w && <span className="nav-end">{w.people.length}</span>}
                 </button>
                 <button
                   data-tour="nav-settings"
@@ -611,7 +625,9 @@ export default function ProjectAnvil() {
                       (syncError || loadError ? "offline" : "")
                     }
                   />
-                  {data.isOffline && data.offlineCopy
+                  {!w
+                    ? "Opening…"
+                    : data.isOffline && data.offlineCopy
                     ? "Working offline"
                     : loadError
                       ? "Connection needs attention"
@@ -643,7 +659,11 @@ export default function ProjectAnvil() {
               >
                 <Menu size={20} />
               </button>
-              <span>{w.name || "Workspace"}</span>
+              <span>
+                {w?.name ||
+                  account.workspaces.find((item) => item.id === activeId)?.name ||
+                  "Workspace"}
+              </span>
               <ChevronRight size={13} />
               <strong>
                 {activeNav?.title ||
@@ -653,17 +673,21 @@ export default function ProjectAnvil() {
               </strong>
             </div>
             <div className="topbar-actions">
-              <RemindersCenter
-                workspace={w}
-                currentPerson={currentPerson}
-                openTask={openTask}
-              />
-              <NotificationCenter
-                openTask={openTask}
-                openNote={openNote}
-                notify={notify}
-                onOpenProject={openProjectHome}
-              />
+              {w && (
+                <>
+                  <RemindersCenter
+                    workspace={w}
+                    currentPerson={currentPerson}
+                    openTask={openTask}
+                  />
+                  <NotificationCenter
+                    openTask={openTask}
+                    openNote={openNote}
+                    notify={notify}
+                    onOpenProject={openProjectHome}
+                  />
+                </>
+              )}
               <div data-tour="appearance">
                 <AppearanceMenu />
               </div>
@@ -673,6 +697,7 @@ export default function ProjectAnvil() {
                 data-tour="tour-button"
                 title="Guide to ProjectAnvil"
                 aria-label="Start guided tour"
+                disabled={!w}
                 onClick={startTour}
               >
                 <CircleHelp size={18} />
@@ -689,16 +714,19 @@ export default function ProjectAnvil() {
                 role="status"
               >
                 <span />
-                {liveStatus === "live"
-                  ? "Live updates"
-                  : liveStatus === "connecting"
-                    ? "Connecting…"
-                    : "Reconnecting…"}
+                {!w
+                  ? "Opening…"
+                  : liveStatus === "live"
+                    ? "Live updates"
+                    : liveStatus === "connecting"
+                      ? "Connecting…"
+                      : "Reconnecting…"}
               </span>
               <button
                 className="top-search btn-icon"
                 title="Search (Ctrl K)"
                 aria-label="Search workspace"
+                disabled={!w}
                 onClick={() => setPalette(true)}
               >
                 <Search size={17} />
@@ -712,6 +740,7 @@ export default function ProjectAnvil() {
               </div>
             </div>
           </header>
+          {w ? <>
           {project &&
             [
               "overview",
@@ -832,6 +861,7 @@ export default function ProjectAnvil() {
           <main
             id="workspace-content"
             tabIndex={-1}
+            aria-busy="false"
             data-tour="workspace-content"
             className={"main-content view-" + page}
           >
@@ -844,6 +874,7 @@ export default function ProjectAnvil() {
             )}
             {page === "overview" && (
               <WorkspaceOverview
+                workspace={w}
                 {...featureProps}
                 onGo={go}
                 onCreate={() => {
@@ -865,6 +896,7 @@ export default function ProjectAnvil() {
             )}
             {(page === "tasks" || page === "my-work") && (
               <TaskWorkspace
+                workspace={w}
                 {...featureProps}
                 mine={page === "my-work"}
                 onCreate={createTask}
@@ -876,6 +908,7 @@ export default function ProjectAnvil() {
             w.projects.some((project) => project.id === projectHomeId) ? (
               <ProjectHome
                 key={projectHomeId}
+                workspace={w}
                 {...featureProps}
                 projectId={projectHomeId}
                 onBack={() => {
@@ -962,6 +995,7 @@ export default function ProjectAnvil() {
             )}
             {(page === "notes" || page === "daily") && (
               <Knowledge
+                workspace={w}
                 {...featureProps}
                 selectedNote={selectedNote}
                 onSelectNote={setSelectedNote}
@@ -971,25 +1005,28 @@ export default function ProjectAnvil() {
             )}
             {page === "graph" && (
               <GraphView
+                workspace={w}
                 {...featureProps}
                 onClearProjectFilter={() => setProjectFilter("")}
               />
             )}
-            {page === "brainstorm" && <Brainstorming {...featureProps} />}
+            {page === "brainstorm" && <Brainstorming workspace={w} {...featureProps} />}
             {page === "activity" && (
               <ActivityCenter
+                workspace={w}
                 {...featureProps}
                 onOpenProject={openProjectHome}
               />
             )}
             {page === "canvas" && (
               <CanvasView
+                workspace={w}
                 {...featureProps}
                 resumeContext={rooms.canvasResume}
                 onContextChange={rooms.trackCanvas}
               />
             )}
-            {page === "collections" && <Collections {...featureProps} />}
+            {page === "collections" && <Collections workspace={w} {...featureProps} />}
             {page === "team" && (
               <TeamManager
                 account={account}
@@ -1001,6 +1038,7 @@ export default function ProjectAnvil() {
             )}
             {page === "settings" && (
               <WorkspaceSettings
+                workspace={w}
                 {...featureProps}
                 onPerson={setPersonModal}
                 prefs={prefs}
@@ -1011,7 +1049,9 @@ export default function ProjectAnvil() {
               />
             )}
           </main>
+          </> : loadingView}
         </div>
+        {w && <>
         {selectedTask &&
           w.tasks.some((task) => task.id === selectedTask) &&
           !permissions.canEditProject(
@@ -1186,6 +1226,7 @@ export default function ProjectAnvil() {
             </button>
           </div>
         )}
+        </>}
       </div>
     </OfflineMediaProvider>
   );

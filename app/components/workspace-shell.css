@@ -1,4 +1,8 @@
 /* Application structure. Shared visual tokens are defined in ui-foundation.css. */
+.app-body > .loading-page {
+  min-height: calc(100dvh - 65px);
+  padding: var(--space-5);
+}
 .feature-load-state {
   display: grid;
   justify-items: start;

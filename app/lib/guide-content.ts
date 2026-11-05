@@ -224,7 +224,7 @@ export const tourSteps: TourStep[] = [
     page: "notes",
     title: "Notes",
     body: "Notes holds research, plans, and reference material. Choose templates for projects, routines, fitness, learning, travel, meetings, or creative worldbuilding. On a phone, Browse opens the note list; Close notes returns to your writing.",
-    tip: "Search and combine folder, tag, type, and bookmark filters in the note list. The count shows how many match; Clear note filters resets the list while keeping your project and current note. Templates stay editable.",
+    tip: "Search and combine folder, tag, type, and bookmark filters in the note list. The count shows how many match; Clear note filters resets the list while keeping your project and current note. A note link may briefly show Opening your workspace while checking for newer notes. Templates stay editable.",
     anchors: [
       '[data-tour="new-note"]',
       ".note-browser-title button",
@@ -457,7 +457,7 @@ export const tourSteps: TourStep[] = [
     id: "people",
     page: "team",
     title: "Accounts and teams",
-    body: "Register with an email address, username, and a ProjectAnvil password. Your personal workspace is private. Create a team workspace, invite registered usernames with an access role, and let them accept. Team projects and their connected content follow workspace roles and project permissions. Account and workspace menus support arrow keys; Escape closes the menu and returns focus.",
+    body: "Register with an email address, username, and a ProjectAnvil password. Your personal workspace is private. Create a team workspace, invite registered usernames with an access role, and let them accept. Team projects and their connected content follow workspace roles and project permissions. Account and workspace menus support arrow keys; Escape closes the menu and returns focus. Menus stay open while changed access is checked; protected work waits for that check.",
     tip: "Account menu → Account security manages verification, passwords, and sessions. Sign in also offers Forgot password? and Verify email. Repeated account attempts are limited. Local recovery links stay on this PC; see the setup guide. Online access needs an approved, verified account. Choose a team workspace before creating shared projects.",
     anchors: [
       '[data-tour="people"]',
