@@ -30,7 +30,8 @@ Gzip is the sum of independently compressed files using Node's default gzip sett
 - **Step 3 — runtime:** reuse one locale-aware collator per Collections sort, constructing none for empty, singleton or numeric-only lists. Use stable native brainstorm sorting without temporary decoration objects. Exact comparison/order checks passed for 5,887 localized pairs, 202 complete sorts and 402 ranking cases. The local 200-row sort median fell from 6.190 ms to 0.902 ms; this is a microbenchmark, not a whole-screen timing claim. Final review changed the array copy from spread to `slice()` to preserve sparse-array holes too; another 1,022 sparse/dense cases and the full check chain passed. Combined source is 96 bytes smaller.
 - **Step 4 — TypeScript:** enabled `noUnusedLocals`, `noUnusedParameters` and `noImplicitReturns` alongside existing strict mode. Added the equivalent explicit final return in the account-policy hook. No broad type/style rewrite was needed; the full check chain passed with the stronger flags.
 - **Step 5 — cleanup:** removed the unused internal `entityTitle` helper after Knip and complete import/reference checks agreed. Reused the identical ID-uniqueness helper through an existing module import; 4,007 equivalence cases passed. This step removes 467 source bytes and passes the full check chain. Existing ignore rules already cover build outputs, caches, logs and private files.
-- **Steps 6–7:** in progress; only verified, behavior-preserving changes will be retained.
+- **Step 6 — assets/loading:** retained the previously losslessly optimized PNGs, referenced SVGs, WOFF2-only math fonts and existing lazy media/renderer loading. No unused asset or safe additional conversion was established. Kept font-display and preload behavior to preserve visible rendering and recovery. The full check chain passed without asset changes.
+- **Step 7:** final verification in progress.
 
 ## Skipped or reverted
 
