@@ -39,6 +39,10 @@ The browser suite runs each engine against a fresh installation with two UI-regi
 
 Formatting checks wait for highlighted markup after theme changes and other rerenders. The code text can appear before its lazy formatter finishes; an instantaneous element count is not a reliable completion check. Security assertions still verify that hostile note content creates no active nodes, unsafe URLs, or executed scripts, including after offline reopening.
 
+First-use readiness waits for the actual guide when its saved preference is absent, dismisses it through **Skip guide**, and checks that the overlay is gone. Returning profiles no longer spend 1.5 seconds waiting for a guide they have already dismissed. A regression deliberately delays the onboarding animation frame beyond that old deadline.
+
+The external-request guard matches only disallowed origins, leaving local requests out of its route chain. This avoids a second continuation when Playwright removes a page fixture while a local request is in flight. A regression checks local fixture removal, blocked external navigation, and allowed blob/data reads. The storage layout check polls the measured document width after viewport changes, retaining the strict desktop/320 px limits and reporting the failing theme and usage case; it does not hide overflow or retry the entire test.
+
 Chromium runs the full five-theme desktop/mobile matrix in detailed workflows. Firefox and WebKit use Focus at both widths in repeated capture loops, retaining every functional/security assertion; the dedicated appearance workflow still checks all five themes. This avoids duplicating the same visual matrix in every engine while retaining coverage of Focus's split surfaces and narrow layouts.
 
 Controllable network-race fixtures temporarily suspend service-worker registration where necessary, then restore it. The session-rotation race holds real network requests, checks that ordinary account refreshes keep them active, then verifies cancellation after a password change and preservation of the current UI. Password changes, independent-session revocation, and saved content use the real server. Offline and update workflows retain the real worker; the WebKit update fixture injects a narrow failed save in the page. This accounts for [Playwright's documented service-worker interception limits](https://playwright.dev/docs/network#missing-network-events-and-service-workers) without skipping account or recovery assertions.
@@ -65,7 +69,15 @@ npm run test:browser -- --headed
 
 Tests create only two accounts per run to stay within the application's normal registration limits. They do not weaken authentication, permission checks, or rate limits.
 
+For repeated workflow verification, start a fresh `npm run test:browser` invocation each time. Playwright's `--repeat-each` reuses the run's database and can exhaust registration limits.
+
 ### Browser verification
+
+The **5 November 2026 CI follow-up** changes browser helpers/assertions and documentation only. The complete code check passed, including **45 native Node tests**, types, zero-warning lint, backend/security regressions, and the production build. The delayed-onboarding regression failed against the old helper and passed with the fix.
+
+Chromium and Firefox each passed **27/27** cases. The full Windows WebKit run passed **21**, then exhausted the media workflow's 180-second deadline as an assertion began; five later workflows did not run. The unchanged media workflow and those five workflows passed together on a fresh installation (**6/6**), including the storage-width and queued-edit update checks. This verifies **81 distinct engine/test cases with a focused WebKit follow-up**, not a completely clean full matrix. Both WebKit reports are retained. No test retry setting, action deadline, security assertion, or application behavior was relaxed.
+
+Firefox initially failed to launch from its existing Windows cache. Its complete run used a temporary copy with matching SHA256 hashes for all 63 runtime files; the original cache was untouched and the copy was removed afterward. Verification used an isolated source copy because the running local app held its build output open; application and test fingerprints matched the working tree. GitHub's Windows Chromium and Linux Firefox/WebKit jobs still need to run on the published follow-up commit.
 
 On **2026-10-31**, final build **`333981ce96b637fdd8ca`** passed strict types, zero-warning lint, backend/model/security checks, **39 native Node tests**, and the production build. Application sources and verification configuration were fingerprinted before the remaining checks and rechecked afterward.
 

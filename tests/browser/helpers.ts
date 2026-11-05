@@ -27,15 +27,31 @@ export const fixtureId = () => randomUUID().replaceAll("-", "");
 const exitingDocuments = new WeakSet<Page>();
 const networkPolicies = new WeakMap<
   BrowserContext,
-  { handler: (route: Route) => Promise<void>; suspended: boolean }
+  {
+    pattern: RegExp;
+    handler: (route: Route) => Promise<void>;
+    suspended: boolean;
+  }
 >();
+
+/** Block external traffic without intercepting the app's own worker requests. */
+export async function restrictToLocalOrigin(
+  context: BrowserContext,
+  baseURL: string,
+) {
+  const origin = new URL(baseURL).origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^(?!${origin}(?:/|$)|blob:|data:)`, "i");
+  const handler = (route: Route) => route.abort("blockedbyclient");
+  networkPolicies.set(context, { pattern, handler, suspended: false });
+  await context.route(pattern, handler);
+}
 
 /** Keep native offline networking without Firefox's interception/navigation race. */
 export async function setActorOffline(actor: BrowserAccount, offline: boolean) {
   const { context } = actor;
   const policy = networkPolicies.get(context);
   if (!offline && policy?.suspended) {
-    await context.route("**/*", policy.handler);
+    await context.route(policy.pattern, policy.handler);
     policy.suspended = false;
   }
   await context.setOffline(offline);
@@ -48,7 +64,7 @@ export async function setActorOffline(actor: BrowserAccount, offline: boolean) {
     // Firefox rejects even worker-generated offline navigations while a route
     // interceptor is installed. Native offline mode already blocks all network
     // traffic, so suspend only our external-request guard until reconnection.
-    await context.unroute("**/*", policy.handler);
+    await context.unroute(policy.pattern, policy.handler);
     policy.suspended = true;
   }
   if (offline)
@@ -126,14 +142,9 @@ export async function registerThroughUi(
       else pageErrors.push(error.message);
     }),
   );
-  const guard = (route: Route) => {
-    const url = new URL(route.request().url());
-    return url.origin === origin || ["blob:", "data:"].includes(url.protocol)
-      ? route.continue()
-      : route.abort("blockedbyclient");
-  };
-  networkPolicies.set(context, { handler: guard, suspended: false });
-  await context.route("**/*", guard);
+  // Removing a page route can already continue a pending same-origin request.
+  // Keep the external guard out of that route chain instead of handling it twice.
+  await restrictToLocalOrigin(context, baseURL);
   const page = await context.newPage();
   const username = `browser_${label}_${fixtureId().slice(0, 10)}`;
   const password = `Fixture-${randomBytes(18).toString("base64url")}!`;
@@ -180,10 +191,12 @@ export async function registerThroughUi(
 
 export async function dismissGuide(page: Page) {
   const guide = page.getByTestId("guided-tour");
-  if (await guide.isVisible())
+  if (await guide.isVisible()) {
     await guide
       .getByRole("button", { name: "Skip guide", exact: true })
       .click();
+    await expect(guide).toBeHidden();
+  }
 }
 
 export async function appReady(page: Page) {
@@ -192,11 +205,14 @@ export async function appReady(page: Page) {
       name: /^(Sign in or create account|Account: )/,
     }),
   ).toBeVisible({ timeout: 30_000 });
-  // First-use onboarding is a real UI workflow, rather than a storage override.
-  await page
-    .getByTestId("guided-tour")
-    .waitFor({ state: "visible", timeout: 1500 })
-    .catch(() => undefined);
+  // The account button can render before onboarding's first animation frame.
+  // A fresh profile must finish the real guide; returning profiles need no wait.
+  if (
+    !(await page.evaluate(() => localStorage.getItem("projectanvil-tour-v1")))
+  )
+    await expect(page.getByTestId("guided-tour")).toBeVisible({
+      timeout: 30_000,
+    });
   await dismissGuide(page);
 }
 

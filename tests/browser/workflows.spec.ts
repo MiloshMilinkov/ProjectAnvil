@@ -4033,11 +4033,17 @@ test.describe("Separate accounts and recoverable everyday work", () => {
                   panel.getByText(/^Attachment storage is (nearly )?full\./),
                 ).toHaveCount(0);
             }
-            expect(
-              await owner.page.evaluate(
-                () => document.documentElement.scrollWidth <= innerWidth,
-              ),
-            ).toBeTruthy();
+            // WebKit may report the previous layout just after resizing. Keep
+            // the strict width limit and wait for the responsive layout to settle.
+            await expect
+              .poll(
+                () =>
+                  owner.page.evaluate(
+                    () => document.documentElement.scrollWidth,
+                  ),
+                { message: `Storage must fit ${width}px in ${theme} (${next}).` },
+              )
+              .toBeLessThanOrEqual(width);
             if (
               next === "full" ||
               (theme === "Focus" && next === "unavailable")
