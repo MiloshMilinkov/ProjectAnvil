@@ -32,6 +32,18 @@ You can keep making local commits without publishing or connecting to GitHub. If
 
 GitHub Actions audits the full dependency tree for high/critical findings, validates source changes, and runs separate two-account Chromium, Firefox, and WebKit suites against disposable local data. Reviewed moderate tooling findings remain visible; see [Dependency security](docs/DEPENDENCY_SECURITY.md). Each engine has its own installation and diagnostic reports. CI retries a failed browser workflow once in a fresh worker; a pass on retry is reported as flaky, and two failures fail the run. A watchdog stops a stalled test worker and names its last step, and each engine has a 35-minute hard deadline, so a hang is reported as a failure rather than a cancelled job. Failed or cancelled runs retain reports for seven days, including the structured test summary, screenshots/traces, and a bounded server-log excerpt with sensitive lines and credentials removed. GitHub also annotates individual test failures. These checks do not host the app. See [Testing](docs/TESTING.md) for browser prerequisites, local engine selection, and optional performance measurements.
 
+## Repository license and protections
+
+The repository is public for viewing only and is not open source; see [LICENSE](LICENSE). Report security problems privately as described in [SECURITY.md](SECURITY.md).
+
+GitHub settings in place:
+
+- **Protect main** ruleset: `main` cannot be force-pushed or deleted. Normal pushes and pull requests are unaffected. Because history on `main` can't be rewritten, never commit secrets: removing them later requires rotating them.
+- **Secret scanning with push protection** blocks pushes that contain recognized keys or tokens.
+- **Dependabot alerts** report vulnerable dependencies. Dependabot does not open pull requests automatically.
+- **Private vulnerability reporting** is the channel SECURITY.md links to.
+- Wiki and Projects are turned off; Issues stay on.
+
 ## Keep app data backed up separately
 
 Git tracks the app code and setup files. These local files are excluded:
