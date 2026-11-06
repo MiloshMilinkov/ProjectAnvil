@@ -20,7 +20,15 @@ import {
   startDisposableServer,
   ownedProcessStopper,
   runNode,
+  killOwnedProcessTree,
+  DEADLINE_EXIT_CODE,
 } from "../scripts/test-runtime.mjs";
+import {
+  readWorkerLease,
+  releaseWorkerLease,
+  writeWorkerLease,
+} from "../scripts/test-worker-lease.mjs";
+import { browserRunDeadline } from "../scripts/run-browser-tests.mjs";
 
 test("a disposable server guardian stops its child when the worker IPC channel disappears", {
   timeout: 15_000,
@@ -360,6 +368,121 @@ test("cancellation is installed before builds/startup and prevents child creatio
   cancellation.dispose();
   assert.equal(events.listenerCount("SIGINT"), 0);
   assert.equal(events.listenerCount("SIGTERM"), 0);
+});
+
+test("a command past its hard deadline is stopped and reported as 124", {
+  timeout: 15_000,
+}, async () => {
+  let reported = 0;
+  const started = Date.now();
+  const status = await runNode("--eval", ["setInterval(() => {}, 1000)"], {
+    stdio: "ignore",
+    deadline: 300,
+    onDeadline: () => reported++,
+  });
+  assert.equal(status, DEADLINE_EXIT_CODE);
+  assert.equal(reported, 1);
+  assert(Date.now() - started < 10_000, "The deadline must stop the command.");
+  // An outer cancellation keeps its own status rather than a deadline.
+  const controller = new AbortController();
+  controller.abort();
+  assert.equal(
+    await runNode("must-never-be-started.mjs", [], {
+      signal: controller.signal,
+      deadline: 60_000,
+    }),
+    130,
+  );
+});
+
+test("browser run deadlines default to 45 minutes and reject invalid values", () => {
+  assert.equal(browserRunDeadline({}), 45 * 60_000);
+  assert.equal(
+    browserRunDeadline({ PROJECTANVIL_BROWSER_DEADLINE_MINUTES: "35" }),
+    35 * 60_000,
+  );
+  assert.throws(
+    () => browserRunDeadline({ PROJECTANVIL_BROWSER_DEADLINE_MINUTES: "-1" }),
+    /positive number/,
+  );
+});
+
+test("the stall watchdog stops only a still-owned worker tree", () => {
+  const listing = { stdout: ["  10   1", "  20  10", "  30  20", "  40   1", ""].join("\n") };
+  const killed = [];
+  const originalKill = process.kill;
+  process.kill = (pid, signal) => {
+    killed.push([pid, signal]);
+    return true;
+  };
+  try {
+    const run = () => listing;
+    assert.equal(
+      killOwnedProcessTree(10, { expectedParent: 1, platform: "linux", run }),
+      true,
+    );
+    assert.deepEqual(killed, [[10, "SIGKILL"], [20, "SIGKILL"], [30, "SIGKILL"]]);
+    killed.length = 0;
+    // A reused ID under another parent is never stopped.
+    assert.equal(
+      killOwnedProcessTree(20, { expectedParent: 1, platform: "linux", run }),
+      false,
+    );
+    const windows = [];
+    const windowsRun = (command) => {
+      windows.push(command);
+      return command === "powershell.exe" ? { stdout: "77\r\n" } : { status: 0 };
+    };
+    assert.equal(
+      killOwnedProcessTree(10, {
+        expectedParent: 1,
+        platform: "win32",
+        run: windowsRun,
+      }),
+      false,
+    );
+    assert.deepEqual(windows, ["powershell.exe"]);
+    assert.equal(
+      killOwnedProcessTree(10, {
+        expectedParent: 77,
+        platform: "win32",
+        run: windowsRun,
+      }),
+      true,
+    );
+    assert.deepEqual(windows, ["powershell.exe", "powershell.exe", "taskkill"]);
+  } finally {
+    process.kill = originalKill;
+  }
+  assert.equal(killed.length, 0);
+  assert.throws(() => killOwnedProcessTree(process.pid), /unowned/);
+  assert.throws(() => killOwnedProcessTree(0), /unowned/);
+});
+
+test("worker leases are honoured only for the same run and runner", async (t) => {
+  const parent = path.join(projectRoot, "work", "qa");
+  await fs.mkdir(parent, { recursive: true });
+  const directory = await fs.mkdtemp(path.join(parent, "lease-test-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const previous = process.env.PROJECTANVIL_TEST_MANIFEST;
+  t.after(() => {
+    if (previous === undefined) delete process.env.PROJECTANVIL_TEST_MANIFEST;
+    else process.env.PROJECTANVIL_TEST_MANIFEST = previous;
+  });
+  process.env.PROJECTANVIL_TEST_MANIFEST = "run-a";
+  const release = writeWorkerLease(3, { directory, pid: 4321, ppid: 99 });
+  assert.equal(readWorkerLease(3, { directory, runnerPid: 99 }), 4321);
+  assert.equal(readWorkerLease(3, { directory, runnerPid: 100 }), undefined);
+  assert.equal(readWorkerLease(4, { directory, runnerPid: 99 }), undefined);
+  process.env.PROJECTANVIL_TEST_MANIFEST = "run-b";
+  assert.equal(readWorkerLease(3, { directory, runnerPid: 99 }), undefined);
+  process.env.PROJECTANVIL_TEST_MANIFEST = "run-a";
+  release();
+  assert.equal(readWorkerLease(3, { directory, runnerPid: 99 }), undefined);
+  writeWorkerLease(5, { directory, pid: 99, ppid: 99 });
+  assert.equal(readWorkerLease(5, { directory, runnerPid: 99 }), undefined);
+  releaseWorkerLease(5, { directory });
+  assert.throws(() => releaseWorkerLease(-1, { directory }), /Invalid worker/);
 });
 
 test("failed tree termination stays retryable; successful cleanup is idempotent", async () => {

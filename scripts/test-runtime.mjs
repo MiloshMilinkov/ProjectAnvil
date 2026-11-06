@@ -104,8 +104,90 @@ export function ownedProcessStopper(
   };
 }
 
+/**
+ * Immediately ends `pid` and every descendant (browsers, server guardians).
+ * Used only for processes this run registered itself; never select by name.
+ * Returns false, stopping nothing, unless `pid` is still `expectedParent`'s child.
+ */
+export function killOwnedProcessTree(
+  pid,
+  {
+    expectedParent = process.pid,
+    platform = process.platform,
+    run = spawnSync,
+  } = {},
+) {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid)
+    throw new Error("Refusing to stop an unowned process.");
+  if (platform === "win32") {
+    // Confirm the current parent so a reused process ID is never stopped.
+    const parent = run(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").ParentProcessId`,
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    if (Number(String(parent.stdout || "").trim()) !== expectedParent)
+      return false;
+    run("taskkill", ["/PID", String(pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return true;
+  }
+  const listing = run("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" });
+  const children = new Map();
+  let parentOfTarget;
+  for (const line of String(listing.stdout || "").split("\n")) {
+    const [child, parent] = line.trim().split(/\s+/).map(Number);
+    if (!child || !parent) continue;
+    if (child === pid) parentOfTarget = parent;
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(child);
+  }
+  if (parentOfTarget !== expectedParent) return false;
+  const tree = [pid];
+  for (let index = 0; index < tree.length; index++)
+    tree.push(...(children.get(tree[index]) || []));
+  // Stop the root first so it cannot start replacements, then descendants.
+  for (const target of tree) {
+    try {
+      process.kill(target, "SIGKILL");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  }
+  return true;
+}
+
+/** Exit status reported when a command exceeds its hard deadline. */
+export const DEADLINE_EXIT_CODE = 124;
+
+/**
+ * Runs an owned Node command. `deadline` (milliseconds) is a hard backstop:
+ * the whole owned tree is stopped and 124 is returned, so a wedged browser or
+ * worker becomes a reported failure instead of an unbounded CI hang.
+ */
 export async function runNode(script, args = [], options = {}) {
-  const { signal, ...spawnOptions } = options;
+  const { signal: outerSignal, deadline, onDeadline, ...spawnOptions } = options;
+  const expiry = deadline ? AbortSignal.timeout(deadline) : undefined;
+  const signal =
+    outerSignal && expiry
+      ? AbortSignal.any([outerSignal, expiry])
+      : outerSignal || expiry;
+  const status = await runOwnedNode(script, args, signal, spawnOptions);
+  if (expiry?.aborted && !outerSignal?.aborted) {
+    onDeadline?.();
+    return DEADLINE_EXIT_CODE;
+  }
+  return status;
+}
+
+async function runOwnedNode(script, args, signal, spawnOptions) {
   if (signal?.aborted) return 130;
   const child = spawn(process.execPath, [script, ...args], {
     stdio: "inherit",

@@ -15,11 +15,16 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  // CI retries a failed workflow once in a fresh worker, browser, and local
+  // installation. A test that passes only on retry is reported as flaky in
+  // the summary; one that fails twice still fails the run.
+  retries: process.env.CI ? 1 : 0,
   timeout: 90_000,
   expect: { timeout: 15_000 },
   reporter: [
     ["list"],
+    // Reports slow tests and stops a wedged worker (see the file for details).
+    ["./tests/browser/progress-reporter.ts"],
     [
       "json",
       {

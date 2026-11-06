@@ -13,6 +13,22 @@ import {
 
 const maximumLogBytes = 64 * 1024;
 
+/**
+ * Hard backstop per browser engine. The runner's stall watchdog normally
+ * turns a wedged test into a failure within minutes; this deadline covers a
+ * runner that cannot recover, so CI reports a failure instead of a cancellation.
+ */
+export function browserRunDeadline(environment = process.env) {
+  const minutes = Number(
+    environment.PROJECTANVIL_BROWSER_DEADLINE_MINUTES || 45,
+  );
+  if (!Number.isFinite(minutes) || minutes <= 0)
+    throw new Error(
+      "PROJECTANVIL_BROWSER_DEADLINE_MINUTES must be a positive number.",
+    );
+  return minutes * 60_000;
+}
+
 /** Diagnostic artifacts contain only a bounded, sanitized tail of this run. */
 export function sanitizeBrowserServerLog(log, secrets = []) {
   const sanitized = stripVTControlCharacters(log)
@@ -155,6 +171,7 @@ async function runBrowserTests() {
         if (!selected.includes(name)) selected.push(name);
       } else forwarded.push(argument);
     }
+    const deadline = browserRunDeadline();
     await ensureTestBuild({ signal: cancellation.signal });
     // Separate databases and account rate limits keep engine runs independent.
     for (const engine of selected.length
@@ -186,6 +203,11 @@ async function runBrowserTests() {
               PROJECTANVIL_TEST_BROWSER: engine,
             },
             signal: cancellation.signal,
+            deadline,
+            onDeadline: () =>
+              console.error(
+                `${engine} checks exceeded their ${deadline / 60_000}-minute deadline and were stopped. See the [progress] and [watchdog] lines above for the last running test.`,
+              ),
           },
         );
         failed = status !== 0;

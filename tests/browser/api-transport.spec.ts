@@ -1,7 +1,8 @@
 import { once } from "node:events";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { test, expect, type BrowserContext } from "@playwright/test";
+import type { BrowserContext } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { api, type BrowserAccount } from "./helpers";
 
 test("fixture reads recover from one connection reset without replaying writes or HTTP failures", async ({
