@@ -2,6 +2,8 @@
   "name": "projectanvil",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
+  "author": "Miloš Milinkov",
   "engines": {
     "node": ">=22.13.0"
   },

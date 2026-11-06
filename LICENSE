@@ -1,0 +1,81 @@
+ProjectAnvil — Proprietary License (All Rights Reserved)
+
+Copyright (c) 2026 Miloš Milinkov. All rights reserved.
+
+1. Viewing only
+
+This repository is public so that its source code can be viewed. Making it
+public does not grant any license. No rights are granted, whether expressly,
+by implication, by estoppel or otherwise, except the limited permissions
+stated in sections 1 and 4.
+
+You may view the source code through GitHub's website. GitHub's Terms of
+Service may also let you fork the repository on GitHub. A fork grants no
+additional rights and may not be used in any way this license prohibits.
+
+2. What you may not do without prior written permission
+
+Unless Miloš Milinkov has given you prior written permission, you may not:
+
+(a) copy, reproduce, modify, translate, adapt or merge the code or any part
+    of it, or create derivative works from it;
+(b) distribute, publish, sublicense, sell, rent or otherwise make the code
+    or a derivative work available to anyone;
+(c) install, run, deploy, host or operate the software, or offer it or a
+    substantially similar product to others, free or paid, including as a
+    hosted or online service;
+(d) reuse the interface design, themes, texts, guides, documentation,
+    templates, the "ProjectAnvil" name or the anvil logo to build or promote
+    a similar product or service;
+(e) use the code, documentation or any other content of this repository to
+    train, fine-tune or evaluate machine-learning or artificial-intelligence
+    models, or to build datasets for them;
+(f) remove, alter or obscure any copyright, license or other proprietary
+    notice.
+
+3. Third-party components
+
+Files that carry their own license notice remain under that license. In
+particular, build/sites-vite-plugin.ts is covered by the MIT license in
+build/sites-vite-plugin.LICENSE. Packages installed through npm belong to
+their respective owners, are licensed by them, and are not part of this
+repository. Nothing in this license limits rights you have under those
+licenses.
+
+4. Security research
+
+You may run an unmodified local copy solely to identify and privately
+report a security vulnerability, as described in SECURITY.md. This does not
+permit any other use, and you must delete that copy once your report is
+complete.
+
+5. Contributions
+
+Opening an issue or a pull request does not give you any license. By
+submitting a contribution, you agree that Miloš Milinkov may use, modify and
+distribute it as part of ProjectAnvil under this license.
+
+6. No warranty and no liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. TO THE EXTENT
+PERMITTED BY LAW, THE COPYRIGHT HOLDER IS NOT LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR ITS
+USE.
+
+7. Breach
+
+Any use that breaches this license is unauthorized and may infringe
+copyright. Copies made in breach of this license must be deleted on
+request.
+
+8. Governing law
+
+This license is governed by the laws of the Republic of Serbia, without
+regard to its conflict-of-law rules.
+
+9. Requesting permission
+
+To ask for permission, contact Miloš Milinkov through
+https://github.com/MiloshMilinkov.

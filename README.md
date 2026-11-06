@@ -16,6 +16,9 @@
   <a href="docs/LOCAL_SETUP.md">Setup &amp; backups</a>
 </p>
 
+> [!IMPORTANT]
+> **View only — not open source.** This repository is public so the code can be read. No license is granted: copying, modifying, redistributing, hosting, or using it to train AI models requires written permission. See [License](#license).
+
 ---
 
 ## Connected work
@@ -135,3 +138,11 @@ The [capacity review](docs/PERFORMANCE.md) records measured behavior and remaini
 Note browsing supports combined filters, matching counts, and **Clear note filters** without leaving the current project or note. Note details open on demand, giving writing more space. Workspace settings groups everyday controls first, with Data & offline and People & access available when needed. Feature modules separate tasks, dashboard, settings, notes, graph, and canvas responsibilities; unused starter components and packages are removed.
 
 Optional screens and technical formatting load when used. Interrupted screen downloads offer **Retry opening** without leaving the workspace; **Reload app** checks unfinished work before restarting. Unavailable formatting keeps readable source. Collections reuse search/property indexes and save property edits with revision checks. The app retains math, syntax colors, diagrams, and its existing planning tools while removing unused connector scaffolding and a redundant framework installation. Use `npm run size:report` to review the [size measurements](docs/PERFORMANCE.md#size-and-maintenance-review).
+
+## License
+
+Copyright © 2026 Miloš Milinkov. All rights reserved.
+
+ProjectAnvil is proprietary. The source is published for viewing only, and no license is granted to copy, modify, distribute, run, host, or reuse it, including its name, logo, design, and texts, or to use it for AI training, without written permission. See [LICENSE](LICENSE) for the full terms. Third-party files keep their own licenses; for example, `build/sites-vite-plugin.ts` is MIT-licensed.
+
+Report security problems privately as described in [SECURITY.md](SECURITY.md).
