@@ -20,6 +20,7 @@ import {
   isNativeDocumentExitError,
   navigate,
   openNote,
+  pressTourControl,
   selectWorkspace,
   setActorOffline,
   upsert,
@@ -1643,13 +1644,9 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     await trigger.click();
     const guide = owner.page.getByTestId("guided-tour");
     await expect(guide).toContainText(/Step 1 of \d+/);
-    await guide
-      .getByRole("button", { name: "Next", exact: true })
-      .press("Enter");
+    await pressTourControl(guide, "Next");
     await expect(guide).toContainText(/Step 2 of \d+/);
-    await guide
-      .getByRole("button", { name: "Previous", exact: true })
-      .press("Enter");
+    await pressTourControl(guide, "Previous");
     await expect(guide).toContainText(/Step 1 of \d+/);
     await owner.page.keyboard.press("Escape");
     await expect(guide).toBeHidden();
@@ -2218,14 +2215,10 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     const guide = owner.page.getByTestId("guided-tour");
     await expect(guide).toContainText("Step 1 of 8");
     for (let step = 2; step <= 8; step++) {
-      await guide
-        .getByRole("button", { name: "Next", exact: true })
-        .press("Enter");
+      await pressTourControl(guide, "Next");
       await expect(guide).toContainText(`Step ${step} of 8`);
     }
-    await guide
-      .getByRole("button", { name: "Finish", exact: true })
-      .press("Enter");
+    await pressTourControl(guide, "Finish");
     await expect(guide).toBeHidden();
     await expect(
       main.getByRole("heading", { name: "Work rooms", exact: true }),
@@ -2317,9 +2310,7 @@ test.describe("Separate accounts and recoverable everyday work", () => {
     ).toBeVisible();
     await expect(scopedProject).toHaveAttribute("aria-pressed", "true");
     await trigger.click();
-    await guide
-      .getByRole("button", { name: "Next", exact: true })
-      .press("Enter");
+    await pressTourControl(guide, "Next");
     await expect(guide).toContainText("Step 2 of 8");
     await owner.page.keyboard.press("Escape");
     await expect(guide).toBeHidden();

@@ -3,6 +3,7 @@ import {
   expect,
   type Browser,
   type BrowserContext,
+  type Locator,
   type Page,
   type Route,
 } from "@playwright/test";
@@ -24,6 +25,7 @@ export interface BrowserAccount {
 }
 
 export const fixtureId = () => randomUUID().replaceAll("-", "");
+const maximumRecordedErrors = 200;
 const exitingDocuments = new WeakSet<Page>();
 const networkPolicies = new WeakMap<
   BrowserContext,
@@ -126,6 +128,13 @@ export async function registerThroughUi(
   const origin = new URL(baseURL).origin;
   const pageErrors: string[] = [];
   const nativeExitErrors: string[] = [];
+  // Any recorded error already fails the test. Bound the copies kept so a
+  // runaway error loop cannot exhaust the worker's memory first.
+  const record = (list: string[], entry: string) => {
+    if (list.length < maximumRecordedErrors) list.push(entry);
+    else if (list.length === maximumRecordedErrors)
+      list.push("…further errors omitted.");
+  };
   context.on("page", (page) =>
     page.on("pageerror", (error) => {
       // Windows WebKit reports a caught pagehide fetch as a page error. Keep
@@ -138,8 +147,8 @@ export async function registerThroughUi(
           origin,
         )
       )
-        nativeExitErrors.push(error.stack!);
-      else pageErrors.push(error.message);
+        record(nativeExitErrors, error.stack!);
+      else record(pageErrors, error.message);
     }),
   );
   // Removing a page route can already continue a pending same-origin request.
@@ -455,4 +464,14 @@ export async function createTaskUi(page: Page, title: string) {
     .getByRole("button", { name: "Create task", exact: true })
     .click();
   await expect(dialog).toBeHidden();
+}
+
+/**
+ * Presses a guided-tour control from the keyboard. Each step moves focus to
+ * its heading on the next animation frame; waiting for that first, as a
+ * keyboard user would, keeps the move from stealing the key press.
+ */
+export async function pressTourControl(guide: Locator, name: string) {
+  await expect(guide.locator("#tour-title")).toBeFocused();
+  await guide.getByRole("button", { name, exact: true }).press("Enter");
 }

@@ -13,8 +13,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
@@ -27,7 +27,11 @@ jobs:
     name: Browser regression checks (${{ matrix.engine }})
     needs: validate
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    # The launcher stops a run at its own deadline (below), leaving time to
+    # upload diagnostics before the job limit.
+    timeout-minutes: 45
+    env:
+      PROJECTANVIL_BROWSER_DEADLINE_MINUTES: "35"
     strategy:
       fail-fast: false
       matrix:
@@ -39,16 +43,16 @@ jobs:
           - engine: webkit
             os: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
       - run: npm run install:ci
       - run: node node_modules/@playwright/test/cli.js install --with-deps ${{ matrix.engine }}
       - run: npm run test:browser -- --project=${{ matrix.engine }}
-      - uses: actions/upload-artifact@v4
-        if: failure()
+      - uses: actions/upload-artifact@v5
+        if: ${{ failure() || cancelled() }}
         with:
           name: browser-test-failures-${{ matrix.engine }}
           path: outputs/browser/${{ matrix.engine }}/

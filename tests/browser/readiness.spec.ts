@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { appReady, restrictToLocalOrigin } from "./helpers";
 
 test("readiness waits for delayed first-use onboarding and dismisses it through the UI", async ({
