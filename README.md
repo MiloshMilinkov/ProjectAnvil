@@ -16,6 +16,8 @@
   <a href="docs/LOCAL_SETUP.md">Setup &amp; backups</a>
 </p>
 
+![ProjectAnvil workspace](docs/screenshot.jpg)
+
 > [!IMPORTANT]
 > **View only — not open source.** This repository is public so the code can be read. No license is granted: copying, modifying, redistributing, hosting, or using it to train AI models requires written permission. See [License](#license).
 
